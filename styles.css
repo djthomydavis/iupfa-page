@@ -363,7 +363,7 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   font-weight: 800;
 }
 .content { padding: 28px; display: grid; gap: 28px; }
-.view-section { display: grid; gap: 28px; }
+.view-section, .admin-view-section { display: grid; gap: 28px; }
 .hero {
   display: flex;
   justify-content: space-between;

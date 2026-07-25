@@ -19,6 +19,7 @@ create table if not exists public.profiles (
 alter table public.profiles add column if not exists email_verified boolean not null default false;
 alter table public.profiles add column if not exists verification_code text;
 alter table public.profiles add column if not exists verification_expires timestamptz;
+alter table public.profiles add column if not exists banned boolean not null default false;
 
 alter table public.profiles enable row level security;
 
@@ -39,6 +40,14 @@ create policy "Users can insert their own profile"
   on public.profiles for insert
   to authenticated
   with check (auth.uid() = id);
+
+-- Permite que un admin cambie el rol de cualquier usuario desde el panel de Usuarios
+drop policy if exists "Admins can update any profile" on public.profiles;
+create policy "Admins can update any profile"
+  on public.profiles for update
+  to authenticated
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 -- Crea automáticamente el perfil cuando alguien se registra
 create or replace function public.handle_new_user()

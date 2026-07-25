@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body data-page="admin">
   <section id="adminScreen" class="portal-shell admin-shell hidden">
@@ -25,7 +26,9 @@
 
       <nav class="sidebar-nav">
         <a class="nav-link" href="index.html">Volver al portal</a>
-        <button class="nav-link active">Panel Admin</button>
+        <button class="nav-link active" data-admin-view="panel">Panel</button>
+        <button class="nav-link" data-admin-view="materias">Materias</button>
+        <button class="nav-link" data-admin-view="usuarios">Usuarios</button>
       </nav>
     </aside>
 
@@ -52,120 +55,93 @@
       </header>
 
       <main class="content">
-        <section class="hero card">
-          <div>
-            <span class="pill blue">Admin</span>
-            <h2>Control central del portal.</h2>
-            <p>Administra publicaciones, fechas académicas y revisa el estado general del contenido visible para los alumnos.</p>
+        <section id="adminPanelView" class="admin-view-section">
+          <section class="hero card">
+            <div>
+              <span class="pill blue">Admin</span>
+              <h2>Control central del portal.</h2>
+              <p>Revisá el estado general del contenido visible para los alumnos.</p>
+            </div>
+          </section>
+
+          <div class="stats-grid">
+            <article class="card stat-card"><span>Eventos cargados</span><strong id="adminEventsCount">0</strong></article>
+            <article class="card stat-card"><span>Posts en foro</span><strong id="adminPostsCount">0</strong></article>
+            <article class="card stat-card"><span>Materias activas</span><strong id="adminSubjectsCount">0</strong></article>
           </div>
+
+          <section class="card"><div class="section-head"><h3>Calendario actual</h3></div><div id="adminCalendarList" class="stack"></div></section>
+
+          <section class="card">
+            <div class="section-head"><h3>Datos locales (calendario, foro, contenido de materias)</h3></div>
+            <p class="form-hint">Las materias y el progreso de los alumnos ya viven en Supabase y se comparten entre dominios. El calendario, el foro general y las unidades/opiniones/encuestas de cada materia todavía se guardan en el navegador — usá esto para pasarlos de un dominio a otro (por ejemplo, de tu prueba local al sitio ya publicado).</p>
+            <div id="dataTransferNotice" class="notice"></div>
+            <div class="stack-row">
+              <button type="button" id="exportLocalDataBtn" class="ghost-btn">⬇ Exportar datos locales</button>
+              <label class="ghost-btn file-label-btn">
+                ⬆ Importar datos locales
+                <input type="file" id="importLocalDataInput" accept="application/json" class="hidden" />
+              </label>
+            </div>
+          </section>
         </section>
 
-        <div class="stats-grid">
-          <article class="card stat-card"><span>Eventos cargados</span><strong id="adminEventsCount">0</strong></article>
-          <article class="card stat-card"><span>Posts en foro</span><strong id="adminPostsCount">0</strong></article>
-          <article class="card stat-card"><span>Materias activas</span><strong id="adminSubjectsCount">0</strong></article>
-        </div>
-
-        <div class="split-grid">
+        <section id="adminMateriasView" class="admin-view-section hidden">
           <section class="card">
-            <div class="section-head"><h3>Nuevo evento académico</h3></div>
-            <form id="eventForm" class="stack">
-              <input id="eventTitle" type="text" placeholder="Título del evento" required />
+            <div class="section-head"><h3 id="subjectFormTitle">Agregar materia</h3></div>
+            <form id="subjectForm" class="stack">
+              <div id="subjectFormNotice" class="notice"></div>
+              <input type="hidden" id="subjectEditId" value="" />
               <div class="two-cols">
-                <input id="eventDate" type="date" required />
-                <select id="eventType">
-                  <option>Académico</option>
-                  <option>Examen</option>
-                  <option>Inscripción</option>
-                  <option>Feriado</option>
-                  <option>Entrega</option>
-                  <option>Cuatrimestre</option>
+                <input id="subjectCode" type="number" min="1" placeholder="Código (1-39)" required />
+                <input id="subjectYearInput" type="number" min="1" placeholder="Año" required />
+              </div>
+              <div class="two-cols">
+                <select id="subjectSemester">
+                  <option value="1">1° cuatrimestre</option>
+                  <option value="2">2° cuatrimestre</option>
+                </select>
+                <input id="subjectHours" type="text" placeholder="Carga horaria (ej. 64 hs)" required />
+              </div>
+              <input id="subjectName" type="text" placeholder="Nombre de la materia" required />
+              <div class="two-cols">
+                <select id="subjectModality">
+                  <option>Presencial</option>
+                  <option>A Distancia</option>
+                  <option>Mixta</option>
+                </select>
+                <input id="subjectCorrelatives" type="text" placeholder="Correlativas (códigos separados por coma, ej. 1, 2)" />
+              </div>
+              <div class="two-cols">
+                <select id="subjectLibre">
+                  <option value="No libre">No libre</option>
+                  <option value="Libre">Libre</option>
+                </select>
+                <select id="subjectExamFinal">
+                  <option value="Con examen final">Con examen final</option>
+                  <option value="Sin examen final">Sin examen final</option>
                 </select>
               </div>
-              <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
-              <label class="field-label">Fecha fin<input id="eventEndDate" type="date" /></label>
-              <div class="two-cols">
-                <label class="field-label">Hora inicio<input id="eventStartTime" type="time" /></label>
-                <label class="field-label">Hora fin<input id="eventEndTime" type="time" /></label>
+              <p class="form-hint">El estado (Cursable / No cursable) se calcula automáticamente según las correlativas. El resto de los estados (Cursando, Aprobada, A rendir final) los define el alumno desde su planificación.</p>
+              <div class="stack-row">
+                <button type="submit" id="subjectFormSubmit">Agregar materia</button>
+                <button type="button" id="subjectFormCancel" class="ghost-btn hidden">Cancelar edición</button>
               </div>
-              <button type="submit">Guardar evento</button>
             </form>
           </section>
 
           <section class="card">
-            <div class="section-head"><h3>Nueva publicación institucional</h3></div>
-            <form id="adminPostForm" class="stack">
-              <input id="adminPostTitle" type="text" placeholder="Título de la publicación" required />
-              <textarea id="adminPostContent" placeholder="Contenido del anuncio" required></textarea>
-              <button type="submit">Publicar anuncio</button>
-            </form>
+            <div class="section-head"><h3>Materias cargadas</h3></div>
+            <div id="adminSubjectsTable"></div>
           </section>
-        </div>
-
-        <div class="split-grid">
-          <section class="card"><div class="section-head"><h3>Calendario actual</h3></div><div id="adminCalendarList" class="stack"></div></section>
-          <section class="card"><div class="section-head"><h3>Publicaciones actuales</h3></div><div id="adminForumList" class="stack"></div></section>
-        </div>
-
-        <section class="card">
-          <div class="section-head"><h3 id="subjectFormTitle">Agregar materia</h3></div>
-          <form id="subjectForm" class="stack">
-            <div id="subjectFormNotice" class="notice"></div>
-            <input type="hidden" id="subjectEditId" value="" />
-            <div class="two-cols">
-              <input id="subjectCode" type="number" min="1" placeholder="Código (1-39)" required />
-              <input id="subjectYearInput" type="number" min="1" placeholder="Año" required />
-            </div>
-            <div class="two-cols">
-              <select id="subjectSemester">
-                <option value="1">1° cuatrimestre</option>
-                <option value="2">2° cuatrimestre</option>
-              </select>
-              <input id="subjectHours" type="text" placeholder="Carga horaria (ej. 64 hs)" required />
-            </div>
-            <input id="subjectName" type="text" placeholder="Nombre de la materia" required />
-            <div class="two-cols">
-              <select id="subjectModality">
-                <option>Presencial</option>
-                <option>A Distancia</option>
-                <option>Mixta</option>
-              </select>
-              <input id="subjectCorrelatives" type="text" placeholder="Correlativas (códigos separados por coma, ej. 1, 2)" />
-            </div>
-            <div class="two-cols">
-              <select id="subjectLibre">
-                <option value="No libre">No libre</option>
-                <option value="Libre">Libre</option>
-              </select>
-              <select id="subjectExamFinal">
-                <option value="Con examen final">Con examen final</option>
-                <option value="Sin examen final">Sin examen final</option>
-              </select>
-            </div>
-            <p class="form-hint">El estado (Cursable / No cursable) se calcula automáticamente según las correlativas. El resto de los estados (Cursando, Aprobada, A rendir final) los define el alumno desde su planificación.</p>
-            <div class="stack-row">
-              <button type="submit" id="subjectFormSubmit">Agregar materia</button>
-              <button type="button" id="subjectFormCancel" class="ghost-btn hidden">Cancelar edición</button>
-            </div>
-          </form>
         </section>
 
-        <section class="card">
-          <div class="section-head"><h3>Materias cargadas</h3></div>
-          <div id="adminSubjectsTable"></div>
-        </section>
-
-        <section class="card">
-          <div class="section-head"><h3>Datos locales (calendario, foro, contenido de materias)</h3></div>
-          <p class="form-hint">Las materias y el progreso de los alumnos ya viven en Supabase y se comparten entre dominios. El calendario, el foro general y las unidades/opiniones/encuestas de cada materia todavía se guardan en el navegador — usá esto para pasarlos de un dominio a otro (por ejemplo, de tu prueba local al sitio ya publicado).</p>
-          <div id="dataTransferNotice" class="notice"></div>
-          <div class="stack-row">
-            <button type="button" id="exportLocalDataBtn" class="ghost-btn">⬇ Exportar datos locales</button>
-            <label class="ghost-btn file-label-btn">
-              ⬆ Importar datos locales
-              <input type="file" id="importLocalDataInput" accept="application/json" class="hidden" />
-            </label>
-          </div>
+        <section id="adminUsuariosView" class="admin-view-section hidden">
+          <section class="card">
+            <div class="section-head"><h3>Usuarios registrados</h3></div>
+            <div id="usersNotice" class="notice"></div>
+            <div id="adminUsersTable"></div>
+          </section>
         </section>
       </main>
     </div>

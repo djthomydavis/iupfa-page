@@ -705,7 +705,6 @@ function renderForumViews() {
   const mapper = item => createItemCard(item.title, item.author, item.content);
   renderList('forumPreview', state.data.forum.slice(0, 3), mapper);
   renderForumList();
-  renderList('adminForumList', state.data.forum, mapper);
 }
 
 function renderHomeStats() {
@@ -1351,6 +1350,25 @@ function updateAdminHeader(user) {
   if (subjects) subjects.textContent = state.data.subjects.length;
 }
 
+function setAdminView(view) {
+  const map = { panel: 'adminPanelView', materias: 'adminMateriasView', usuarios: 'adminUsuariosView' };
+
+  Object.values(map).forEach(id => {
+    const section = document.getElementById(id);
+    if (section) section.classList.add('hidden');
+  });
+
+  if (map[view] && document.getElementById(map[view])) {
+    document.getElementById(map[view]).classList.remove('hidden');
+  }
+
+  document.querySelectorAll('.nav-link[data-admin-view]').forEach(link => {
+    link.classList.toggle('active', link.dataset.adminView === view);
+  });
+
+  if (view === 'usuarios') loadAndRenderAdminUsers();
+}
+
 function showAuthForm(mode) {
   const landingScreen = document.getElementById('landingScreen');
   const authScreen = document.getElementById('authScreen');
@@ -1506,9 +1524,12 @@ function attachPortalEvents() {
       if (error) {
         if (notice) {
           notice.className = 'notice show error';
-          notice.textContent = error.message.toLowerCase().includes('confirm')
+          const message = error.message.toLowerCase();
+          notice.textContent = message.includes('confirm')
             ? 'Confirmá tu correo antes de iniciar sesión (revisá tu bandeja de entrada).'
-            : 'Correo o contraseña incorrectos.';
+            : message.includes('banned')
+              ? 'Tu cuenta fue suspendida por un administrador.'
+              : 'Correo o contraseña incorrectos.';
         }
         if (submitBtn) submitBtn.textContent = 'Entrar';
         return;
@@ -2188,6 +2209,173 @@ function renderAdminSubjectsTable() {
   });
 }
 
+async function loadAndRenderAdminUsers() {
+  const target = document.getElementById('adminUsersTable');
+  const notice = document.getElementById('usersNotice');
+  if (!target || !supabaseClient) return;
+
+  target.innerHTML = '<p class="table-empty">Cargando usuarios...</p>';
+
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    target.innerHTML = '';
+    if (notice) {
+      notice.className = 'notice show error';
+      notice.textContent = 'No se pudieron cargar los usuarios: ' + error.message;
+    }
+    return;
+  }
+
+  if (notice) notice.className = 'notice';
+  renderAdminUsersTable(data || []);
+}
+
+async function callAdminUsersFunction(action, userId) {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const token = sessionData && sessionData.session ? sessionData.session.access_token : null;
+  if (!token) return { ok: false, message: 'Sesión inválida.' };
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ action, userId })
+    });
+    const result = await response.json();
+    if (!response.ok) return { ok: false, message: result.error || 'No se pudo completar la acción.' };
+    return { ok: true, ...result };
+  } catch (error) {
+    return { ok: false, message: 'No se pudo contactar la función de administración (¿está desplegada?).' };
+  }
+}
+
+function renderAdminUsersTable(users) {
+  const target = document.getElementById('adminUsersTable');
+  if (!target) return;
+
+  const rows = users.map(profile => {
+    const isSelf = state.currentUser && profile.id === state.currentUser.id;
+    const isAdmin = profile.role === 'admin';
+    const isBanned = !!profile.banned;
+    const toggleLabel = isAdmin ? 'Quitar admin' : 'Hacer admin';
+    const selfAttrs = isSelf ? 'disabled title="No podés aplicarte esta acción a vos mismo"' : '';
+    return `
+      <tr data-user-id="${profile.id}">
+        <td>${profile.name}</td>
+        <td>${profile.email}</td>
+        <td><span class="subject-status-badge ${isAdmin ? 'status-aprobada' : 'status-cursable'}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+        <td>${profile.email_verified ? 'Verificado' : 'Pendiente'}${isBanned ? ' · <span class="subject-status-badge status-no-cursable">Suspendido</span>' : ''}</td>
+        <td class="stack-row">
+          <button type="button" class="ghost-btn small-btn" data-toggle-role="${profile.id}" data-current-role="${profile.role}" ${selfAttrs}>${toggleLabel}</button>
+          <button type="button" class="ghost-btn small-btn" data-toggle-ban="${profile.id}" data-current-banned="${isBanned}" ${selfAttrs}>${isBanned ? 'Desbanear' : 'Banear'}</button>
+          <button type="button" class="ghost-btn small-btn" data-reset-password="${profile.id}" data-email="${profile.email}" data-name="${profile.name}">Cambiar contraseña</button>
+          <button type="button" class="ghost-btn small-btn danger-btn" data-delete-user="${profile.id}" data-name="${profile.name}" ${selfAttrs}>Eliminar</button>
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="5" class="table-empty">Todavía no hay usuarios registrados.</td></tr>';
+
+  target.innerHTML = `
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Correo verificado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  function setNotice(text, isError) {
+    const notice = document.getElementById('usersNotice');
+    if (!notice) return;
+    notice.className = isError ? 'notice show error' : 'notice show';
+    notice.textContent = text;
+  }
+
+  target.querySelectorAll('[data-toggle-role]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const userId = button.dataset.toggleRole;
+      const newRole = button.dataset.currentRole === 'admin' ? 'student' : 'admin';
+      button.disabled = true;
+      const { error } = await supabaseClient.from('profiles').update({ role: newRole }).eq('id', userId);
+      if (error) {
+        setNotice('No se pudo actualizar el rol: ' + error.message, true);
+        button.disabled = false;
+        return;
+      }
+      setNotice('Rol actualizado.', false);
+      loadAndRenderAdminUsers();
+    });
+  });
+
+  target.querySelectorAll('[data-toggle-ban]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const userId = button.dataset.toggleBan;
+      const isBanned = button.dataset.currentBanned === 'true';
+      const action = isBanned ? 'unban' : 'ban';
+      if (!isBanned && !window.confirm('¿Suspender a este usuario? No va a poder iniciar sesión hasta que lo desbanees.')) return;
+      button.disabled = true;
+      const result = await callAdminUsersFunction(action, userId);
+      if (!result.ok) {
+        setNotice(result.message, true);
+        button.disabled = false;
+        return;
+      }
+      setNotice(isBanned ? 'Usuario desbaneado.' : 'Usuario suspendido.', false);
+      loadAndRenderAdminUsers();
+    });
+  });
+
+  target.querySelectorAll('[data-delete-user]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const userId = button.dataset.deleteUser;
+      const name = button.dataset.name;
+      if (!window.confirm(`¿Eliminar definitivamente la cuenta de ${name}? Esta acción no se puede deshacer.`)) return;
+      button.disabled = true;
+      const result = await callAdminUsersFunction('delete', userId);
+      if (!result.ok) {
+        setNotice(result.message, true);
+        button.disabled = false;
+        return;
+      }
+      setNotice('Usuario eliminado.', false);
+      loadAndRenderAdminUsers();
+    });
+  });
+
+  target.querySelectorAll('[data-reset-password]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const userId = button.dataset.resetPassword;
+      const email = button.dataset.email;
+      const name = button.dataset.name;
+      if (!window.confirm(`¿Generar una contraseña nueva para ${name} y enviársela por correo?`)) return;
+      button.disabled = true;
+      const result = await callAdminUsersFunction('reset_password', userId);
+      if (!result.ok) {
+        setNotice(result.message, true);
+        button.disabled = false;
+        return;
+      }
+      const emailResult = await sendVerificationEmail(email, name, result.password);
+      if (!emailResult.ok) {
+        setNotice('Se generó la nueva contraseña pero no se pudo enviar el correo: ' + emailResult.message, true);
+        button.disabled = false;
+        return;
+      }
+      setNotice('Contraseña nueva enviada a ' + email + '.', false);
+      button.disabled = false;
+    });
+  });
+}
+
 function resetSubjectForm() {
   const form = document.getElementById('subjectForm');
   const notice = document.getElementById('subjectFormNotice');
@@ -2253,10 +2441,12 @@ async function deleteSubject(subjectId) {
 function attachAdminEvents() {
   setupSidebarToggle('adminScreen');
   const logoutBtn = document.getElementById('adminLogoutBtn');
-  const eventForm = document.getElementById('eventForm');
-  const postForm = document.getElementById('adminPostForm');
   const subjectForm = document.getElementById('subjectForm');
   const subjectFormCancel = document.getElementById('subjectFormCancel');
+
+  document.querySelectorAll('.nav-link[data-admin-view]').forEach(button => {
+    button.addEventListener('click', () => setAdminView(button.dataset.adminView));
+  });
 
   if (subjectFormCancel) subjectFormCancel.addEventListener('click', resetSubjectForm);
 
@@ -2379,37 +2569,6 @@ function attachAdminEvents() {
     });
   }
 
-  if (eventForm) {
-    eventForm.addEventListener('submit', event => {
-      event.preventDefault();
-      const title = document.getElementById('eventTitle').value.trim();
-      const date = document.getElementById('eventDate').value;
-      const type = document.getElementById('eventType').value;
-      const endDate = document.getElementById('eventEndDate').value;
-      const startTime = document.getElementById('eventStartTime').value;
-      const endTime = document.getElementById('eventEndTime').value;
-      if (!title || !date) return;
-      state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime });
-      savePortalData();
-      eventForm.reset();
-      renderCalendarViews();
-      updateAdminHeader(state.currentUser);
-    });
-  }
-
-  if (postForm) {
-    postForm.addEventListener('submit', event => {
-      event.preventDefault();
-      const title = document.getElementById('adminPostTitle').value.trim();
-      const content = document.getElementById('adminPostContent').value.trim();
-      if (!title || !content) return;
-      state.data.forum.unshift({ id: generateLocalId('post'), title, content, author: 'Administración' });
-      savePortalData();
-      postForm.reset();
-      renderForumViews();
-      updateAdminHeader(state.currentUser);
-    });
-  }
 }
 
 function initPortalPage() {
@@ -2475,6 +2634,7 @@ function initAdminPage() {
   renderAdminSubjectsTable();
   updateAdminHeader(user);
   attachAdminEvents();
+  setAdminView('panel');
 }
 
 document.addEventListener('click', event => {
