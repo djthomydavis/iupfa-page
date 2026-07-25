@@ -20,6 +20,8 @@ alter table public.profiles add column if not exists email_verified boolean not 
 alter table public.profiles add column if not exists verification_code text;
 alter table public.profiles add column if not exists verification_expires timestamptz;
 alter table public.profiles add column if not exists banned boolean not null default false;
+alter table public.profiles add column if not exists password_reset_code text;
+alter table public.profiles add column if not exists password_reset_expires timestamptz;
 
 alter table public.profiles enable row level security;
 

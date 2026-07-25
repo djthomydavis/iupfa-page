@@ -156,7 +156,7 @@ function generateVerificationCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function sendVerificationEmail(email, name, code) {
+async function sendVerificationEmail(email, name, code, validFor) {
   if (typeof window === 'undefined' || !window.emailjs) {
     return { ok: false, message: 'EmailJS no se cargó en la página.' };
   }
@@ -165,7 +165,7 @@ async function sendVerificationEmail(email, name, code) {
       email,
       name,
       passcode: code,
-      time: '15 minutos'
+      time: validFor || '15 minutos'
     });
     return { ok: true };
   } catch (error) {
@@ -187,6 +187,24 @@ async function issueVerificationCode(userId, email, name) {
     return { ok: false, message: 'No se pudo generar el código. Intentá de nuevo.' };
   }
   return sendVerificationEmail(email, name, code);
+}
+
+async function confirmPasswordReset(email, code, newPassword) {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ action: 'confirm_password_reset', email, code, newPassword })
+    });
+    const result = await response.json();
+    if (!response.ok) return { ok: false, message: result.error || 'No se pudo actualizar la contraseña.' };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: 'No se pudo contactar el servidor.' };
+  }
 }
 
 function mapSubjectRow(row) {
@@ -1377,6 +1395,7 @@ function showAuthForm(mode) {
   const verifyForm = document.getElementById('verifyForm');
   const forgotForm = document.getElementById('forgotForm');
   const resetForm = document.getElementById('resetForm');
+  const codeResetForm = document.getElementById('codeResetForm');
   const indicator = document.querySelector('.auth-tab-indicator');
 
   if (landingScreen) landingScreen.classList.add('hidden');
@@ -1386,6 +1405,7 @@ function showAuthForm(mode) {
   if (verifyForm) verifyForm.classList.add('hidden');
   if (forgotForm) forgotForm.classList.add('hidden');
   if (resetForm) resetForm.classList.add('hidden');
+  if (codeResetForm) codeResetForm.classList.add('hidden');
   state.pendingConfirmEmail = null;
   state.pendingConfirmUserId = null;
   state.pendingConfirmName = '';
@@ -1745,6 +1765,66 @@ function attachPortalEvents() {
 
       await supabaseClient.auth.signOut();
       window.location.reload();
+    });
+  }
+
+  const haveCodeBtn = document.getElementById('haveCodeBtn');
+  const codeResetBackToLogin = document.getElementById('codeResetBackToLogin');
+  const codeResetForm = document.getElementById('codeResetForm');
+  const codeResetNotice = document.getElementById('codeResetNotice');
+
+  if (haveCodeBtn) {
+    haveCodeBtn.addEventListener('click', () => {
+      if (loginForm) loginForm.classList.add('hidden');
+      if (codeResetForm) codeResetForm.classList.remove('hidden');
+      if (codeResetNotice) codeResetNotice.className = 'notice';
+    });
+  }
+
+  if (codeResetBackToLogin) {
+    codeResetBackToLogin.addEventListener('click', () => {
+      if (codeResetForm) codeResetForm.classList.add('hidden');
+      if (loginForm) loginForm.classList.remove('hidden');
+    });
+  }
+
+  if (codeResetForm) {
+    codeResetForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const email = document.getElementById('codeResetEmail').value.trim();
+      const code = document.getElementById('codeResetCode').value.trim();
+      const newPassword = document.getElementById('codeResetPassword').value.trim();
+      const newPasswordConfirm = document.getElementById('codeResetPasswordConfirm').value.trim();
+
+      if (newPassword !== newPasswordConfirm) {
+        if (codeResetNotice) {
+          codeResetNotice.className = 'notice show error';
+          codeResetNotice.textContent = 'Las contraseñas no coinciden.';
+        }
+        return;
+      }
+
+      const submitBtn = codeResetForm.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Guardando...'; }
+
+      const result = await confirmPasswordReset(email, code, newPassword);
+
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Guardar nueva contraseña'; }
+
+      if (!result.ok) {
+        if (codeResetNotice) {
+          codeResetNotice.className = 'notice show error';
+          codeResetNotice.textContent = result.message;
+        }
+        return;
+      }
+
+      if (codeResetNotice) {
+        codeResetNotice.className = 'notice show';
+        codeResetNotice.textContent = 'Contraseña actualizada. Ya podés iniciar sesión.';
+      }
+      codeResetForm.reset();
+      setTimeout(() => showAuthForm('login'), 1200);
     });
   }
 
@@ -2356,7 +2436,7 @@ function renderAdminUsersTable(users) {
       const userId = button.dataset.resetPassword;
       const email = button.dataset.email;
       const name = button.dataset.name;
-      if (!window.confirm(`¿Generar una contraseña nueva para ${name} y enviársela por correo?`)) return;
+      if (!window.confirm(`¿Enviarle a ${name} un código de un solo uso para que elija una contraseña nueva?`)) return;
       button.disabled = true;
       const result = await callAdminUsersFunction('reset_password', userId);
       if (!result.ok) {
@@ -2364,13 +2444,13 @@ function renderAdminUsersTable(users) {
         button.disabled = false;
         return;
       }
-      const emailResult = await sendVerificationEmail(email, name, result.password);
+      const emailResult = await sendVerificationEmail(email, name, result.code, '30 minutos');
       if (!emailResult.ok) {
-        setNotice('Se generó la nueva contraseña pero no se pudo enviar el correo: ' + emailResult.message, true);
+        setNotice('Se generó el código pero no se pudo enviar el correo: ' + emailResult.message, true);
         button.disabled = false;
         return;
       }
-      setNotice('Contraseña nueva enviada a ' + email + '.', false);
+      setNotice('Código enviado a ' + email + '. Válido por 30 minutos.', false);
       button.disabled = false;
     });
   });

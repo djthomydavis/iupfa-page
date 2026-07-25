@@ -103,6 +103,7 @@
           <button type="submit">Entrar</button>
           <p class="auth-switch">¿No tenés cuenta? <button type="button" data-auth="register">Registrate</button></p>
           <p class="auth-switch"><button type="button" id="forgotPasswordBtn">¿Olvidaste tu contraseña?</button></p>
+          <p class="auth-switch"><button type="button" id="haveCodeBtn">¿Un admin te envió un código?</button></p>
         </form>
 
         <form id="registerForm" class="auth-card hidden">
@@ -160,6 +161,32 @@
           </div>
 
           <button type="submit">Guardar nueva contraseña</button>
+        </form>
+
+        <form id="codeResetForm" class="auth-card hidden">
+          <h2>Restablecer contraseña</h2>
+          <p>Ingresá el código de un solo uso que te envió un administrador y elegí tu nueva contraseña.</p>
+          <div id="codeResetNotice" class="notice"></div>
+
+          <div class="field">
+            <input id="codeResetEmail" type="email" placeholder=" " required />
+            <label for="codeResetEmail">Correo</label>
+          </div>
+          <div class="field">
+            <input id="codeResetCode" type="text" inputmode="numeric" maxlength="6" placeholder=" " required />
+            <label for="codeResetCode">Código de 6 dígitos</label>
+          </div>
+          <div class="field">
+            <input id="codeResetPassword" type="password" placeholder=" " required minlength="6" />
+            <label for="codeResetPassword">Nueva contraseña</label>
+          </div>
+          <div class="field">
+            <input id="codeResetPasswordConfirm" type="password" placeholder=" " required minlength="6" />
+            <label for="codeResetPasswordConfirm">Confirmar nueva contraseña</label>
+          </div>
+
+          <button type="submit">Guardar nueva contraseña</button>
+          <p class="auth-switch"><button type="button" id="codeResetBackToLogin">Volver a iniciar sesión</button></p>
         </form>
 
         <form id="verifyForm" class="auth-card hidden">
