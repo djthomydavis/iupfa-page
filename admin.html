@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Cybersecurity Students IUPFA</title>
+  <link rel="icon" type="image/png" href="img/IUPFA Logo Alumnos.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body data-page="admin">
+  <section id="adminScreen" class="portal-shell admin-shell hidden">
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
+        <div>
+          <strong>CS IUPFA</strong>
+          <span>Administración</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link" href="index.html">Volver al portal</a>
+        <button class="nav-link active">Panel Admin</button>
+      </nav>
+    </aside>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <button type="button" id="sidebarToggle" class="ghost-btn icon-btn" aria-label="Mostrar/ocultar menú">☰</button>
+          <div class="logo-mark small"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
+          <div>
+            <h1>Panel de Administración</h1>
+            <span>Gestión de archivos, foros y calendario</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="profile-pill">
+            <div id="adminAvatar" class="avatar">A</div>
+            <div>
+              <strong id="adminName">Administrador</strong>
+              <span>Acceso total</span>
+            </div>
+          </div>
+          <button id="adminLogoutBtn" class="ghost-btn">Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="hero card">
+          <div>
+            <span class="pill blue">Admin</span>
+            <h2>Control central del portal.</h2>
+            <p>Administra publicaciones, fechas académicas y revisa el estado general del contenido visible para los alumnos.</p>
+          </div>
+        </section>
+
+        <div class="stats-grid">
+          <article class="card stat-card"><span>Eventos cargados</span><strong id="adminEventsCount">0</strong></article>
+          <article class="card stat-card"><span>Posts en foro</span><strong id="adminPostsCount">0</strong></article>
+          <article class="card stat-card"><span>Materias activas</span><strong id="adminSubjectsCount">0</strong></article>
+        </div>
+
+        <div class="split-grid">
+          <section class="card">
+            <div class="section-head"><h3>Nuevo evento académico</h3></div>
+            <form id="eventForm" class="stack">
+              <input id="eventTitle" type="text" placeholder="Título del evento" required />
+              <div class="two-cols">
+                <input id="eventDate" type="date" required />
+                <select id="eventType">
+                  <option>Académico</option>
+                  <option>Examen</option>
+                  <option>Inscripción</option>
+                  <option>Feriado</option>
+                  <option>Entrega</option>
+                  <option>Cuatrimestre</option>
+                </select>
+              </div>
+              <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
+              <label class="field-label">Fecha fin<input id="eventEndDate" type="date" /></label>
+              <div class="two-cols">
+                <label class="field-label">Hora inicio<input id="eventStartTime" type="time" /></label>
+                <label class="field-label">Hora fin<input id="eventEndTime" type="time" /></label>
+              </div>
+              <button type="submit">Guardar evento</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Nueva publicación institucional</h3></div>
+            <form id="adminPostForm" class="stack">
+              <input id="adminPostTitle" type="text" placeholder="Título de la publicación" required />
+              <textarea id="adminPostContent" placeholder="Contenido del anuncio" required></textarea>
+              <button type="submit">Publicar anuncio</button>
+            </form>
+          </section>
+        </div>
+
+        <div class="split-grid">
+          <section class="card"><div class="section-head"><h3>Calendario actual</h3></div><div id="adminCalendarList" class="stack"></div></section>
+          <section class="card"><div class="section-head"><h3>Publicaciones actuales</h3></div><div id="adminForumList" class="stack"></div></section>
+        </div>
+
+        <section class="card">
+          <div class="section-head"><h3 id="subjectFormTitle">Agregar materia</h3></div>
+          <form id="subjectForm" class="stack">
+            <div id="subjectFormNotice" class="notice"></div>
+            <input type="hidden" id="subjectEditId" value="" />
+            <div class="two-cols">
+              <input id="subjectCode" type="number" min="1" placeholder="Código (1-39)" required />
+              <input id="subjectYearInput" type="number" min="1" placeholder="Año" required />
+            </div>
+            <div class="two-cols">
+              <select id="subjectSemester">
+                <option value="1">1° cuatrimestre</option>
+                <option value="2">2° cuatrimestre</option>
+              </select>
+              <input id="subjectHours" type="text" placeholder="Carga horaria (ej. 64 hs)" required />
+            </div>
+            <input id="subjectName" type="text" placeholder="Nombre de la materia" required />
+            <div class="two-cols">
+              <select id="subjectModality">
+                <option>Presencial</option>
+                <option>A Distancia</option>
+                <option>Mixta</option>
+              </select>
+              <input id="subjectCorrelatives" type="text" placeholder="Correlativas (códigos separados por coma, ej. 1, 2)" />
+            </div>
+            <div class="two-cols">
+              <select id="subjectLibre">
+                <option value="No libre">No libre</option>
+                <option value="Libre">Libre</option>
+              </select>
+              <select id="subjectExamFinal">
+                <option value="Con examen final">Con examen final</option>
+                <option value="Sin examen final">Sin examen final</option>
+              </select>
+            </div>
+            <p class="form-hint">El estado (Cursable / No cursable) se calcula automáticamente según las correlativas. El resto de los estados (Cursando, Aprobada, A rendir final) los define el alumno desde su planificación.</p>
+            <div class="stack-row">
+              <button type="submit" id="subjectFormSubmit">Agregar materia</button>
+              <button type="button" id="subjectFormCancel" class="ghost-btn hidden">Cancelar edición</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="section-head"><h3>Materias cargadas</h3></div>
+          <div id="adminSubjectsTable"></div>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
