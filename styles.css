@@ -623,6 +623,7 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .inline-form textarea { min-height: 70px; }
 .file-item { display: block; }
 .file-item:hover { border-color: var(--primary); }
+.file-label-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* Subject detail tabs */
 .subject-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }

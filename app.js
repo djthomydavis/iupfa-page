@@ -375,6 +375,46 @@ function mergeLocalSubjectContent() {
   }
 }
 
+// Calendario, foro general y contenido de materias viven en localStorage
+// (por ahora), así que no se comparten solos entre dominios (ej. tu prueba
+// local vs. el sitio ya publicado). Este export/import los mueve a mano.
+function exportLocalData() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: PORTAL_DATA_VERSION,
+    calendar: JSON.parse(localStorage.getItem('portalCalendar') || JSON.stringify(state.data.calendar)),
+    forum: JSON.parse(localStorage.getItem('portalForum') || JSON.stringify(state.data.forum)),
+    subjectContent: JSON.parse(localStorage.getItem('portalSubjectContent') || JSON.stringify(extractSubjectContent()))
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `iupfa-datos-locales-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importLocalData(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      if (payload.calendar) localStorage.setItem('portalCalendar', JSON.stringify(payload.calendar));
+      if (payload.forum) localStorage.setItem('portalForum', JSON.stringify(payload.forum));
+      if (payload.subjectContent) localStorage.setItem('portalSubjectContent', JSON.stringify(payload.subjectContent));
+      localStorage.setItem('portalDataVersion', PORTAL_DATA_VERSION);
+      onDone(null);
+    } catch (error) {
+      onDone(error);
+    }
+  };
+  reader.onerror = () => onDone(reader.error);
+  reader.readAsText(file);
+}
+
 function createItemCard(title, subtitle, content) {
   return `<article class="item-card"><strong>${title}</strong>${content ? `<p>${content}</p>` : ''}<span>${subtitle}</span></article>`;
 }
@@ -2219,6 +2259,38 @@ function attachAdminEvents() {
   const subjectFormCancel = document.getElementById('subjectFormCancel');
 
   if (subjectFormCancel) subjectFormCancel.addEventListener('click', resetSubjectForm);
+
+  const exportLocalDataBtn = document.getElementById('exportLocalDataBtn');
+  const importLocalDataInput = document.getElementById('importLocalDataInput');
+  const dataTransferNotice = document.getElementById('dataTransferNotice');
+
+  if (exportLocalDataBtn) {
+    exportLocalDataBtn.addEventListener('click', () => {
+      exportLocalData();
+      if (dataTransferNotice) {
+        dataTransferNotice.className = 'notice show';
+        dataTransferNotice.textContent = 'Se descargó el archivo con el calendario, el foro y el contenido de materias.';
+      }
+    });
+  }
+
+  if (importLocalDataInput) {
+    importLocalDataInput.addEventListener('change', event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      importLocalData(file, error => {
+        if (error) {
+          if (dataTransferNotice) {
+            dataTransferNotice.className = 'notice show error';
+            dataTransferNotice.textContent = 'El archivo no es válido: ' + error.message;
+          }
+          return;
+        }
+        alert('Datos importados. La página se va a recargar.');
+        window.location.reload();
+      });
+    });
+  }
 
   if (subjectForm) {
     subjectForm.addEventListener('submit', async event => {

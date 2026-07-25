@@ -154,6 +154,19 @@
           <div class="section-head"><h3>Materias cargadas</h3></div>
           <div id="adminSubjectsTable"></div>
         </section>
+
+        <section class="card">
+          <div class="section-head"><h3>Datos locales (calendario, foro, contenido de materias)</h3></div>
+          <p class="form-hint">Las materias y el progreso de los alumnos ya viven en Supabase y se comparten entre dominios. El calendario, el foro general y las unidades/opiniones/encuestas de cada materia todavía se guardan en el navegador — usá esto para pasarlos de un dominio a otro (por ejemplo, de tu prueba local al sitio ya publicado).</p>
+          <div id="dataTransferNotice" class="notice"></div>
+          <div class="stack-row">
+            <button type="button" id="exportLocalDataBtn" class="ghost-btn">⬇ Exportar datos locales</button>
+            <label class="ghost-btn file-label-btn">
+              ⬆ Importar datos locales
+              <input type="file" id="importLocalDataInput" accept="application/json" class="hidden" />
+            </label>
+          </div>
+        </section>
       </main>
     </div>
   </section>
