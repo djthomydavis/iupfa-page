@@ -223,6 +223,8 @@
         <button class="nav-link" data-view="calendario">Calendario</button>
         <button class="nav-link" data-view="planificacion">Planificación</button>
         <button class="nav-link" data-view="foro">Foro General</button>
+        <button class="nav-link" data-view="alumnos">Alumnos</button>
+        <button class="nav-link" data-view="mensajes">Mensajes <span id="unreadBadge" class="nav-badge hidden">0</span></button>
         <a id="adminShortcut" class="nav-link hidden" href="admin.html">Ir a Admin</a>
       </nav>
 
@@ -243,7 +245,7 @@
           </div>
         </div>
         <div class="topbar-actions">
-          <div class="profile-pill">
+          <div id="profilePillBtn" class="profile-pill clickable" title="Gestionar mi perfil">
             <div id="userAvatar" class="avatar">U</div>
             <div>
               <strong id="userName">Usuario</strong>
@@ -291,8 +293,9 @@
         </section>
 
         <section id="calendarioView" class="view-section hidden">
-          <div class="split-grid">
-            <section class="card">
+          <button type="button" id="calendarNavToggle" class="ghost-btn units-nav-toggle-btn">🗓️ Calendario académico</button>
+          <div id="calendarLayout" class="content-layout calendar-layout">
+            <section class="card content-main">
               <div class="section-head">
                 <h3 id="calendarMonthLabel">Mes</h3>
                 <div class="calendar-nav">
@@ -306,10 +309,14 @@
               </div>
               <div id="calendarGrid" class="calendar-grid"></div>
             </section>
-            <section class="card">
+            <div id="calendarNavBackdrop" class="units-nav-backdrop"></div>
+            <aside class="card content-units-nav">
               <div class="section-head">
                 <h3>Calendario académico</h3>
-                <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
+                <div class="stack-row">
+                  <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
+                  <button type="button" id="calendarNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar calendario académico">✕</button>
+                </div>
               </div>
               <form id="newCalendarEventForm" class="stack inline-edit-form hidden">
                 <input id="newCalendarEventTitle" type="text" placeholder="Título del evento" required />
@@ -336,7 +343,7 @@
                 </div>
               </form>
               <div id="calendarFull" class="stack"></div>
-            </section>
+            </aside>
           </div>
         </section>
 
@@ -378,6 +385,38 @@
               </form>
             </section>
             <section class="card"><div class="section-head"><h3>Debates recientes</h3></div><div id="forumList" class="stack"></div></section>
+          </div>
+        </section>
+
+        <section id="alumnosView" class="view-section hidden">
+          <section class="card">
+            <div class="section-head"><h3>Alumnos</h3></div>
+            <p class="form-hint">Encontrá compañeros que estén cursando lo mismo que vos. Solo se muestran los datos que cada alumno decidió hacer visibles.</p>
+            <div class="planning-filters">
+              <input type="text" id="alumnosSearch" placeholder="Buscar por nombre..." />
+              <select id="alumnosSubjectFilter">
+                <option value="all">Todas las materias</option>
+              </select>
+            </div>
+            <div id="alumnosNotice" class="notice"></div>
+            <div id="alumnosList" class="stack"></div>
+          </section>
+        </section>
+
+        <section id="mensajesView" class="view-section hidden">
+          <div class="split-grid">
+            <section class="card">
+              <div class="section-head"><h3>Conversaciones</h3></div>
+              <div id="conversationsList" class="stack"></div>
+            </section>
+            <section class="card">
+              <div class="section-head"><h3 id="conversationWithName">Seleccioná una conversación</h3></div>
+              <div id="conversationThread" class="stack"></div>
+              <form id="replyMessageForm" class="inline-form hidden">
+                <textarea id="replyMessageInput" placeholder="Escribí tu mensaje..." required></textarea>
+                <button type="submit">Enviar</button>
+              </form>
+            </section>
           </div>
         </section>
 
@@ -432,7 +471,7 @@
               </form>
             </div>
             <button type="button" id="unitsNavToggle" class="ghost-btn units-nav-toggle-btn">📚 Unidades</button>
-            <div class="content-layout">
+            <div id="contentLayout" class="content-layout">
               <div id="subjectContent" class="card content-main stack"></div>
               <div id="unitsNavBackdrop" class="units-nav-backdrop"></div>
               <aside class="card content-units-nav">
@@ -511,6 +550,13 @@
           </section>
         </section>
       </main>
+    </div>
+
+    <div id="studentProfileModal" class="modal-overlay hidden">
+      <div class="modal-card card">
+        <button type="button" id="closeStudentModal" class="ghost-btn icon-btn tiny-btn modal-close-btn" aria-label="Cerrar">✕</button>
+        <div id="studentProfileContent"></div>
+      </div>
     </div>
   </section>
 

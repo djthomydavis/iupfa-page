@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi perfil | Cybersecurity Students IUPFA</title>
+  <link rel="icon" type="image/png" href="img/IUPFA Logo Alumnos.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body data-page="user">
+  <section id="userScreen" class="portal-shell hidden">
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
+        <div>
+          <strong>CS IUPFA</strong>
+          <span>Mi perfil</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link" href="index.html">&larr; Volver al portal</a>
+      </nav>
+    </aside>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <button type="button" id="sidebarToggle" class="ghost-btn icon-btn" aria-label="Mostrar/ocultar menú">☰</button>
+          <div class="logo-mark small"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
+          <div>
+            <h1>Mi perfil</h1>
+            <span>Gestioná tus datos personales</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="logoutBtn" class="ghost-btn">Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="view-section">
+
+          <section class="card">
+            <div class="section-head"><h3>Foto de perfil</h3></div>
+            <div class="profile-photo-row">
+              <div id="profileAvatarPreview" class="avatar large">U</div>
+              <div class="stack-row">
+                <label class="ghost-btn file-label-btn">
+                  Subir foto
+                  <input type="file" id="avatarInput" accept="image/*" class="hidden" />
+                </label>
+                <button type="button" id="removeAvatarBtn" class="ghost-btn small-btn">Quitar foto</button>
+              </div>
+            </div>
+            <div id="avatarNotice" class="notice"></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Datos principales</h3></div>
+            <p class="form-hint">Nombre, apellido y fecha de nacimiento son los únicos datos de esta sección que ven otros alumnos. El correo y la contraseña son siempre privados.</p>
+            <form id="accountForm" class="stack">
+              <div id="accountNotice" class="notice"></div>
+              <div class="two-cols">
+                <div class="field">
+                  <input id="accountName" type="text" placeholder=" " required />
+                  <label for="accountName">Nombre</label>
+                </div>
+                <div class="field">
+                  <input id="accountLastName" type="text" placeholder=" " />
+                  <label for="accountLastName">Apellido</label>
+                </div>
+              </div>
+              <div class="field">
+                <input id="accountBirthDate" type="date" placeholder=" " />
+                <label for="accountBirthDate">Fecha de nacimiento</label>
+              </div>
+
+              <div class="email-field-row">
+                <div class="field">
+                  <input id="accountEmail" type="text" placeholder=" " disabled />
+                  <label for="accountEmail">Correo</label>
+                </div>
+                <button type="button" id="toggleEmailBtn" class="ghost-btn small-btn">Ver</button>
+              </div>
+
+              <label class="checkbox-row"><input type="checkbox" id="allowMessages" /> Permitir que otros usuarios me envíen mensajes</label>
+
+              <button type="submit">Guardar datos principales</button>
+            </form>
+
+            <div class="password-change-block">
+              <button type="button" id="togglePasswordChange" class="ghost-btn small-btn">Cambiar contraseña</button>
+              <form id="passwordForm" class="stack hidden">
+                <div id="passwordNotice" class="notice"></div>
+                <div class="field">
+                  <input id="currentPassword" type="password" placeholder=" " required />
+                  <label for="currentPassword">Contraseña actual</label>
+                </div>
+                <div class="field">
+                  <input id="newPassword" type="password" placeholder=" " minlength="6" required />
+                  <label for="newPassword">Contraseña nueva</label>
+                </div>
+                <div class="field">
+                  <input id="newPasswordConfirm" type="password" placeholder=" " minlength="6" required />
+                  <label for="newPasswordConfirm">Confirmar contraseña nueva</label>
+                </div>
+                <button type="submit">Actualizar contraseña</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Contacto</h3></div>
+            <p class="form-hint">Opcional. Activá el toggle si querés que otros alumnos vean estos datos para contactarte (por ejemplo, por WhatsApp usando tu teléfono).</p>
+            <form id="contactForm" class="stack">
+              <div id="contactNotice" class="notice"></div>
+              <div class="field">
+                <input id="contactPhone" type="tel" placeholder=" " />
+                <label for="contactPhone">Teléfono (con código de país, ej: 549261XXXXXXX)</label>
+              </div>
+              <div class="field">
+                <input id="contactInstagram" type="text" placeholder=" " />
+                <label for="contactInstagram">Instagram</label>
+              </div>
+              <div class="field">
+                <input id="contactLinkedin" type="text" placeholder=" " />
+                <label for="contactLinkedin">LinkedIn</label>
+              </div>
+              <label class="checkbox-row"><input type="checkbox" id="contactVisible" /> Mostrar mis datos de contacto a otros alumnos</label>
+              <button type="submit">Guardar contacto</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Datos adicionales</h3></div>
+            <p class="form-hint">Todos estos datos son opcionales. Marcá "Visible" en los que quieras que otros estudiantes puedan ver en tu perfil.</p>
+            <form id="extraForm" class="stack">
+              <div id="extraNotice" class="notice"></div>
+
+              <div class="extra-field-row">
+                <div class="field"><input id="extraAddress" type="text" placeholder=" " /><label for="extraAddress">Dirección domiciliaria</label></div>
+                <label class="checkbox-row small"><input type="checkbox" id="extraAddressVisible" /> Visible</label>
+              </div>
+
+              <div class="extra-field-row">
+                <div class="field"><input id="extraDni" type="text" placeholder=" " /><label for="extraDni">DNI</label></div>
+                <label class="checkbox-row small"><input type="checkbox" id="extraDniVisible" /> Visible</label>
+              </div>
+
+              <div class="extra-field-row">
+                <div class="field"><input id="extraJoinDate" type="date" placeholder=" " /><label for="extraJoinDate">Fecha de ingreso a la facultad</label></div>
+                <label class="checkbox-row small"><input type="checkbox" id="extraJoinDateVisible" /> Visible</label>
+              </div>
+
+              <div class="extra-field-row extra-field-row-static">
+                <div>
+                  <span class="field-static-label">Materias que se cursan actualmente</span>
+                  <div id="currentSubjectsPreview" class="current-subjects-preview"></div>
+                </div>
+                <label class="checkbox-row small"><input type="checkbox" id="extraCurrentSubjectsVisible" /> Visible</label>
+              </div>
+
+              <button type="submit">Guardar datos adicionales</button>
+            </form>
+          </section>
+
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

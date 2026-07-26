@@ -104,9 +104,17 @@ const state = {
       { id: 'post_seed_2', title: 'Consulta sobre fechas de entrega', content: '¿Alguien tiene confirmado el cronograma actualizado de evaluaciones?', author: 'Mariano F.' }
     ],
     subjects: [],
-    studentProgress: {}
+    studentProgress: {},
+    students: [],
+    studentSubjects: {},
+    messages: []
   },
   currentUser: null,
+  authError: null,
+  alumnosSearch: '',
+  alumnosSubjectFilter: 'all',
+  selectedConversationUserId: null,
+  openStudentProfileId: null,
   currentSubjectId: null,
   currentUnitId: null,
   currentItemId: null,
@@ -273,8 +281,12 @@ async function setCurrentUserFromSession(session) {
 
   if (error || !profile) {
     state.currentUser = null;
+    state.authError = error ? error.message : 'No se encontró el perfil de este usuario.';
+    console.error('No se pudo cargar el perfil tras iniciar sesión:', error);
     return;
   }
+
+  state.authError = null;
 
   if (!profile.email_verified) {
     state.currentUser = null;
@@ -289,8 +301,18 @@ async function setCurrentUserFromSession(session) {
     id: session.user.id,
     email: session.user.email,
     name: profile.name,
+    lastName: profile.last_name || '',
+    birthDate: profile.birth_date || '',
     role: profile.role,
-    avatar: profile.avatar
+    avatar: profile.avatar,
+    avatarUrl: profile.avatar_url || null,
+    allowMessages: !!profile.allow_messages,
+    extraInfo: profile.extra_info || {},
+    createdAt: profile.created_at,
+    phone: profile.phone || '',
+    instagram: profile.instagram || '',
+    linkedin: profile.linkedin || '',
+    contactVisible: !!profile.contact_visible
   };
   await loadStudentProgress(session.user.id, session.user.email);
 }
@@ -1321,6 +1343,8 @@ function setView(view) {
     calendario: 'calendarioView',
     planificacion: 'planificacionView',
     foro: 'foroView',
+    alumnos: 'alumnosView',
+    mensajes: 'mensajesView',
     materias: 'materiasView',
     materia: 'materiaView'
   };
@@ -1341,6 +1365,23 @@ function setView(view) {
   if (view !== 'materias' && view !== 'materia') {
     document.querySelectorAll('.year-btn').forEach(btn => btn.classList.remove('active'));
   }
+
+  if (view === 'alumnos') loadStudentDirectory();
+  if (view === 'mensajes') loadMessages();
+}
+
+function getFullName(user) {
+  if (!user) return '';
+  return [user.name, user.lastName].filter(Boolean).join(' ').trim() || user.name || '';
+}
+
+function renderAvatarInto(el, user) {
+  if (!el) return;
+  if (user.avatarUrl) {
+    el.innerHTML = `<img src="${user.avatarUrl}" alt="${user.name}" />`;
+  } else {
+    el.textContent = user.avatar;
+  }
 }
 
 function updatePortalHeader(user) {
@@ -1348,9 +1389,9 @@ function updatePortalHeader(user) {
   const role = document.getElementById('userRole');
   const avatar = document.getElementById('userAvatar');
 
-  if (name) name.textContent = user.name;
+  if (name) name.textContent = getFullName(user);
   if (role) role.textContent = state.viewMode === 'user' && user.role === 'admin' ? 'Estudiante (vista previa)' : (user.role === 'admin' ? 'Administrador' : 'Estudiante');
-  if (avatar) avatar.textContent = user.avatar;
+  renderAvatarInto(avatar, user);
   applyViewMode();
 }
 
@@ -1361,8 +1402,8 @@ function updateAdminHeader(user) {
   const posts = document.getElementById('adminPostsCount');
   const subjects = document.getElementById('adminSubjectsCount');
 
-  if (name) name.textContent = user.name;
-  if (avatar) avatar.textContent = user.avatar;
+  if (name) name.textContent = getFullName(user);
+  renderAvatarInto(avatar, user);
   if (events) events.textContent = state.data.calendar.length;
   if (posts) posts.textContent = state.data.forum.length;
   if (subjects) subjects.textContent = state.data.subjects.length;
@@ -1451,31 +1492,358 @@ function setupSidebarToggle(shellId) {
   }
 }
 
-function setupUnitsNavToggle() {
-  const layout = document.querySelector('.content-layout');
-  const toggle = document.getElementById('unitsNavToggle');
-  const close = document.getElementById('unitsNavClose');
-  const backdrop = document.getElementById('unitsNavBackdrop');
+function setupDrawerToggle({ layoutId, toggleId, closeId, backdropId, openClass, autoCloseItemSelector }) {
+  const layout = document.getElementById(layoutId);
+  const toggle = document.getElementById(toggleId);
+  const close = document.getElementById(closeId);
+  const backdrop = document.getElementById(backdropId);
   if (!layout || !toggle) return;
 
-  const setOpen = open => layout.classList.toggle('units-nav-open', open);
+  const setOpen = open => layout.classList.toggle(openClass, open);
 
-  toggle.addEventListener('click', () => setOpen(!layout.classList.contains('units-nav-open')));
+  toggle.addEventListener('click', () => setOpen(!layout.classList.contains(openClass)));
   if (close) close.addEventListener('click', () => setOpen(false));
   if (backdrop) backdrop.addEventListener('click', () => setOpen(false));
 
-  const unitNavList = document.getElementById('unitNavList');
-  if (unitNavList) {
-    unitNavList.addEventListener('click', event => {
+  if (autoCloseItemSelector) {
+    layout.addEventListener('click', event => {
       if (window.innerWidth > 900) return;
-      if (event.target.closest('.unit-nav-item')) setOpen(false);
+      if (event.target.closest(autoCloseItemSelector)) setOpen(false);
     });
   }
+}
+
+function setupUnitsNavToggle() {
+  setupDrawerToggle({
+    layoutId: 'contentLayout',
+    toggleId: 'unitsNavToggle',
+    closeId: 'unitsNavClose',
+    backdropId: 'unitsNavBackdrop',
+    openClass: 'units-nav-open',
+    autoCloseItemSelector: '.unit-nav-item'
+  });
+}
+
+function setupCalendarNavToggle() {
+  setupDrawerToggle({
+    layoutId: 'calendarLayout',
+    toggleId: 'calendarNavToggle',
+    closeId: 'calendarNavClose',
+    backdropId: 'calendarNavBackdrop',
+    openClass: 'units-nav-open'
+  });
+}
+
+// =========================================================
+// Alumnos: directorio de compañeros + perfil público + mensajes
+// =========================================================
+
+async function loadStudentDirectory() {
+  if (!supabaseClient || !state.currentUser) return;
+  const list = document.getElementById('alumnosList');
+  const notice = document.getElementById('alumnosNotice');
+  if (list) list.innerHTML = '<p class="table-empty">Cargando alumnos...</p>';
+
+  const [{ data: students, error: studentsError }, { data: subjectRows, error: subjectsError }] = await Promise.all([
+    supabaseClient.from('student_directory').select('*').neq('id', state.currentUser.id).order('name'),
+    supabaseClient.from('student_current_subjects').select('*')
+  ]);
+
+  if (studentsError || subjectsError) {
+    if (notice) {
+      notice.className = 'notice show error';
+      notice.textContent = 'No se pudo cargar el directorio: ' + (studentsError || subjectsError).message;
+    }
+    if (list) list.innerHTML = '';
+    return;
+  }
+
+  if (notice) notice.className = 'notice';
+  state.data.students = students || [];
+
+  const subjectMap = {};
+  (subjectRows || []).forEach(row => {
+    if (!subjectMap[row.user_id]) subjectMap[row.user_id] = [];
+    subjectMap[row.user_id].push({ id: row.subject_id, code: row.code, name: row.name });
+  });
+  state.data.studentSubjects = subjectMap;
+
+  const subjectFilter = document.getElementById('alumnosSubjectFilter');
+  if (subjectFilter && subjectFilter.options.length <= 1) {
+    const uniqueSubjects = {};
+    (subjectRows || []).forEach(row => { uniqueSubjects[row.subject_id] = row; });
+    Object.values(uniqueSubjects)
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }))
+      .forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject.subject_id;
+        option.textContent = `${subject.code} · ${subject.name}`;
+        subjectFilter.appendChild(option);
+      });
+  }
+
+  renderAlumnosList();
+}
+
+function studentFullName(student) {
+  return [student.name, student.last_name].filter(Boolean).join(' ').trim() || student.name || 'Alumno';
+}
+
+function renderStudentAvatar(student) {
+  return student.avatar_url ? `<img src="${student.avatar_url}" alt="${studentFullName(student)}" />` : (student.avatar || 'U');
+}
+
+function renderAlumnosList() {
+  const list = document.getElementById('alumnosList');
+  if (!list) return;
+
+  const search = state.alumnosSearch.trim().toLowerCase();
+  const subjectFilter = state.alumnosSubjectFilter;
+
+  const filtered = state.data.students.filter(student => {
+    const matchesSearch = !search || studentFullName(student).toLowerCase().includes(search);
+    const subjects = state.data.studentSubjects[student.id] || [];
+    const matchesSubject = subjectFilter === 'all' || subjects.some(subject => subject.id === subjectFilter);
+    return matchesSearch && matchesSubject;
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = '<p class="table-empty">No se encontraron alumnos con ese filtro.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(student => {
+    const subjects = student.current_subjects_visible ? (state.data.studentSubjects[student.id] || []) : [];
+    const subjectsHtml = student.current_subjects_visible
+      ? (subjects.length
+        ? `<div class="student-card-subjects">${subjects.map(s => `<span class="pill blue">${s.code}</span>`).join('')}</div>`
+        : '<span class="student-card-empty">No está cursando materias actualmente.</span>')
+      : '<span class="student-card-empty">No comparte sus materias actuales.</span>';
+    return `
+      <div class="item-card student-card" data-open-student="${student.id}">
+        <div class="avatar">${renderStudentAvatar(student)}</div>
+        <div class="student-card-info">
+          <strong>${studentFullName(student)}</strong>
+          ${subjectsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openStudentProfile(studentId) {
+  const student = state.data.students.find(item => item.id === studentId);
+  const modal = document.getElementById('studentProfileModal');
+  const content = document.getElementById('studentProfileContent');
+  if (!student || !modal || !content) return;
+
+  state.openStudentProfileId = studentId;
+  const subjects = student.current_subjects_visible ? (state.data.studentSubjects[student.id] || []) : [];
+
+  const mainFields = [['Fecha de nacimiento', student.birth_date]].filter(([, value]) => value);
+  const mainFieldsHtml = mainFields.length
+    ? `<div class="student-profile-fields">${mainFields.map(([label, value]) => `<div class="student-profile-field"><span>${label}</span><span>${value}</span></div>`).join('')}</div>`
+    : '';
+
+  const extraFields = [
+    ['Dirección domiciliaria', student.address],
+    ['DNI', student.dni],
+    ['Fecha de ingreso a la facultad', student.join_date]
+  ].filter(([, value]) => value);
+
+  const extraFieldsHtml = extraFields.length
+    ? `<div class="student-profile-fields">${extraFields.map(([label, value]) => `<div class="student-profile-field"><span>${label}</span><span>${value}</span></div>`).join('')}</div>`
+    : '<p class="student-profile-empty">Este alumno no compartió datos adicionales.</p>';
+
+  const subjectsHtml = student.current_subjects_visible
+    ? (subjects.length
+      ? `<div class="student-card-subjects">${subjects.map(s => `<span class="pill blue">${s.code} · ${s.name}</span>`).join('')}</div>`
+      : '<p class="student-profile-empty">No está cursando materias actualmente.</p>')
+    : '<p class="student-profile-empty">No comparte sus materias actuales.</p>';
+
+  const contactFields = student.contact_visible
+    ? [['Teléfono', student.phone], ['Instagram', student.instagram], ['LinkedIn', student.linkedin]].filter(([, value]) => value)
+    : [];
+  const contactFieldsHtml = student.contact_visible
+    ? (contactFields.length
+      ? `<div class="student-profile-fields">${contactFields.map(([label, value]) => `<div class="student-profile-field"><span>${label}</span><span>${value}</span></div>`).join('')}</div>`
+      : '<p class="student-profile-empty">Este alumno no cargó datos de contacto.</p>')
+    : '<p class="student-profile-empty">Este alumno no comparte sus datos de contacto.</p>';
+
+  const whatsappHtml = student.contact_visible && student.phone
+    ? `<a class="whatsapp-btn" target="_blank" rel="noopener" href="https://wa.me/${student.phone.replace(/[^0-9]/g, '')}">💬 Contactar por WhatsApp</a>`
+    : '';
+
+  const messageHtml = student.allow_messages
+    ? `<button type="button" id="startConversationBtn" data-message-user="${student.id}">✉ Enviar mensaje</button>`
+    : '<p class="student-profile-empty">Este alumno no recibe mensajes por el portal.</p>';
+
+  content.innerHTML = `
+    <div class="student-profile-head">
+      <div class="avatar large">${renderStudentAvatar(student)}</div>
+      <strong>${studentFullName(student)}</strong>
+    </div>
+    ${mainFieldsHtml}
+    <div class="section-head" style="margin-top:16px"><h4>Materias que cursa actualmente</h4></div>
+    ${subjectsHtml}
+    <div class="section-head" style="margin-top:16px"><h4>Contacto</h4></div>
+    ${contactFieldsHtml}
+    <div class="section-head" style="margin-top:16px"><h4>Datos adicionales</h4></div>
+    ${extraFieldsHtml}
+    <div class="student-profile-actions">
+      ${messageHtml}
+      ${whatsappHtml}
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+
+  const startBtn = document.getElementById('startConversationBtn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      closeStudentProfile();
+      setView('mensajes');
+      openConversation(student.id, studentFullName(student));
+    });
+  }
+}
+
+function closeStudentProfile() {
+  const modal = document.getElementById('studentProfileModal');
+  if (modal) modal.classList.add('hidden');
+  state.openStudentProfileId = null;
+}
+
+// =========================================================
+// Mensajes
+// =========================================================
+
+async function loadMessages() {
+  if (!supabaseClient || !state.currentUser) return;
+  if (!state.data.students.length) await loadStudentDirectory();
+
+  const { data, error } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .or(`sender_id.eq.${state.currentUser.id},receiver_id.eq.${state.currentUser.id}`)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    const notice = document.getElementById('mensajesNotice');
+    if (notice) { notice.className = 'notice show error'; notice.textContent = 'No se pudieron cargar los mensajes: ' + error.message; }
+    return;
+  }
+
+  state.data.messages = data || [];
+  updateUnreadBadge();
+  renderConversationsList();
+  if (state.selectedConversationUserId) renderConversationThread();
+}
+
+function getConversationPartners() {
+  const me = state.currentUser.id;
+  const partners = {};
+  state.data.messages.forEach(message => {
+    const otherId = message.sender_id === me ? message.receiver_id : message.sender_id;
+    if (!partners[otherId] || new Date(message.created_at) > new Date(partners[otherId].created_at)) {
+      partners[otherId] = message;
+    }
+  });
+  return partners;
+}
+
+function findStudentName(userId) {
+  const student = state.data.students.find(item => item.id === userId);
+  return student ? studentFullName(student) : 'Usuario';
+}
+
+function renderConversationsList() {
+  const target = document.getElementById('conversationsList');
+  if (!target) return;
+  const me = state.currentUser.id;
+  const partners = getConversationPartners();
+  const entries = Object.entries(partners).sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at));
+
+  if (!entries.length) {
+    target.innerHTML = '<p class="table-empty">Todavía no tenés conversaciones. Escribile a un alumno desde "Alumnos".</p>';
+    return;
+  }
+
+  target.innerHTML = entries.map(([userId, lastMessage]) => {
+    const hasUnread = state.data.messages.some(m => m.sender_id === userId && m.receiver_id === me && !m.read);
+    const name = findStudentName(userId) !== 'Usuario' ? findStudentName(userId) : (lastMessage.sender_id === me ? 'Usuario' : lastMessage.sender_id);
+    return `
+      <div class="conversation-item ${state.selectedConversationUserId === userId ? 'active' : ''}" data-open-conversation="${userId}">
+        <div class="conversation-item-info">
+          <strong>${name}</strong>
+          <span class="conversation-item-preview">${lastMessage.sender_id === me ? 'Vos: ' : ''}${lastMessage.content}</span>
+        </div>
+        ${hasUnread ? '<span class="conversation-unread-dot"></span>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderConversationThread() {
+  const thread = document.getElementById('conversationThread');
+  const title = document.getElementById('conversationWithName');
+  const replyForm = document.getElementById('replyMessageForm');
+  if (!thread || !state.selectedConversationUserId) return;
+
+  const me = state.currentUser.id;
+  const partnerId = state.selectedConversationUserId;
+  const messages = state.data.messages.filter(m => m.sender_id === partnerId || m.receiver_id === partnerId);
+
+  if (title) title.textContent = findStudentName(partnerId);
+  if (replyForm) replyForm.classList.remove('hidden');
+
+  thread.innerHTML = messages.map(m => {
+    const mine = m.sender_id === me;
+    const time = new Date(m.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return `<div class="message-bubble ${mine ? 'mine' : 'theirs'}">${m.content}<time>${time}</time></div>`;
+  }).join('');
+  thread.scrollTop = thread.scrollHeight;
+}
+
+async function openConversation(userId, fallbackName) {
+  state.selectedConversationUserId = userId;
+  renderConversationsList();
+  renderConversationThread();
+
+  const unread = state.data.messages.filter(m => m.sender_id === userId && m.receiver_id === state.currentUser.id && !m.read);
+  if (unread.length && supabaseClient) {
+    await supabaseClient.from('messages').update({ read: true }).in('id', unread.map(m => m.id));
+    unread.forEach(m => { m.read = true; });
+    updateUnreadBadge();
+    renderConversationsList();
+  }
+}
+
+function updateUnreadBadge() {
+  const badge = document.getElementById('unreadBadge');
+  if (!badge || !state.currentUser) return;
+  const count = state.data.messages.filter(m => m.receiver_id === state.currentUser.id && !m.read).length;
+  badge.textContent = count;
+  badge.classList.toggle('hidden', count === 0);
+}
+
+async function sendMessageTo(receiverId, content) {
+  if (!supabaseClient || !state.currentUser || !content.trim()) return { ok: false, message: 'Escribí un mensaje.' };
+  const { data, error } = await supabaseClient
+    .from('messages')
+    .insert({ sender_id: state.currentUser.id, receiver_id: receiverId, content: content.trim() })
+    .select()
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+  state.data.messages.push(data);
+  return { ok: true };
 }
 
 function attachPortalEvents() {
   setupSidebarToggle('portalScreen');
   setupUnitsNavToggle();
+  setupCalendarNavToggle();
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
   const logoutBtn = document.getElementById('logoutBtn');
@@ -1856,6 +2224,63 @@ function attachPortalEvents() {
     button.addEventListener('click', () => setView(button.dataset.jump));
   });
 
+  const alumnosSearch = document.getElementById('alumnosSearch');
+  const alumnosSubjectFilter = document.getElementById('alumnosSubjectFilter');
+  if (alumnosSearch) {
+    alumnosSearch.addEventListener('input', event => {
+      state.alumnosSearch = event.target.value;
+      renderAlumnosList();
+    });
+  }
+  if (alumnosSubjectFilter) {
+    alumnosSubjectFilter.addEventListener('change', event => {
+      state.alumnosSubjectFilter = event.target.value;
+      renderAlumnosList();
+    });
+  }
+
+  const alumnosList = document.getElementById('alumnosList');
+  if (alumnosList) {
+    alumnosList.addEventListener('click', event => {
+      const card = event.target.closest('[data-open-student]');
+      if (card) openStudentProfile(card.dataset.openStudent);
+    });
+  }
+
+  const studentProfileModal = document.getElementById('studentProfileModal');
+  const closeStudentModal = document.getElementById('closeStudentModal');
+  if (closeStudentModal) closeStudentModal.addEventListener('click', closeStudentProfile);
+  if (studentProfileModal) {
+    studentProfileModal.addEventListener('click', event => {
+      if (event.target === studentProfileModal) closeStudentProfile();
+    });
+  }
+
+  const conversationsList = document.getElementById('conversationsList');
+  if (conversationsList) {
+    conversationsList.addEventListener('click', event => {
+      const item = event.target.closest('[data-open-conversation]');
+      if (item) openConversation(item.dataset.openConversation);
+    });
+  }
+
+  const replyMessageForm = document.getElementById('replyMessageForm');
+  if (replyMessageForm) {
+    replyMessageForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!state.selectedConversationUserId) return;
+      const input = document.getElementById('replyMessageInput');
+      const submitBtn = replyMessageForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      const result = await sendMessageTo(state.selectedConversationUserId, input.value);
+      if (submitBtn) submitBtn.disabled = false;
+      if (!result.ok) return;
+      input.value = '';
+      renderConversationThread();
+      renderConversationsList();
+    });
+  }
+
   if (forumForm) {
     forumForm.addEventListener('submit', event => {
       event.preventDefault();
@@ -1863,7 +2288,7 @@ function attachPortalEvents() {
       const title = document.getElementById('forumTitle').value.trim();
       const content = document.getElementById('forumContent').value.trim();
       if (!title || !content) return;
-      state.data.forum.unshift({ id: generateLocalId('post'), title, content, author: state.currentUser.name });
+      state.data.forum.unshift({ id: generateLocalId('post'), title, content, author: getFullName(state.currentUser) });
       savePortalData();
       forumForm.reset();
       renderForumViews();
@@ -2106,7 +2531,7 @@ function attachPortalEvents() {
         }
 
         const { data: urlData } = supabaseClient.storage.from('subject-content').getPublicUrl(path);
-        const newItem = { id: generateLocalId('item'), type: 'pdf', title, fileName: file.name, url: urlData.publicUrl, storagePath: path, uploadedBy: state.currentUser.name };
+        const newItem = { id: generateLocalId('item'), type: 'pdf', title, fileName: file.name, url: urlData.publicUrl, storagePath: path, uploadedBy: getFullName(state.currentUser) };
         unit.items.unshift(newItem);
         state.currentItemId = newItem.id;
         if (!savePortalData()) {
@@ -2124,7 +2549,7 @@ function attachPortalEvents() {
       } else {
         const body = document.getElementById('contentBodyInput').value.trim();
         if (!body) return;
-        const newItem = { id: generateLocalId('item'), type: 'clase', title, body, uploadedBy: state.currentUser.name };
+        const newItem = { id: generateLocalId('item'), type: 'clase', title, body, uploadedBy: getFullName(state.currentUser) };
         unit.items.unshift(newItem);
         state.currentItemId = newItem.id;
         if (!savePortalData()) {
@@ -2159,7 +2584,7 @@ function attachPortalEvents() {
       subject.polls.unshift({
         id: generateLocalId('poll'),
         question,
-        createdBy: state.currentUser.name,
+        createdBy: getFullName(state.currentUser),
         options: optionLabels.map(label => ({ id: generateLocalId('opt'), label, votes: [] }))
       });
       savePortalData();
@@ -2176,7 +2601,7 @@ function attachPortalEvents() {
       const content = input.value.trim();
       if (!subject || !state.currentUser || !content) return;
 
-      subject.forum.unshift({ author: state.currentUser.name, content });
+      subject.forum.unshift({ author: getFullName(state.currentUser), content });
       savePortalData();
       renderSubjectLists(subject);
       subjectForumForm.reset();
@@ -2217,7 +2642,7 @@ function attachPortalEvents() {
         return;
       }
 
-      subject.opinions.unshift({ id: generateLocalId('opinion'), professor, rating, content, author: state.currentUser.name });
+      subject.opinions.unshift({ id: generateLocalId('opinion'), professor, rating, content, author: getFullName(state.currentUser) });
       savePortalData();
       renderSubjectLists(subject);
       subjectOpinionForm.reset();
@@ -2692,6 +3117,14 @@ function initPortalPage() {
     if (portalScreen) portalScreen.classList.remove('hidden');
     updatePortalHeader(user);
     setView('inicio');
+    loadMessages();
+  } else if (state.authError) {
+    showAuthForm('login');
+    const notice = document.getElementById('notice');
+    if (notice) {
+      notice.className = 'notice show error';
+      notice.textContent = 'No se pudo cargar tu perfil: ' + state.authError;
+    }
   } else {
     if (landingScreen) landingScreen.classList.remove('hidden');
     if (authScreen) authScreen.classList.add('hidden');
@@ -2718,6 +3151,12 @@ function initAdminPage() {
 }
 
 document.addEventListener('click', event => {
+  if (event.target.closest('#profilePillBtn')) {
+    window.location.href = 'user.html';
+  }
+});
+
+document.addEventListener('click', event => {
   const btn = event.target.closest('[data-pdf-fullscreen]');
   if (!btn) return;
   const frame = document.getElementById('pdfPreviewFrame');
@@ -2729,6 +3168,321 @@ document.addEventListener('click', event => {
     window.open(frame.src, '_blank');
   }
 });
+
+function renderCurrentSubjectsPreview() {
+  const target = document.getElementById('currentSubjectsPreview');
+  if (!target || !state.currentUser) return;
+  const current = state.data.subjects.filter(subject => getSubjectProgress(state.currentUser.email, subject.id).status === 'Cursando');
+  target.innerHTML = current.length
+    ? current.map(subject => `<span class="pill blue">${subject.code} · ${subject.name}</span>`).join('')
+    : '<span class="current-subjects-empty">No estás cursando ninguna materia actualmente.</span>';
+}
+
+function fillUserProfileForm(user) {
+  const accountName = document.getElementById('accountName');
+  const accountLastName = document.getElementById('accountLastName');
+  const accountBirthDate = document.getElementById('accountBirthDate');
+  const accountEmail = document.getElementById('accountEmail');
+  const allowMessages = document.getElementById('allowMessages');
+  if (accountName) accountName.value = user.name || '';
+  if (accountLastName) accountLastName.value = user.lastName || '';
+  if (accountBirthDate) accountBirthDate.value = user.birthDate || '';
+  if (accountEmail) accountEmail.value = '••••••••••••';
+  if (allowMessages) allowMessages.checked = !!user.allowMessages;
+
+  const contactPhone = document.getElementById('contactPhone');
+  const contactInstagram = document.getElementById('contactInstagram');
+  const contactLinkedin = document.getElementById('contactLinkedin');
+  const contactVisible = document.getElementById('contactVisible');
+  if (contactPhone) contactPhone.value = user.phone || '';
+  if (contactInstagram) contactInstagram.value = user.instagram || '';
+  if (contactLinkedin) contactLinkedin.value = user.linkedin || '';
+  if (contactVisible) contactVisible.checked = !!user.contactVisible;
+
+  renderAvatarInto(document.getElementById('profileAvatarPreview'), user);
+
+  const extra = user.extraInfo || {};
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value || ''; };
+  const setChecked = (id, value) => { const el = document.getElementById(id); if (el) el.checked = !!value; };
+  setValue('extraAddress', extra.address);
+  setChecked('extraAddressVisible', extra.address_visible);
+  setValue('extraDni', extra.dni);
+  setChecked('extraDniVisible', extra.dni_visible);
+  setValue('extraJoinDate', extra.join_date);
+  setChecked('extraJoinDateVisible', extra.join_date_visible);
+  setChecked('extraCurrentSubjectsVisible', extra.current_subjects_visible);
+
+  renderCurrentSubjectsPreview();
+}
+
+function attachUserPageEvents() {
+  setupSidebarToggle('userScreen');
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      if (supabaseClient) await supabaseClient.auth.signOut();
+      window.location.href = 'index.html';
+    });
+  }
+
+  const avatarInput = document.getElementById('avatarInput');
+  const avatarNotice = document.getElementById('avatarNotice');
+  if (avatarInput) {
+    avatarInput.addEventListener('change', async () => {
+      const file = avatarInput.files && avatarInput.files[0];
+      if (!file || !supabaseClient || !state.currentUser) return;
+      if (avatarNotice) avatarNotice.className = 'notice';
+
+      const path = `${state.currentUser.id}/avatar_${Date.now()}_${sanitizeStorageFilename(file.name)}`;
+      const { error: uploadError } = await supabaseClient.storage
+        .from('avatars')
+        .upload(path, file, { contentType: file.type || 'image/jpeg' });
+
+      if (uploadError) {
+        if (avatarNotice) {
+          avatarNotice.className = 'notice show error';
+          avatarNotice.textContent = 'No se pudo subir la foto: ' + uploadError.message;
+        }
+        return;
+      }
+
+      const { data: urlData } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+      const { error: dbError } = await supabaseClient
+        .from('profiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', state.currentUser.id);
+
+      if (dbError) {
+        if (avatarNotice) {
+          avatarNotice.className = 'notice show error';
+          avatarNotice.textContent = 'No se pudo guardar la foto: ' + dbError.message;
+        }
+        return;
+      }
+
+      state.currentUser.avatarUrl = urlData.publicUrl;
+      renderAvatarInto(document.getElementById('profileAvatarPreview'), state.currentUser);
+      if (avatarNotice) { avatarNotice.className = 'notice show'; avatarNotice.textContent = 'Foto actualizada.'; }
+      avatarInput.value = '';
+    });
+  }
+
+  const removeAvatarBtn = document.getElementById('removeAvatarBtn');
+  if (removeAvatarBtn) {
+    removeAvatarBtn.addEventListener('click', async () => {
+      if (!supabaseClient || !state.currentUser) return;
+      const { error } = await supabaseClient.from('profiles').update({ avatar_url: null }).eq('id', state.currentUser.id);
+      if (avatarNotice) {
+        if (error) {
+          avatarNotice.className = 'notice show error';
+          avatarNotice.textContent = 'No se pudo quitar la foto: ' + error.message;
+          return;
+        }
+        avatarNotice.className = 'notice show';
+        avatarNotice.textContent = 'Foto eliminada.';
+      }
+      state.currentUser.avatarUrl = null;
+      renderAvatarInto(document.getElementById('profileAvatarPreview'), state.currentUser);
+    });
+  }
+
+  const toggleEmailBtn = document.getElementById('toggleEmailBtn');
+  if (toggleEmailBtn) {
+    toggleEmailBtn.addEventListener('click', () => {
+      const emailInput = document.getElementById('accountEmail');
+      if (!emailInput || !state.currentUser) return;
+      const isHidden = toggleEmailBtn.textContent.trim() === 'Ver';
+      emailInput.value = isHidden ? state.currentUser.email : '••••••••••••';
+      toggleEmailBtn.textContent = isHidden ? 'Ocultar' : 'Ver';
+    });
+  }
+
+  const togglePasswordChange = document.getElementById('togglePasswordChange');
+  const passwordForm = document.getElementById('passwordForm');
+  if (togglePasswordChange && passwordForm) {
+    togglePasswordChange.addEventListener('click', () => {
+      passwordForm.classList.toggle('hidden');
+    });
+  }
+
+  const accountForm = document.getElementById('accountForm');
+  const accountNotice = document.getElementById('accountNotice');
+  if (accountForm) {
+    accountForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+      const name = document.getElementById('accountName').value.trim();
+      const lastName = document.getElementById('accountLastName').value.trim();
+      const birthDate = document.getElementById('accountBirthDate').value;
+      const allowMessages = document.getElementById('allowMessages').checked;
+      const submitBtn = accountForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({
+          name,
+          last_name: lastName,
+          birth_date: birthDate || null,
+          allow_messages: allowMessages,
+          avatar: name.charAt(0).toUpperCase() || state.currentUser.avatar
+        })
+        .eq('id', state.currentUser.id);
+
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (accountNotice) {
+        if (error) {
+          accountNotice.className = 'notice show error';
+          accountNotice.textContent = 'No se pudieron guardar los datos: ' + error.message;
+          return;
+        }
+        accountNotice.className = 'notice show';
+        accountNotice.textContent = 'Datos actualizados.';
+      }
+      state.currentUser.name = name;
+      state.currentUser.lastName = lastName;
+      state.currentUser.birthDate = birthDate;
+      state.currentUser.allowMessages = allowMessages;
+    });
+  }
+
+  const passwordNotice = document.getElementById('passwordNotice');
+  if (passwordForm) {
+    passwordForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value.trim();
+      const newPasswordConfirm = document.getElementById('newPasswordConfirm').value.trim();
+
+      if (newPassword !== newPasswordConfirm) {
+        if (passwordNotice) {
+          passwordNotice.className = 'notice show error';
+          passwordNotice.textContent = 'Las contraseñas nuevas no coinciden.';
+        }
+        return;
+      }
+
+      const submitBtn = passwordForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      const { error: reauthError } = await supabaseClient.auth.signInWithPassword({
+        email: state.currentUser.email,
+        password: currentPassword
+      });
+
+      if (reauthError) {
+        if (submitBtn) submitBtn.disabled = false;
+        if (passwordNotice) {
+          passwordNotice.className = 'notice show error';
+          passwordNotice.textContent = 'La contraseña actual es incorrecta.';
+        }
+        return;
+      }
+
+      const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (passwordNotice) {
+        if (error) {
+          passwordNotice.className = 'notice show error';
+          passwordNotice.textContent = 'No se pudo actualizar la contraseña: ' + error.message;
+          return;
+        }
+        passwordNotice.className = 'notice show';
+        passwordNotice.textContent = 'Contraseña actualizada.';
+      }
+      passwordForm.reset();
+    });
+  }
+
+  const contactForm = document.getElementById('contactForm');
+  const contactNotice = document.getElementById('contactNotice');
+  if (contactForm) {
+    contactForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+
+      const phone = document.getElementById('contactPhone').value.trim();
+      const instagram = document.getElementById('contactInstagram').value.trim();
+      const linkedin = document.getElementById('contactLinkedin').value.trim();
+      const contactVisible = document.getElementById('contactVisible').checked;
+
+      const submitBtn = contactForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ phone, instagram, linkedin, contact_visible: contactVisible })
+        .eq('id', state.currentUser.id);
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (contactNotice) {
+        if (error) {
+          contactNotice.className = 'notice show error';
+          contactNotice.textContent = 'No se pudo guardar el contacto: ' + error.message;
+          return;
+        }
+        contactNotice.className = 'notice show';
+        contactNotice.textContent = 'Datos de contacto guardados.';
+      }
+      state.currentUser.phone = phone;
+      state.currentUser.instagram = instagram;
+      state.currentUser.linkedin = linkedin;
+      state.currentUser.contactVisible = contactVisible;
+    });
+  }
+
+  const extraForm = document.getElementById('extraForm');
+  const extraNotice = document.getElementById('extraNotice');
+  if (extraForm) {
+    extraForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+
+      const extraInfo = {
+        address: document.getElementById('extraAddress').value.trim(),
+        address_visible: document.getElementById('extraAddressVisible').checked,
+        dni: document.getElementById('extraDni').value.trim(),
+        dni_visible: document.getElementById('extraDniVisible').checked,
+        join_date: document.getElementById('extraJoinDate').value,
+        join_date_visible: document.getElementById('extraJoinDateVisible').checked,
+        current_subjects_visible: document.getElementById('extraCurrentSubjectsVisible').checked
+      };
+
+      const submitBtn = extraForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      const { error } = await supabaseClient.from('profiles').update({ extra_info: extraInfo }).eq('id', state.currentUser.id);
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (extraNotice) {
+        if (error) {
+          extraNotice.className = 'notice show error';
+          extraNotice.textContent = 'No se pudieron guardar los datos adicionales: ' + error.message;
+          return;
+        }
+        extraNotice.className = 'notice show';
+        extraNotice.textContent = 'Datos adicionales guardados.';
+      }
+      state.currentUser.extraInfo = extraInfo;
+    });
+  }
+}
+
+function initUserPage() {
+  const userScreen = document.getElementById('userScreen');
+  const user = state.currentUser;
+
+  if (!user) {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  if (userScreen) userScreen.classList.remove('hidden');
+  fillUserProfileForm(user);
+  attachUserPageEvents();
+}
 
 async function init() {
   if (supabaseClient) {
@@ -2745,6 +3499,7 @@ async function init() {
   const page = document.body.dataset.page;
   if (page === 'portal') initPortalPage();
   if (page === 'admin') initAdminPage();
+  if (page === 'user') initUserPage();
 }
 
 document.addEventListener('DOMContentLoaded', init);

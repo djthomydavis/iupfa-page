@@ -23,13 +23,62 @@ alter table public.profiles add column if not exists banned boolean not null def
 alter table public.profiles add column if not exists password_reset_code text;
 alter table public.profiles add column if not exists password_reset_expires timestamptz;
 
+-- Perfil de usuario: foto, preferencia de mensajes y datos adicionales opcionales
+-- (extra_info guarda { address, address_visible, dni, dni_visible,
+-- join_date, join_date_visible, current_subjects_visible }).
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists allow_messages boolean not null default false;
+alter table public.profiles add column if not exists extra_info jsonb not null default '{}'::jsonb;
+
+-- Datos principales (nombre, apellido y fecha de nacimiento son siempre
+-- públicos para otros alumnos, sin toggle de visibilidad).
+alter table public.profiles add column if not exists last_name text;
+alter table public.profiles add column if not exists birth_date date;
+
+-- Contacto (teléfono, Instagram, LinkedIn) con un único toggle de visibilidad
+-- que controla los tres a la vez. Reemplaza a whatsapp_number/whatsapp_enabled.
+-- "cascade" porque la vista student_directory (redefinida más abajo) puede
+-- depender todavía de estas columnas si ya corriste una versión anterior de
+-- este script; al recrearse la vista más abajo con "create or replace" no
+-- hay pérdida real, solo evita que este drop falle por la dependencia.
+alter table public.profiles drop column if exists whatsapp_number cascade;
+alter table public.profiles drop column if exists whatsapp_enabled cascade;
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists instagram text;
+alter table public.profiles add column if not exists linkedin text;
+alter table public.profiles add column if not exists contact_visible boolean not null default false;
+
 alter table public.profiles enable row level security;
 
+-- Chequeo de "¿el usuario logueado es admin?" como función security definer:
+-- evita la recursión infinita que da Postgres cuando una policy de "profiles"
+-- consulta "profiles" dentro de sí misma (el error típico es "infinite
+-- recursion detected in policy for relation profiles"). Al ser security
+-- definer, esta función lee la tabla evadiendo RLS, así que la policy que la
+-- usa no vuelve a disparar su propia evaluación.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select coalesce((select role = 'admin' from public.profiles where id = auth.uid()), false);
+$$;
+
+-- IMPORTANTE (endurecido): antes cualquier usuario autenticado podía leer la fila
+-- COMPLETA de cualquier otro perfil (incluyendo DNI, dirección, códigos de
+-- verificación, etc.) porque esta policy usaba "using (true)". Ahora solo el
+-- propio dueño del perfil o un admin pueden leer la fila completa; el
+-- directorio de "Alumnos" usa las vistas de abajo (student_directory /
+-- student_current_subjects), que exponen únicamente lo que cada usuario marcó
+-- como visible.
 drop policy if exists "Profiles are viewable by authenticated users" on public.profiles;
-create policy "Profiles are viewable by authenticated users"
+drop policy if exists "Users can view own profile or admins view all" on public.profiles;
+create policy "Users can view own profile or admins view all"
   on public.profiles for select
   to authenticated
-  using (true);
+  using (auth.uid() = id or public.is_admin());
 
 drop policy if exists "Users can update their own profile" on public.profiles;
 create policy "Users can update their own profile"
@@ -48,8 +97,8 @@ drop policy if exists "Admins can update any profile" on public.profiles;
 create policy "Admins can update any profile"
   on public.profiles for update
   to authenticated
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
-  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- Crea automáticamente el perfil cuando alguien se registra
 create or replace function public.handle_new_user()
@@ -101,8 +150,8 @@ create policy "Subjects are viewable by authenticated users"
 drop policy if exists "Only admins can modify subjects" on public.subjects;
 create policy "Only admins can modify subjects"
   on public.subjects for all to authenticated
-  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-  with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- =========================================================
 -- STUDENT_PROGRESS (estado + notas, propio de cada alumno)
@@ -123,6 +172,89 @@ create policy "Users manage their own progress"
   on public.student_progress for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- =========================================================
+-- DIRECTORIO DE ALUMNOS: vistas de solo lectura que exponen
+-- únicamente los datos que cada alumno marcó como visibles
+-- (sección "Alumnos" del portal). Al ser vistas creadas por el
+-- dueño de la base (que evade RLS), pueden leer profiles/student_progress
+-- completos por dentro pero solo devuelven, columna por columna, lo que la
+-- lógica de abajo decide exponer — la RLS de las tablas base sigue
+-- restringida a "uno mismo o admin".
+-- =========================================================
+create or replace view public.student_directory as
+select
+  id,
+  name,
+  last_name,
+  birth_date,
+  avatar,
+  avatar_url,
+  allow_messages,
+  case when contact_visible then phone else null end as phone,
+  case when contact_visible then instagram else null end as instagram,
+  case when contact_visible then linkedin else null end as linkedin,
+  contact_visible,
+  case when coalesce((extra_info->>'address_visible')::boolean, false) then extra_info->>'address' else null end as address,
+  case when coalesce((extra_info->>'dni_visible')::boolean, false) then extra_info->>'dni' else null end as dni,
+  case when coalesce((extra_info->>'join_date_visible')::boolean, false) then extra_info->>'join_date' else null end as join_date,
+  coalesce((extra_info->>'current_subjects_visible')::boolean, false) as current_subjects_visible
+from public.profiles
+where role = 'student' and email_verified = true;
+
+grant select on public.student_directory to authenticated;
+
+create or replace view public.student_current_subjects as
+select sp.user_id, s.id as subject_id, s.code, s.name
+from public.student_progress sp
+join public.subjects s on s.id = sp.subject_id
+join public.profiles p on p.id = sp.user_id
+where sp.status = 'Cursando'
+  and coalesce((p.extra_info->>'current_subjects_visible')::boolean, false) = true;
+
+grant select on public.student_current_subjects to authenticated;
+
+-- =========================================================
+-- MENSAJES entre alumnos (solo si el destinatario lo permite
+-- desde su perfil: "Permitir que otros usuarios me envíen mensajes")
+-- =========================================================
+create or replace function public.user_allows_messages(target uuid)
+returns boolean
+language sql
+security definer set search_path = public
+as $$
+  select coalesce(allow_messages, false) from public.profiles where id = target;
+$$;
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references auth.users(id) on delete cascade,
+  receiver_id uuid not null references auth.users(id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now(),
+  read boolean not null default false
+);
+
+alter table public.messages enable row level security;
+
+drop policy if exists "Users can view their own messages" on public.messages;
+create policy "Users can view their own messages"
+  on public.messages for select
+  to authenticated
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+drop policy if exists "Users can send messages to users who allow it" on public.messages;
+create policy "Users can send messages to users who allow it"
+  on public.messages for insert
+  to authenticated
+  with check (auth.uid() = sender_id and public.user_allows_messages(receiver_id));
+
+drop policy if exists "Receiver can mark messages as read" on public.messages;
+create policy "Receiver can mark messages as read"
+  on public.messages for update
+  to authenticated
+  using (auth.uid() = receiver_id)
+  with check (auth.uid() = receiver_id);
 
 -- =========================================================
 -- SEED: curriculum completo (39 materias)
@@ -188,19 +320,46 @@ drop policy if exists "Admins can upload subject-content" on storage.objects;
 create policy "Admins can upload subject-content"
   on storage.objects for insert
   to authenticated
-  with check (
-    bucket_id = 'subject-content'
-    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
+  with check (bucket_id = 'subject-content' and public.is_admin());
 
 drop policy if exists "Admins can delete subject-content" on storage.objects;
 create policy "Admins can delete subject-content"
   on storage.objects for delete
   to authenticated
-  using (
-    bucket_id = 'subject-content'
-    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
+  using (bucket_id = 'subject-content' and public.is_admin());
+
+-- =========================================================
+-- STORAGE: bucket público para las fotos de perfil de cada usuario
+-- (cada usuario solo puede subir/editar/borrar dentro de su propia
+-- carpeta, nombrada con su user id).
+-- =========================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Anyone can view avatars" on storage.objects;
+create policy "Anyone can view avatars"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'avatars');
+
+drop policy if exists "Users can upload their own avatar" on storage.objects;
+create policy "Users can upload their own avatar"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "Users can update their own avatar" on storage.objects;
+create policy "Users can update their own avatar"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "Users can delete their own avatar" on storage.objects;
+create policy "Users can delete their own avatar"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- =========================================================
 -- IMPORTANTE: convertí tu usuario admin manualmente después de registrarte

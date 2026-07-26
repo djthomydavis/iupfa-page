@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
 body { margin: 0; font-family: 'Montserrat', Arial, sans-serif; background: var(--bg); color: var(--text); }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; border: none; }
@@ -322,7 +323,70 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.08);
 }
+.nav-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
 .year-nav { display: grid; gap: 8px; }
+
+/* Alumnos: tarjetas + modal de perfil */
+.item-card.student-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
+.student-card:hover { background: var(--surface-soft); }
+.student-card-info { min-width: 0; }
+.student-card-info strong { display: block; font-size: 15px; }
+.student-card-subjects { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.student-card-subjects .pill { font-size: 11px; padding: 3px 9px; }
+.student-card-empty { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 15, 30, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 80;
+}
+.modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.modal-close-btn { position: absolute; top: 14px; right: 14px; }
+.student-profile-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; padding-right: 30px; }
+.student-profile-head strong { font-size: 19px; display: block; }
+.student-profile-fields { display: grid; gap: 10px; margin-bottom: 18px; }
+.student-profile-field { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.student-profile-field span:first-child { color: var(--muted); }
+.student-profile-field span:last-child { font-weight: 600; text-align: right; }
+.student-profile-empty { color: var(--muted); font-size: 13px; }
+.student-profile-actions { display: grid; gap: 10px; }
+.whatsapp-btn { background: #25d366; }
+.whatsapp-btn:hover { background: #1fb856; }
+
+/* Mensajes */
+.conversation-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; position: relative; }
+.conversation-item:hover, .conversation-item.active { background: var(--surface-soft); }
+.conversation-item-info { min-width: 0; flex: 1; }
+.conversation-item-info strong { display: block; font-size: 14px; }
+.conversation-item-preview { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.message-bubble { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+.message-bubble.mine { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+.message-bubble.theirs { background: var(--surface-soft); margin-right: auto; border-bottom-left-radius: 4px; }
+.message-bubble time { display: block; font-size: 10px; opacity: 0.75; margin-top: 4px; }
+#conversationThread { max-height: 420px; overflow-y: auto; padding-right: 4px; margin-bottom: 14px; }
 .main-column { display: flex; flex-direction: column; min-width: 0; }
 .topbar {
   position: sticky;
@@ -361,6 +425,34 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   background: linear-gradient(135deg, var(--primary), var(--primary-light));
   color: white;
   font-weight: 800;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.large { width: 84px; height: 84px; font-size: 30px; }
+.profile-pill.clickable { cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.profile-pill.clickable:hover { box-shadow: 0 14px 30px rgba(22, 32, 51, 0.14); transform: translateY(-1px); }
+
+.profile-photo-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+.email-field-row { display: flex; align-items: flex-end; gap: 10px; }
+.email-field-row .field { flex: 1; }
+.password-change-block { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.password-change-block form { margin-top: 14px; }
+
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); font-weight: 600; cursor: pointer; }
+.checkbox-row input { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+.checkbox-row.small { font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+
+.extra-field-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+.extra-field-row-static { align-items: start; }
+.field-static-label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.current-subjects-preview { display: flex; flex-wrap: wrap; gap: 6px; }
+.current-subjects-empty { color: var(--muted); font-size: 13px; }
+
+@media (max-width: 480px) {
+  .extra-field-row { grid-template-columns: 1fr; align-items: start; }
+  .extra-field-row .checkbox-row.small { margin-top: -4px; }
 }
 .content { padding: 28px; display: grid; gap: 28px; }
 .view-section, .admin-view-section { display: grid; gap: 28px; }
@@ -464,7 +556,7 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .icon-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 12px; font-size: 20px; line-height: 1; }
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   text-align: center;
   font-size: 12px;
   font-weight: 700;
@@ -472,11 +564,16 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 18px 0 10px;
+  width: 100%;
+  max-width: 100%;
 }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.calendar-weekdays span { overflow: hidden; text-overflow: clip; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 100%; }
 .calendar-cell {
   position: relative;
   aspect-ratio: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -655,6 +752,8 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 20px;
   align-items: start;
+  min-width: 0;
+  max-width: 100%;
 }
 .content-main { min-height: 240px; min-width: 0; overflow-wrap: anywhere; }
 .content-units-nav { min-width: 0; }
@@ -668,6 +767,16 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .content-units-nav .section-head { margin-bottom: 14px; }
 .content-units-nav .section-head h4 { font-size: 16px; }
 #unitNavList { gap: 12px; }
+
+/* Calendario: en desktop se ve igual que antes (columnas iguales, sin sticky/scroll propio del panel) */
+.calendar-layout { grid-template-columns: 1fr 1fr; }
+.calendar-layout .content-units-nav {
+  position: static;
+  top: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 24px;
+}
 .unit-nav-block {
   border-radius: 14px;
   overflow: hidden;
@@ -760,6 +869,33 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   .content-main { padding: 10px; border-radius: 10px; }
   .content-item { padding: 8px; border: none; background: transparent; }
   .content-layout { gap: 12px; }
+
+  .calendar-layout { grid-template-columns: 1fr; }
+  .calendar-layout .content-main { padding: 14px; }
+  .calendar-layout .content-units-nav {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 320px;
+    max-width: 88vw;
+    max-height: none;
+    overflow-y: auto;
+    border-radius: 0;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 65;
+    padding: 20px;
+  }
+  .calendar-layout.units-nav-open .content-units-nav { transform: translateX(0); }
+  .calendar-layout .section-head { flex-wrap: wrap; row-gap: 8px; }
+  .calendar-layout #calendarMonthLabel { font-size: 17px; }
+  .calendar-nav { flex-wrap: wrap; gap: 6px; }
+  .calendar-grid { gap: 4px; }
+  .calendar-cell { font-size: 12px; gap: 2px; border-radius: 8px; }
+  .calendar-weekdays { font-size: 10px; margin: 12px 0 8px; }
+  .event-dot { width: 5px; height: 5px; }
+  .units-nav-toggle-btn { width: 100%; justify-content: center; }
 }
 
 .content-item { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: #fbfdff; }
@@ -882,10 +1018,14 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   border-radius: 18px;
   background: #fbfdff;
   border: 1px solid var(--border);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .item-card span, .item-card p { margin: 0; color: var(--muted); line-height: 1.5; }
 
-#calendarFull { max-height: 520px; overflow-y: auto; padding-right: 6px; }
+.content-units-nav { min-width: 0; max-width: 100%; overflow-x: hidden; }
+#calendarFull { max-height: 520px; overflow-y: auto; overflow-x: hidden; padding-right: 6px; min-width: 0; max-width: 100%; }
 .calendar-sticky-current {
   position: sticky;
   bottom: 0;
@@ -1031,4 +1171,13 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   .icon-btn { width: 32px; height: 32px; font-size: 17px; }
   .avatar { width: 36px; height: 36px; }
   .logo-mark { width: 38px; height: 38px; }
+
+  .calendar-layout .content-main { padding: 8px; }
+  .calendar-layout #calendarMonthLabel { font-size: 15px; }
+  .calendar-nav .small-btn { padding: 6px 10px; font-size: 12px; }
+  .calendar-nav .icon-btn { width: 30px; height: 30px; font-size: 16px; }
+  .calendar-weekdays { font-size: 9px; letter-spacing: 0; margin: 10px 0 6px; }
+  .calendar-grid { gap: 3px; }
+  .calendar-cell { font-size: 11px; border-radius: 6px; }
+  .units-nav-toggle-btn { font-size: 13px; padding: 10px 12px; }
 }
