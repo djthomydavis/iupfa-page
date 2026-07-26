@@ -941,6 +941,36 @@ function renderPlanningTable() {
   });
 }
 
+// Editor de texto enriquecido para "Clase" (RichTextWrapper estilo TinyMCE).
+// Nota: "insertar fórmula matemática" (editor WIRIS/MathType) es un plugin
+// pago exclusivo de Moodle y no tiene equivalente gratuito para un sitio
+// estático; "insertar símbolos matemáticos" se mapea al mapa de caracteres
+// especiales de TinyMCE (incluye símbolos matemáticos entre otros), e
+// "insertar objeto web 2.0" se mapea al plugin de medios embebidos (YouTube,
+// Vimeo, etc.).
+function initClaseEditor() {
+  if (typeof window === 'undefined' || !window.tinymce) return;
+  if (tinymce.get('contentBodyInput')) return;
+
+  tinymce.init({
+    selector: '#contentBodyInput',
+    height: 340,
+    menubar: false,
+    statusbar: false,
+    toolbar_mode: 'wrap',
+    plugins: 'lists link image charmap preview emoticons media',
+    toolbar: 'blocks | bold italic underline strikethrough | forecolor backcolor | bullist numlist | preview | ' +
+      'alignleft aligncenter alignright alignjustify | emoticons charmap | link unlink | image media',
+    content_style: "body { font-family: Montserrat, Arial, sans-serif; font-size: 15px; }",
+    branding: false
+  });
+}
+
+function getClaseEditorContent() {
+  if (typeof window === 'undefined' || !window.tinymce) return null;
+  return tinymce.get('contentBodyInput');
+}
+
 function parseClaseBody(text) {
   return (text || '')
     .split('\n')
@@ -1011,7 +1041,7 @@ function renderContentItemBody(item) {
          <a class="download-link" href="${pdfSrc}" target="_blank" rel="noopener">↗ Abrir en pestaña nueva</a>
          <a class="download-link" href="${pdfSrc}" download="${item.fileName}">⬇ Descargar PDF</a>
        </div>`)
-    : `<div class="clase-body">${parseClaseBody(item.body)}</div>`;
+    : `<div class="clase-body">${/^\s*</.test(item.body || '') ? item.body : parseClaseBody(item.body)}</div>`;
 
   return `
     <div class="content-item">
@@ -2450,7 +2480,8 @@ function attachPortalEvents() {
     contentTypeSelect.addEventListener('change', () => {
       const isPdf = contentTypeSelect.value === 'pdf';
       document.getElementById('contentFileInput').classList.toggle('hidden', !isPdf);
-      document.getElementById('contentBodyInput').classList.toggle('hidden', isPdf);
+      document.getElementById('contentBodyWrapper').classList.toggle('hidden', isPdf);
+      if (!isPdf) initClaseEditor();
     });
   }
 
@@ -2547,7 +2578,8 @@ function attachPortalEvents() {
         contentItemForm.reset();
         if (contentItemNotice) contentItemNotice.className = 'notice';
       } else {
-        const body = document.getElementById('contentBodyInput').value.trim();
+        const editor = getClaseEditorContent();
+        const body = (editor ? editor.getContent() : document.getElementById('contentBodyInput').value).trim();
         if (!body) return;
         const newItem = { id: generateLocalId('item'), type: 'clase', title, body, uploadedBy: getFullName(state.currentUser) };
         unit.items.unshift(newItem);
@@ -2563,8 +2595,9 @@ function attachPortalEvents() {
         }
         renderSubjectLists(subject);
         contentItemForm.reset();
+        if (editor) editor.setContent('');
         document.getElementById('contentFileInput').classList.remove('hidden');
-        document.getElementById('contentBodyInput').classList.add('hidden');
+        document.getElementById('contentBodyWrapper').classList.add('hidden');
         if (contentItemNotice) contentItemNotice.className = 'notice';
       }
     });
@@ -3500,6 +3533,9 @@ async function init() {
   if (page === 'portal') initPortalPage();
   if (page === 'admin') initAdminPage();
   if (page === 'user') initUserPage();
+
+  const loader = document.getElementById('pageLoader');
+  if (loader) loader.classList.add('hidden');
 }
 
 document.addEventListener('DOMContentLoaded', init);

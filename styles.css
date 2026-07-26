@@ -19,6 +19,21 @@ button, input, textarea, select { font: inherit; }
 button { cursor: pointer; border: none; }
 a { color: inherit; text-decoration: none; }
 .hidden { display: none !important; }
+
+.page-loader {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+.page-loader .logo-mark { width: 64px; height: 64px; animation: page-loader-pulse 1.1s ease-in-out infinite; }
+@keyframes page-loader-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1); }
+}
 .stack { display: grid; gap: 14px; }
 .two-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .card {

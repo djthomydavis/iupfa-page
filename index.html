@@ -11,9 +11,11 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body data-page="portal">
-  <section id="landingScreen" class="landing-screen">
+  <div id="pageLoader" class="page-loader"><div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div></div>
+  <section id="landingScreen" class="landing-screen hidden">
     <header class="landing-nav">
       <div class="landing-brand">
         <div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
@@ -466,7 +468,9 @@
                 </select>
                 <input id="contentTitleInput" type="text" placeholder="Título del contenido" required />
                 <input id="contentFileInput" type="file" accept="application/pdf" class="content-field-pdf" />
-                <textarea id="contentBodyInput" class="content-field-clase hidden" placeholder="Escribí la clase. Usá '# Texto' para título, '## Texto' para subtítulo, párrafos normales tal cual, y pegá un link de YouTube en su propia línea para insertarlo como video."></textarea>
+                <div id="contentBodyWrapper" class="content-field-clase hidden">
+                  <textarea id="contentBodyInput"></textarea>
+                </div>
                 <button type="submit">Agregar contenido</button>
               </form>
             </div>
