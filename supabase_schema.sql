@@ -23,11 +23,10 @@ alter table public.profiles add column if not exists banned boolean not null def
 alter table public.profiles add column if not exists password_reset_code text;
 alter table public.profiles add column if not exists password_reset_expires timestamptz;
 
--- Perfil de usuario: foto, preferencia de mensajes y datos adicionales opcionales
+-- Perfil de usuario: foto y datos adicionales opcionales
 -- (extra_info guarda { address, address_visible, dni, dni_visible,
 -- join_date, join_date_visible, current_subjects_visible }).
 alter table public.profiles add column if not exists avatar_url text;
-alter table public.profiles add column if not exists allow_messages boolean not null default false;
 alter table public.profiles add column if not exists extra_info jsonb not null default '{}'::jsonb;
 
 -- Datos principales (nombre, apellido y fecha de nacimiento son siempre
@@ -190,7 +189,6 @@ select
   birth_date,
   avatar,
   avatar_url,
-  allow_messages,
   case when contact_visible then phone else null end as phone,
   case when contact_visible then instagram else null end as instagram,
   case when contact_visible then linkedin else null end as linkedin,
@@ -215,46 +213,226 @@ where sp.status = 'Cursando'
 grant select on public.student_current_subjects to authenticated;
 
 -- =========================================================
--- MENSAJES entre alumnos (solo si el destinatario lo permite
--- desde su perfil: "Permitir que otros usuarios me envíen mensajes")
+-- La mensajería directa entre alumnos se dio de baja: se borra la tabla,
+-- la función de permiso y la columna que la habilitaba.
 -- =========================================================
-create or replace function public.user_allows_messages(target uuid)
-returns boolean
-language sql
-security definer set search_path = public
-as $$
-  select coalesce(allow_messages, false) from public.profiles where id = target;
-$$;
+drop table if exists public.messages cascade;
+drop function if exists public.user_allows_messages(uuid) cascade;
+alter table public.profiles drop column if exists allow_messages cascade;
 
-create table if not exists public.messages (
+-- =========================================================
+-- FORO GENERAL (antes vivía en localStorage; ahora es un dato real y
+-- compartido, igual que el calendario).
+-- =========================================================
+create table if not exists public.forum_posts (
   id uuid primary key default gen_random_uuid(),
-  sender_id uuid not null references auth.users(id) on delete cascade,
-  receiver_id uuid not null references auth.users(id) on delete cascade,
+  author_id uuid references auth.users(id) on delete set null,
+  author_name text not null,
+  title text not null,
   content text not null,
-  created_at timestamptz not null default now(),
-  read boolean not null default false
+  created_at timestamptz not null default now()
 );
 
-alter table public.messages enable row level security;
+alter table public.forum_posts enable row level security;
 
-drop policy if exists "Users can view their own messages" on public.messages;
-create policy "Users can view their own messages"
-  on public.messages for select
-  to authenticated
-  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+drop policy if exists "Forum posts are viewable by authenticated users" on public.forum_posts;
+create policy "Forum posts are viewable by authenticated users"
+  on public.forum_posts for select to authenticated using (true);
 
-drop policy if exists "Users can send messages to users who allow it" on public.messages;
-create policy "Users can send messages to users who allow it"
-  on public.messages for insert
-  to authenticated
-  with check (auth.uid() = sender_id and public.user_allows_messages(receiver_id));
+drop policy if exists "Users can create their own forum posts" on public.forum_posts;
+create policy "Users can create their own forum posts"
+  on public.forum_posts for insert to authenticated
+  with check (auth.uid() = author_id);
 
-drop policy if exists "Receiver can mark messages as read" on public.messages;
-create policy "Receiver can mark messages as read"
-  on public.messages for update
-  to authenticated
-  using (auth.uid() = receiver_id)
-  with check (auth.uid() = receiver_id);
+drop policy if exists "Admins can update forum posts" on public.forum_posts;
+create policy "Admins can update forum posts"
+  on public.forum_posts for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "Admins can delete forum posts" on public.forum_posts;
+create policy "Admins can delete forum posts"
+  on public.forum_posts for delete to authenticated
+  using (public.is_admin());
+
+-- =========================================================
+-- CONTENIDO DE MATERIAS: unidades + items (PDF/clase). Solo un admin
+-- puede escribir; todos los autenticados pueden leer.
+-- =========================================================
+create table if not exists public.subject_units (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  title text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_units enable row level security;
+
+drop policy if exists "Subject units are viewable by authenticated users" on public.subject_units;
+create policy "Subject units are viewable by authenticated users"
+  on public.subject_units for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify subject units" on public.subject_units;
+create policy "Only admins can modify subject units"
+  on public.subject_units for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+create table if not exists public.subject_content_items (
+  id uuid primary key default gen_random_uuid(),
+  unit_id uuid not null references public.subject_units(id) on delete cascade,
+  subject_id text not null references public.subjects(id) on delete cascade,
+  type text not null check (type in ('pdf','clase')),
+  title text not null,
+  file_name text,
+  url text,
+  storage_path text,
+  body text,
+  uploaded_by text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_content_items enable row level security;
+
+drop policy if exists "Subject content is viewable by authenticated users" on public.subject_content_items;
+create policy "Subject content is viewable by authenticated users"
+  on public.subject_content_items for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify subject content" on public.subject_content_items;
+create policy "Only admins can modify subject content"
+  on public.subject_content_items for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- =========================================================
+-- FORO DE CADA MATERIA (distinto del foro general)
+-- =========================================================
+create table if not exists public.subject_forum_posts (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  author_id uuid references auth.users(id) on delete set null,
+  author_name text not null,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_forum_posts enable row level security;
+
+drop policy if exists "Subject forum posts are viewable by authenticated users" on public.subject_forum_posts;
+create policy "Subject forum posts are viewable by authenticated users"
+  on public.subject_forum_posts for select to authenticated using (true);
+
+drop policy if exists "Users can create their own subject forum posts" on public.subject_forum_posts;
+create policy "Users can create their own subject forum posts"
+  on public.subject_forum_posts for insert to authenticated
+  with check (auth.uid() = author_id);
+
+drop policy if exists "Admins can delete subject forum posts" on public.subject_forum_posts;
+create policy "Admins can delete subject forum posts"
+  on public.subject_forum_posts for delete to authenticated
+  using (public.is_admin());
+
+-- =========================================================
+-- OPINIONES sobre profesores, por materia
+-- =========================================================
+create table if not exists public.subject_opinions (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  author_id uuid references auth.users(id) on delete set null,
+  author_name text not null,
+  professor text not null,
+  rating int not null check (rating between 1 and 5),
+  content text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_opinions enable row level security;
+
+drop policy if exists "Subject opinions are viewable by authenticated users" on public.subject_opinions;
+create policy "Subject opinions are viewable by authenticated users"
+  on public.subject_opinions for select to authenticated using (true);
+
+drop policy if exists "Users can create their own opinions" on public.subject_opinions;
+create policy "Users can create their own opinions"
+  on public.subject_opinions for insert to authenticated
+  with check (auth.uid() = author_id);
+
+drop policy if exists "Admins can delete opinions" on public.subject_opinions;
+create policy "Admins can delete opinions"
+  on public.subject_opinions for delete to authenticated
+  using (public.is_admin());
+
+-- =========================================================
+-- ENCUESTAS por materia (cualquier alumno puede crear una y votar;
+-- un voto por alumno por encuesta, votar de nuevo cambia el voto).
+-- =========================================================
+create table if not exists public.subject_polls (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  created_by_id uuid references auth.users(id) on delete set null,
+  created_by_name text not null,
+  question text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_polls enable row level security;
+
+drop policy if exists "Subject polls are viewable by authenticated users" on public.subject_polls;
+create policy "Subject polls are viewable by authenticated users"
+  on public.subject_polls for select to authenticated using (true);
+
+drop policy if exists "Users can create their own polls" on public.subject_polls;
+create policy "Users can create their own polls"
+  on public.subject_polls for insert to authenticated
+  with check (auth.uid() = created_by_id);
+
+drop policy if exists "Admins can delete polls" on public.subject_polls;
+create policy "Admins can delete polls"
+  on public.subject_polls for delete to authenticated
+  using (public.is_admin());
+
+create table if not exists public.subject_poll_options (
+  id uuid primary key default gen_random_uuid(),
+  poll_id uuid not null references public.subject_polls(id) on delete cascade,
+  label text not null,
+  position int not null default 0
+);
+
+alter table public.subject_poll_options enable row level security;
+
+drop policy if exists "Subject poll options are viewable by authenticated users" on public.subject_poll_options;
+create policy "Subject poll options are viewable by authenticated users"
+  on public.subject_poll_options for select to authenticated using (true);
+
+drop policy if exists "Users can add options to their own polls" on public.subject_poll_options;
+create policy "Users can add options to their own polls"
+  on public.subject_poll_options for insert to authenticated
+  with check (exists (
+    select 1 from public.subject_polls p
+    where p.id = poll_id and p.created_by_id = auth.uid()
+  ));
+
+drop policy if exists "Admins can delete poll options" on public.subject_poll_options;
+create policy "Admins can delete poll options"
+  on public.subject_poll_options for delete to authenticated
+  using (public.is_admin());
+
+create table if not exists public.subject_poll_votes (
+  poll_id uuid not null references public.subject_polls(id) on delete cascade,
+  option_id uuid not null references public.subject_poll_options(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  voted_at timestamptz not null default now(),
+  primary key (poll_id, user_id)
+);
+
+alter table public.subject_poll_votes enable row level security;
+
+drop policy if exists "Votes are viewable by authenticated users" on public.subject_poll_votes;
+create policy "Votes are viewable by authenticated users"
+  on public.subject_poll_votes for select to authenticated using (true);
+
+drop policy if exists "Users manage their own vote" on public.subject_poll_votes;
+create policy "Users manage their own vote"
+  on public.subject_poll_votes for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- =========================================================
 -- SEED: curriculum completo (39 materias)
@@ -328,6 +506,64 @@ create policy "Admins can delete subject-content"
   to authenticated
   using (bucket_id = 'subject-content' and public.is_admin());
 
+-- Los resúmenes de alumnos se guardan en el mismo bucket, en la carpeta
+-- summaries/<subject_id>/<user_id>/<archivo>, para poder validar el dueño
+-- por path sin tocar las políticas de admin de arriba (se combinan con OR).
+drop policy if exists "Students can upload their own summaries" on storage.objects;
+create policy "Students can upload their own summaries"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'subject-content'
+    and (storage.foldername(name))[1] = 'summaries'
+    and (storage.foldername(name))[3] = auth.uid()::text
+  );
+
+drop policy if exists "Owner or admin can delete summaries" on storage.objects;
+create policy "Owner or admin can delete summaries"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'subject-content'
+    and (storage.foldername(name))[1] = 'summaries'
+    and ((storage.foldername(name))[3] = auth.uid()::text or public.is_admin())
+  );
+
+-- =========================================================
+-- RESÚMENES: PDFs que suben los propios alumnos por materia
+-- =========================================================
+create table if not exists public.subject_summaries (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  author_name text not null,
+  title text not null,
+  file_name text,
+  url text not null,
+  storage_path text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.subject_summaries enable row level security;
+
+drop policy if exists "Authenticated can view subject summaries" on public.subject_summaries;
+create policy "Authenticated can view subject summaries"
+  on public.subject_summaries for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Students can upload their own summaries" on public.subject_summaries;
+create policy "Students can upload their own summaries"
+  on public.subject_summaries for insert
+  to authenticated
+  with check (auth.uid() = author_id);
+
+drop policy if exists "Owner or admin can delete summaries" on public.subject_summaries;
+create policy "Owner or admin can delete summaries"
+  on public.subject_summaries for delete
+  to authenticated
+  using (auth.uid() = author_id or public.is_admin());
+
 -- =========================================================
 -- STORAGE: bucket público para las fotos de perfil de cada usuario
 -- (cada usuario solo puede subir/editar/borrar dentro de su propia
@@ -360,6 +596,303 @@ create policy "Users can delete their own avatar"
   on storage.objects for delete
   to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- =========================================================
+-- CALENDAR_EVENTS (antes vivía solo en localStorage de cada navegador;
+-- se migra acá para que sea un dato real y compartido — entre otras cosas,
+-- para que el bot de Discord pueda leerlo y mandar recordatorios).
+-- =========================================================
+create table if not exists public.calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  type text not null default 'Académico'
+    check (type in ('Académico','Examen','Inscripción','Feriado','Entrega','Cuatrimestre')),
+  date date not null,
+  end_date date,
+  start_time time,
+  end_time time,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.calendar_events enable row level security;
+
+drop policy if exists "Calendar events are viewable by authenticated users" on public.calendar_events;
+create policy "Calendar events are viewable by authenticated users"
+  on public.calendar_events for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify calendar events" on public.calendar_events;
+create policy "Only admins can modify calendar events"
+  on public.calendar_events for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- DISCORD_LINKS: vincula una cuenta del portal con un usuario de Discord,
+-- para poder mandarle recordatorios por DM. El flujo es:
+-- 1) El alumno pide un código desde su perfil (user.html -> "Vincular Discord").
+-- 2) Le escribe /vincular <código> al bot en Discord.
+-- 3) El bot (con la service_role key, que evade RLS) guarda su discord_user_id
+--    acá y borra el código.
+-- =========================================================
+create table if not exists public.discord_links (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  discord_user_id text unique,
+  link_code text,
+  link_code_expires timestamptz,
+  linked_at timestamptz,
+  reminders_enabled boolean not null default true
+);
+
+alter table public.discord_links enable row level security;
+
+drop policy if exists "Users manage their own discord link" on public.discord_links;
+create policy "Users manage their own discord link"
+  on public.discord_links for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =========================================================
+-- REMINDER_LOG: registro de qué recordatorios ya mandó el bot, para no
+-- duplicarlos si el proceso se reinicia el mismo día. Solo lo usa el bot
+-- con la service_role key, así que no necesita policies (RLS activado sin
+-- policies = nadie con la anon/authenticated key puede tocarlo).
+-- =========================================================
+create table if not exists public.reminder_log (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.calendar_events(id) on delete cascade,
+  days_before int not null,
+  sent_at timestamptz not null default now(),
+  unique (event_id, days_before)
+);
+
+alter table public.reminder_log enable row level security;
+
+-- =========================================================
+-- AUTOPOST_LOG: qué PDFs (subject_content_items) ya posteó el bot
+-- automáticamente, para no duplicarlos en cada revisión periódica (ver
+-- autopost.js del bot). El canal de destino no se guarda acá: se descubre
+-- por convención de nombre ("<código de materia>_material", ej.
+-- "12_material" para la materia con código 12). Solo lo toca el bot con la
+-- service_role key, sin policies (RLS activado sin policies = nadie con la
+-- anon/authenticated key puede tocarlo).
+-- =========================================================
+create table if not exists public.autopost_log (
+  content_item_id uuid primary key references public.subject_content_items(id) on delete cascade,
+  posted_at timestamptz not null default now()
+);
+
+alter table public.autopost_log enable row level security;
+
+-- =========================================================
+-- BOT_OUTBOX: mensajes puntuales que un admin manda desde admin.html
+-- (sección "Discord") para que el bot los postee en un canal. El bot hace
+-- polling de esta tabla con la service_role key; la web solo puede
+-- insertar/leer si es admin (RLS).
+-- =========================================================
+create table if not exists public.bot_outbox (
+  id uuid primary key default gen_random_uuid(),
+  channel_id text not null,
+  content text not null,
+  embed jsonb,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  error text
+);
+
+alter table public.bot_outbox add column if not exists embed jsonb;
+alter table public.bot_outbox alter column content drop not null;
+
+alter table public.bot_outbox enable row level security;
+
+drop policy if exists "Admins manage bot_outbox" on public.bot_outbox;
+create policy "Admins manage bot_outbox"
+  on public.bot_outbox for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- SCHEDULED_MESSAGES: mensajes programados (una vez o recurrentes con
+-- expresión cron) que el bot manda solo, configurados desde admin.html.
+-- =========================================================
+create table if not exists public.scheduled_messages (
+  id uuid primary key default gen_random_uuid(),
+  channel_id text not null,
+  content text not null,
+  embed jsonb,
+  schedule_type text not null check (schedule_type in ('once','recurring')),
+  run_at timestamptz,             -- usado si schedule_type = 'once'
+  cron_expression text,           -- usado si schedule_type = 'recurring' (ej. "0 9 * * 1")
+  timezone text not null default 'America/Argentina/Buenos_Aires',
+  enabled boolean not null default true,
+  last_run_at timestamptz,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.scheduled_messages add column if not exists embed jsonb;
+alter table public.scheduled_messages alter column content drop not null;
+
+alter table public.scheduled_messages enable row level security;
+
+drop policy if exists "Admins manage scheduled_messages" on public.scheduled_messages;
+create policy "Admins manage scheduled_messages"
+  on public.scheduled_messages for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- DISCORD_CHANNELS: espejo de los canales de texto del servidor de Discord,
+-- sincronizado por el bot cada 5 min (y al iniciar). Existe para que
+-- admin.html pueda mostrar un <select> con los nombres de los canales en vez
+-- de pedirle al admin que copie el ID a mano desde Discord.
+-- =========================================================
+create table if not exists public.discord_channels (
+  id text primary key,
+  name text not null,
+  category text,
+  position integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.discord_channels enable row level security;
+
+drop policy if exists "Discord channels viewable by authenticated users" on public.discord_channels;
+create policy "Discord channels viewable by authenticated users"
+  on public.discord_channels for select to authenticated using (true);
+
+-- =========================================================
+-- SUBJECT_MESSAGE_TEMPLATES: plantilla de texto (con variables tipo
+-- {{materia}}) que usa el bot al postear un PDF nuevo de esa materia en su
+-- canal "<código>_material". Si una materia no tiene fila acá, el bot usa
+-- la plantilla general (pdf_message_template_default, más abajo).
+-- =========================================================
+create table if not exists public.subject_message_templates (
+  subject_id text primary key references public.subjects(id) on delete cascade,
+  template text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.subject_message_templates enable row level security;
+
+drop policy if exists "Subject templates viewable by authenticated users" on public.subject_message_templates;
+create policy "Subject templates viewable by authenticated users"
+  on public.subject_message_templates for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify subject templates" on public.subject_message_templates;
+create policy "Only admins can modify subject templates"
+  on public.subject_message_templates for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- PDF_MESSAGE_TEMPLATE_DEFAULT: la plantilla "general", editable desde
+-- admin.html, que se usa para cualquier materia que no tenga su propia fila
+-- en subject_message_templates. Fila única (id siempre 1). Si esta tabla
+-- está vacía, el bot cae a la plantilla fija de su .env como último resorte.
+-- =========================================================
+create table if not exists public.pdf_message_template_default (
+  id smallint primary key default 1 check (id = 1),
+  template text not null default '📄 Nuevo material de **{{materia}}**: {{archivo}}',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.pdf_message_template_default enable row level security;
+
+drop policy if exists "Default template viewable by authenticated users" on public.pdf_message_template_default;
+create policy "Default template viewable by authenticated users"
+  on public.pdf_message_template_default for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify default template" on public.pdf_message_template_default;
+create policy "Only admins can modify default template"
+  on public.pdf_message_template_default for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- PDF_BULK_POST_REQUESTS: botón "Publicar PDFs pendientes ahora" de
+-- admin.html (sección Discord, tarjeta de plantillas). El bot hace polling
+-- y postea en el canal "<código>_material" todo lo que todavía no esté en
+-- autopost_log (la primera vez, es el backlog completo de la materia).
+-- subject_id nulo = "todas las materias" (botón de publicar todo el backlog
+-- pendiente de una vez).
+-- =========================================================
+create table if not exists public.pdf_bulk_post_requests (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text references public.subjects(id) on delete cascade,
+  requested_by uuid references auth.users(id) on delete set null,
+  requested_at timestamptz not null default now(),
+  processed_at timestamptz,
+  posted_count integer,
+  error text
+);
+
+-- por si esta tabla ya existía de una versión anterior de este script, con
+-- subject_id todavía NOT NULL.
+alter table public.pdf_bulk_post_requests alter column subject_id drop not null;
+
+alter table public.pdf_bulk_post_requests enable row level security;
+
+drop policy if exists "Admins manage pdf_bulk_post_requests" on public.pdf_bulk_post_requests;
+create policy "Admins manage pdf_bulk_post_requests"
+  on public.pdf_bulk_post_requests for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- PDF_CHANNEL_CLEAR_REQUESTS: botón "Borrar publicaciones de esta materia"
+-- de admin.html. El bot borra sus propios mensajes en el canal
+-- "<código>_material" correspondiente y libera esos PDFs de autopost_log,
+-- para que se puedan volver a publicar limpios (sin tener que borrar a
+-- mano en Discord, lo que dejaba el registro interno desincronizado).
+-- subject_id nulo = todas las materias.
+-- =========================================================
+create table if not exists public.pdf_channel_clear_requests (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text references public.subjects(id) on delete cascade,
+  requested_by uuid references auth.users(id) on delete set null,
+  requested_at timestamptz not null default now(),
+  processed_at timestamptz,
+  deleted_count integer,
+  error text
+);
+
+alter table public.pdf_channel_clear_requests enable row level security;
+
+drop policy if exists "Admins manage pdf_channel_clear_requests" on public.pdf_channel_clear_requests;
+create policy "Admins manage pdf_channel_clear_requests"
+  on public.pdf_channel_clear_requests for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- BOT_SETTINGS: interruptores generales del bot, editables en vivo desde
+-- admin.html sin tocar el .env ni reiniciar el proceso. Fila única (id
+-- siempre 1). Por defecto la publicación automática de PDFs está apagada:
+-- el bot solo publica cuando se lo pide explícitamente desde la web
+-- ("Publicar PDFs pendientes"), nunca solo.
+-- =========================================================
+create table if not exists public.bot_settings (
+  id smallint primary key default 1 check (id = 1),
+  autopost_enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.bot_settings (id) values (1) on conflict (id) do nothing;
+
+alter table public.bot_settings enable row level security;
+
+drop policy if exists "Settings viewable by authenticated users" on public.bot_settings;
+create policy "Settings viewable by authenticated users"
+  on public.bot_settings for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify settings" on public.bot_settings;
+create policy "Only admins can modify settings"
+  on public.bot_settings for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- =========================================================
 -- IMPORTANTE: convertí tu usuario admin manualmente después de registrarte

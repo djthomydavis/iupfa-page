@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin | Cybersecurity Students IUPFA</title>
+  <script>(function () { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); })();</script>
   <link rel="icon" type="image/png" href="img/IUPFA Logo Alumnos.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,7 +31,16 @@
         <button class="nav-link active" data-admin-view="panel">Panel</button>
         <button class="nav-link" data-admin-view="materias">Materias</button>
         <button class="nav-link" data-admin-view="usuarios">Usuarios</button>
+        <button class="nav-link" data-admin-view="discord">Discord</button>
       </nav>
+
+      <div class="sidebar-footer">
+        <label class="theme-toggle">
+          <span>🌙 Modo oscuro</span>
+          <input type="checkbox" id="darkModeToggle" />
+          <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+        </label>
+      </div>
     </aside>
 
     <div class="main-column">
@@ -83,7 +93,9 @@
                 ⬆ Importar datos locales
                 <input type="file" id="importLocalDataInput" accept="application/json" class="hidden" />
               </label>
+              <button type="button" id="clearImportedDataBtn" class="ghost-btn danger-btn small-btn">🗑 Vaciar calendario, foro y contenido</button>
             </div>
+            <label class="checkbox-row small"><input type="checkbox" id="clearBeforeImportCheckbox" /> Vaciar todo antes de importar (evita duplicados)</label>
           </section>
         </section>
 
@@ -142,6 +154,136 @@
             <div class="section-head"><h3>Usuarios registrados</h3></div>
             <div id="usersNotice" class="notice"></div>
             <div id="adminUsersTable"></div>
+          </section>
+        </section>
+
+        <section id="adminDiscordView" class="admin-view-section hidden">
+          <h4 class="view-group-title">Mensajes</h4>
+
+          <section class="card">
+            <div class="section-head"><h3>Enviar mensaje ahora</h3></div>
+            <p class="form-hint">El bot revisa esto cada 15 segundos y lo postea en el canal elegido.</p>
+            <div id="outboxNotice" class="notice"></div>
+            <form id="outboxForm" class="stack">
+              <select id="outboxChannelId" required>
+                <option value="">Elegí un canal…</option>
+              </select>
+              <div class="md-toolbar" id="outboxMdToolbar">
+                <button type="button" class="md-btn" data-md="bold" title="Negrita"><b>N</b></button>
+                <button type="button" class="md-btn" data-md="italic" title="Cursiva"><i>C</i></button>
+                <button type="button" class="md-btn" data-md="strike" title="Tachado"><s>T</s></button>
+                <button type="button" class="md-btn" data-md="code" title="Código en línea">{ }</button>
+                <button type="button" class="md-btn" data-md="quote" title="Cita">"</button>
+                <button type="button" class="md-btn" data-md="list" title="Lista">•</button>
+                <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+              </div>
+              <textarea id="outboxContent" placeholder="Mensaje a enviar (admite Markdown de Discord)" rows="3"></textarea>
+              <label class="checkbox-row"><input type="checkbox" id="outboxEmbedToggle" /> Agregar embed (tarjeta enriquecida)</label>
+              <div id="outboxEmbedFields" class="embed-builder hidden"></div>
+              <button type="submit">Enviar</button>
+            </form>
+            <div id="outboxHistory" class="stack"></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Mensajes programados</h3></div>
+            <p class="form-hint">Una vez: se manda una sola vez en la fecha/hora elegida. Recurrente: se repite según los días y la hora marcados (zona horaria de Argentina).</p>
+            <div id="scheduledNotice" class="notice"></div>
+            <form id="scheduledForm" class="stack">
+              <select id="scheduledChannelId" required>
+                <option value="">Elegí un canal…</option>
+              </select>
+              <div class="md-toolbar" id="scheduledMdToolbar">
+                <button type="button" class="md-btn" data-md="bold" title="Negrita"><b>N</b></button>
+                <button type="button" class="md-btn" data-md="italic" title="Cursiva"><i>C</i></button>
+                <button type="button" class="md-btn" data-md="strike" title="Tachado"><s>T</s></button>
+                <button type="button" class="md-btn" data-md="code" title="Código en línea">{ }</button>
+                <button type="button" class="md-btn" data-md="quote" title="Cita">"</button>
+                <button type="button" class="md-btn" data-md="list" title="Lista">•</button>
+                <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+              </div>
+              <textarea id="scheduledContent" placeholder="Mensaje a enviar (admite Markdown de Discord)" rows="3"></textarea>
+              <label class="checkbox-row"><input type="checkbox" id="scheduledEmbedToggle" /> Agregar embed (tarjeta enriquecida)</label>
+              <div id="scheduledEmbedFields" class="embed-builder hidden"></div>
+              <div class="two-cols">
+                <select id="scheduledType">
+                  <option value="once">Una vez</option>
+                  <option value="recurring">Recurrente</option>
+                </select>
+                <input id="scheduledOnceAt" type="datetime-local" />
+              </div>
+              <div id="scheduledRecurringFields" class="hidden">
+                <div class="checkbox-row-group">
+                  <label class="checkbox-row small"><input type="checkbox" value="1" class="scheduledDay" /> Lun</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="2" class="scheduledDay" /> Mar</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="3" class="scheduledDay" /> Mié</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="4" class="scheduledDay" /> Jue</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="5" class="scheduledDay" /> Vie</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="6" class="scheduledDay" /> Sáb</label>
+                  <label class="checkbox-row small"><input type="checkbox" value="0" class="scheduledDay" /> Dom</label>
+                </div>
+                <label class="field-label">Hora<input id="scheduledTime" type="time" value="09:00" /></label>
+              </div>
+              <button type="submit">Programar mensaje</button>
+            </form>
+            <div id="scheduledList" class="stack"></div>
+          </section>
+
+          <h4 class="view-group-title">Contenido de materias (PDFs)</h4>
+
+          <section class="card">
+            <div class="section-head"><h3>Publicación automática</h3></div>
+            <p class="form-hint">Si está activada, el bot revisa cada 2 minutos si hay PDFs nuevos y los publica solo, sin que hagas nada. Si está apagada (por defecto), un PDF nuevo <strong>nunca</strong> se publica hasta que vos lo pidas explícitamente más abajo con "Publicar PDFs pendientes".</p>
+            <div id="autopostNotice" class="notice"></div>
+            <label class="checkbox-row"><input type="checkbox" id="autopostEnabledToggle" /> Publicar PDFs nuevos automáticamente</label>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Plantilla general de PDFs</h3></div>
+            <p class="form-hint">Se usa para cualquier materia que no tenga su propia plantilla (abajo). Variables disponibles: <code>{{materia}}</code>, <code>{{codigo}}</code>, <code>{{unidad}}</code>, <code>{{archivo}}</code>.</p>
+            <div id="defaultTemplateNotice" class="notice"></div>
+            <form id="defaultTemplateForm" class="stack">
+              <textarea id="defaultTemplateContent" placeholder="Ej: 📄 Nuevo material de {{materia}}: {{archivo}}" rows="2"></textarea>
+              <button type="submit">Guardar plantilla general</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Materia seleccionada</h3></div>
+            <p class="form-hint">Elegí una materia acá: las tres tarjetas de abajo (plantilla propia, publicar y borrar) actúan sobre la que elijas.</p>
+            <select id="templateSubjectSelect"></select>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Plantilla propia de esta materia <span class="pill">opcional</span></h3></div>
+            <p class="form-hint">Solo si esta materia necesita un mensaje distinto al general. Dejala vacía para seguir usando la plantilla general.</p>
+            <div id="templateNotice" class="notice"></div>
+            <form id="templateForm" class="stack">
+              <textarea id="templateContent" placeholder="Ej: Material {{unidad}} de la Materia {{materia}}: {{archivo}}" rows="2"></textarea>
+              <button type="submit">Guardar plantilla de esta materia</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Publicar contenido pendiente</h3></div>
+            <p class="form-hint">Postea en el canal "&lt;código&gt;_material" todos los PDFs que todavía no se hayan publicado. Nunca duplica lo que ya está publicado.</p>
+            <div id="bulkPostNotice" class="notice"></div>
+            <div class="stack-row">
+              <button type="button" id="bulkPostBtn">Publicar pendientes de esta materia</button>
+              <button type="button" id="bulkPostAllBtn" class="ghost-btn">Publicar pendientes de todas las materias</button>
+            </div>
+            <div id="bulkPostHistory" class="stack"></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Borrar publicaciones</h3></div>
+            <p class="form-hint">Borra los mensajes que mandó el bot en el canal "&lt;código&gt;_material" y libera esos PDFs para poder volver a publicarlos limpios (evita que quede desincronizado si preferís borrar así en vez de borrar a mano en Discord). Requiere el permiso "Leer historial de mensajes" para el bot en ese canal.</p>
+            <div id="clearChannelNotice" class="notice"></div>
+            <div class="stack-row">
+              <button type="button" id="clearChannelBtn" class="ghost-btn danger-btn">Borrar de esta materia</button>
+              <button type="button" id="clearChannelAllBtn" class="ghost-btn danger-btn">Borrar de todas las materias</button>
+            </div>
+            <div id="clearChannelHistory" class="stack"></div>
           </section>
         </section>
       </main>

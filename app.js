@@ -106,14 +106,12 @@ const state = {
     subjects: [],
     studentProgress: {},
     students: [],
-    studentSubjects: {},
-    messages: []
+    studentSubjects: {}
   },
   currentUser: null,
   authError: null,
   alumnosSearch: '',
   alumnosSubjectFilter: 'all',
-  selectedConversationUserId: null,
   openStudentProfileId: null,
   currentSubjectId: null,
   currentUnitId: null,
@@ -241,7 +239,163 @@ async function loadSubjectsFromSupabase() {
     state.data.subjects = buildCurriculumSubjects();
     return;
   }
-  state.data.subjects = data.map(mapSubjectRow);
+  // "code" es texto en la base, así que .order('code') lo ordena
+  // alfabéticamente (1, 10, 11, 2, 3...) en vez de numéricamente. Se
+  // reordena acá una sola vez para que toda la web (listados, selectores,
+  // etc.) muestre 1, 2, 3... 10, 11 como corresponde.
+  state.data.subjects = data.map(mapSubjectRow).sort((a, b) => parseInt(a.code, 10) - parseInt(b.code, 10));
+}
+
+// El calendario vive en Supabase (tabla calendar_events) para que sea un
+// dato real y compartido: entre otras cosas, es lo que lee el bot de
+// Discord para mostrar fechas y mandar recordatorios. Si no hay conexión a
+// Supabase (ej. abriendo el archivo local sin red) se usan los 3 eventos
+// semilla de arriba como fallback, igual que el curriculum.
+function mapCalendarRow(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    date: row.date,
+    endDate: row.end_date || '',
+    startTime: row.start_time ? row.start_time.slice(0, 5) : '',
+    endTime: row.end_time ? row.end_time.slice(0, 5) : ''
+  };
+}
+
+async function loadCalendarFromSupabase() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('calendar_events').select('*').order('date');
+  if (error || !data) return;
+  state.data.calendar = data.map(mapCalendarRow);
+}
+
+async function createCalendarEvent({ title, date, type, endDate, startTime, endTime }) {
+  if (!supabaseClient) {
+    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime });
+    return;
+  }
+  const { data, error } = await supabaseClient.from('calendar_events').insert({
+    title, date, type,
+    end_date: endDate || null,
+    start_time: startTime || null,
+    end_time: endTime || null,
+    created_by: state.currentUser ? state.currentUser.id : null
+  }).select().single();
+  if (error) { console.error('No se pudo crear el evento:', error); return; }
+  state.data.calendar.unshift(mapCalendarRow(data));
+}
+
+async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime }) {
+  const item = state.data.calendar.find(entry => entry.id === id);
+  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime });
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('calendar_events').update({
+    title, date, type,
+    end_date: endDate || null,
+    start_time: startTime || null,
+    end_time: endTime || null
+  }).eq('id', id);
+  if (error) console.error('No se pudo actualizar el evento:', error);
+}
+
+async function deleteCalendarEvent(id) {
+  state.data.calendar = state.data.calendar.filter(item => item.id !== id);
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('calendar_events').delete().eq('id', id);
+  if (error) console.error('No se pudo borrar el evento:', error);
+}
+
+// =========================================================
+// Foro general
+// =========================================================
+async function createForumPost({ title, content }) {
+  if (!supabaseClient || !state.currentUser) return { ok: false, message: 'No hay sesión.' };
+  const { data, error } = await supabaseClient.from('forum_posts').insert({
+    title, content,
+    author_id: state.currentUser.id,
+    author_name: getFullName(state.currentUser)
+  }).select().single();
+  if (error) return { ok: false, message: error.message };
+  state.data.forum.unshift(mapForumRow(data));
+  return { ok: true };
+}
+
+async function updateForumPost(id, { title, content }) {
+  const item = state.data.forum.find(entry => entry.id === id);
+  if (item) Object.assign(item, { title, content });
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('forum_posts').update({ title, content }).eq('id', id);
+  if (error) console.error('No se pudo actualizar la publicación:', error);
+}
+
+async function deleteForumPost(id) {
+  state.data.forum = state.data.forum.filter(item => item.id !== id);
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('forum_posts').delete().eq('id', id);
+  if (error) console.error('No se pudo borrar la publicación:', error);
+}
+
+// Vinculación de la cuenta del portal con Discord (ver user.html, sección
+// "Discord"). El código generado acá lo consume el bot con /vincular, que
+// usa la service_role key (evade RLS) para completar discord_user_id.
+function initDiscordLinkSection() {
+  const generateBtn = document.getElementById('generateDiscordCodeBtn');
+  const unlinkBtn = document.getElementById('unlinkDiscordBtn');
+  const status = document.getElementById('discordLinkStatus');
+  if (!generateBtn || !status || !supabaseClient || !state.currentUser) return;
+
+  async function refreshStatus() {
+    const { data } = await supabaseClient
+      .from('discord_links')
+      .select('discord_user_id, link_code, link_code_expires')
+      .eq('user_id', state.currentUser.id)
+      .maybeSingle();
+
+    if (data && data.discord_user_id) {
+      status.className = 'notice show';
+      status.textContent = 'Tu cuenta ya está vinculada con Discord. Vas a recibir recordatorios por DM.';
+      unlinkBtn.classList.remove('hidden');
+      generateBtn.textContent = 'Generar nuevo código';
+    } else if (data && data.link_code && new Date(data.link_code_expires) > new Date()) {
+      status.className = 'notice show';
+      status.textContent = `Tu código es ${data.link_code}. Escribile "/vincular ${data.link_code}" al bot antes de que expire (10 min).`;
+      unlinkBtn.classList.add('hidden');
+    } else {
+      status.className = 'notice show';
+      status.textContent = 'Todavía no vinculaste tu cuenta de Discord.';
+      unlinkBtn.classList.add('hidden');
+    }
+  }
+
+  generateBtn.addEventListener('click', async () => {
+    generateBtn.disabled = true;
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const { error } = await supabaseClient.from('discord_links').upsert({
+      user_id: state.currentUser.id,
+      link_code: code,
+      link_code_expires: expires
+    });
+    generateBtn.disabled = false;
+    if (error) {
+      status.className = 'notice show error';
+      status.textContent = 'No se pudo generar el código: ' + error.message;
+      return;
+    }
+    await refreshStatus();
+  });
+
+  unlinkBtn.addEventListener('click', async () => {
+    unlinkBtn.disabled = true;
+    await supabaseClient.from('discord_links')
+      .update({ discord_user_id: null, linked_at: null, link_code: null, link_code_expires: null })
+      .eq('user_id', state.currentUser.id);
+    unlinkBtn.disabled = false;
+    await refreshStatus();
+  });
+
+  refreshStatus();
 }
 
 async function loadStudentProgress(userId, email) {
@@ -306,7 +460,6 @@ async function setCurrentUserFromSession(session) {
     role: profile.role,
     avatar: profile.avatar,
     avatarUrl: profile.avatar_url || null,
-    allowMessages: !!profile.allow_messages,
     extraInfo: profile.extra_info || {},
     createdAt: profile.created_at,
     phone: profile.phone || '',
@@ -349,16 +502,130 @@ function applyViewMode() {
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const PORTAL_DATA_VERSION = '11';
 
-// El curriculum (subjects) y el progreso por alumno viven en Supabase.
-// Acá solo persistimos localmente lo que todavía no migramos: calendario,
-// foro general, y el contenido propio de cada materia (unidades, fechas,
-// foro de materia, opiniones, encuestas).
-function extractSubjectContent() {
+// El curriculum, el progreso por alumno, el calendario, el foro general y el
+// contenido de cada materia (unidades, PDFs/clases, foro de materia,
+// opiniones, encuestas) viven todos en Supabase — son datos reales y
+// compartidos entre dominios/dispositivos, no locales del navegador.
+
+function mapForumRow(row) {
+  return { id: row.id, title: row.title, content: row.content, author: row.author_name, authorId: row.author_id };
+}
+
+async function loadForumFromSupabase() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('forum_posts').select('*').order('created_at', { ascending: false });
+  if (error || !data) return;
+  state.data.forum = data.map(mapForumRow);
+}
+
+function mapContentItemRow(row) {
+  const base = { id: row.id, type: row.type, title: row.title, uploadedBy: row.uploaded_by };
+  return row.type === 'pdf'
+    ? { ...base, fileName: row.file_name, url: row.url, storagePath: row.storage_path }
+    : { ...base, body: row.body };
+}
+
+// Carga en bloque (pocas queries en vez de una por materia) todo el
+// contenido propio de cada materia y lo cuelga de state.data.subjects.
+function mapSummaryRow(row) {
+  return { id: row.id, title: row.title, fileName: row.file_name, url: row.url, storagePath: row.storage_path, author: row.author_name, authorId: row.author_id };
+}
+
+async function loadSubjectContentFromSupabase() {
+  state.data.subjects.forEach(subject => {
+    subject.units = [];
+    subject.dates = subject.dates || [];
+    subject.forum = [];
+    subject.opinions = [];
+    subject.polls = [];
+    subject.summaries = [];
+  });
+  if (!supabaseClient) return;
+
+  const [unitsRes, itemsRes, forumRes, opinionsRes, pollsRes, optionsRes, votesRes, summariesRes] = await Promise.all([
+    supabaseClient.from('subject_units').select('*').order('created_at', { ascending: true }),
+    supabaseClient.from('subject_content_items').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_forum_posts').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_opinions').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_polls').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_poll_options').select('*').order('position', { ascending: true }),
+    supabaseClient.from('subject_poll_votes').select('*'),
+    supabaseClient.from('subject_summaries').select('*').order('created_at', { ascending: false })
+  ]);
+
+  const subjectsById = {};
+  state.data.subjects.forEach(subject => { subjectsById[subject.id] = subject; });
+
+  const unitsById = {};
+  (unitsRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (!subject) return;
+    const unit = { id: row.id, title: row.title, items: [] };
+    unitsById[row.id] = unit;
+    subject.units.push(unit);
+  });
+
+  (itemsRes.data || []).forEach(row => {
+    const unit = unitsById[row.unit_id];
+    if (unit) unit.items.push(mapContentItemRow(row));
+  });
+
+  (forumRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (subject) subject.forum.push({ id: row.id, author: row.author_name, authorId: row.author_id, content: row.content });
+  });
+
+  (opinionsRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (subject) subject.opinions.push({ id: row.id, professor: row.professor, rating: row.rating, content: row.content, author: row.author_name, authorId: row.author_id });
+  });
+
+  const pollsById = {};
+  (pollsRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (!subject) return;
+    const poll = { id: row.id, question: row.question, createdBy: row.created_by_name, options: [] };
+    pollsById[row.id] = poll;
+    subject.polls.push(poll);
+  });
+
+  const optionsById = {};
+  (optionsRes.data || []).forEach(row => {
+    const poll = pollsById[row.poll_id];
+    if (!poll) return;
+    const option = { id: row.id, label: row.label, votes: [] };
+    optionsById[row.id] = option;
+    poll.options.push(option);
+  });
+
+  (votesRes.data || []).forEach(row => {
+    const option = optionsById[row.option_id];
+    if (option) option.votes.push(row.user_id);
+  });
+
+  (summariesRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (subject) subject.summaries.push(mapSummaryRow(row));
+  });
+}
+
+// Calendario, foro general y contenido de materias viven todos en Supabase.
+// Esta herramienta (panel Admin → Datos locales) sirve para dos cosas:
+// 1) hacer un backup en JSON de todo lo que hay cargado, y
+// 2) migrar a Supabase un backup viejo de cuando esto todavía se guardaba en
+//    localStorage del navegador.
+// Ojo con el import: no chequea duplicados (importar el mismo archivo dos
+// veces duplica todo), y como el JSON viejo solo guardaba el NOMBRE del autor
+// (no su id), las publicaciones/opiniones/encuestas importadas quedan
+// atribuidas a la cuenta del admin que hace la importación (se conserva el
+// nombre original solo como texto). Los votos de encuestas viejas tampoco se
+// migran, porque antes se guardaban por email y no hay forma confiable de
+// mapear eso a una cuenta real.
+function buildSubjectContentSnapshot() {
   const map = {};
   state.data.subjects.forEach(subject => {
     map[subject.id] = {
       units: subject.units,
-      dates: subject.dates,
       forum: subject.forum,
       opinions: subject.opinions,
       polls: subject.polls
@@ -367,64 +634,13 @@ function extractSubjectContent() {
   return map;
 }
 
-function savePortalData() {
-  try {
-    localStorage.setItem('portalCalendar', JSON.stringify(state.data.calendar));
-    localStorage.setItem('portalForum', JSON.stringify(state.data.forum));
-    localStorage.setItem('portalSubjectContent', JSON.stringify(extractSubjectContent()));
-    localStorage.setItem('portalDataVersion', PORTAL_DATA_VERSION);
-    return true;
-  } catch (error) {
-    console.error('No se pudo guardar en localStorage (¿almacenamiento lleno?):', error);
-    return false;
-  }
-}
-
-function loadLocalContent() {
-  const version = localStorage.getItem('portalDataVersion');
-  if (version !== PORTAL_DATA_VERSION) {
-    savePortalData();
-    return;
-  }
-  try {
-    const calendar = localStorage.getItem('portalCalendar');
-    const forum = localStorage.getItem('portalForum');
-    if (calendar) state.data.calendar = JSON.parse(calendar);
-    if (forum) state.data.forum = JSON.parse(forum);
-  } catch (error) {
-    // keep seed defaults
-  }
-}
-
-function mergeLocalSubjectContent() {
-  const raw = localStorage.getItem('portalSubjectContent');
-  if (!raw) return;
-  try {
-    const map = JSON.parse(raw);
-    state.data.subjects.forEach(subject => {
-      const saved = map[subject.id];
-      if (!saved) return;
-      subject.units = saved.units || [];
-      subject.dates = saved.dates || [];
-      subject.forum = saved.forum || [];
-      subject.opinions = saved.opinions || [];
-      subject.polls = saved.polls || [];
-    });
-  } catch (error) {
-    // ignore malformed cache
-  }
-}
-
-// Calendario, foro general y contenido de materias viven en localStorage
-// (por ahora), así que no se comparten solos entre dominios (ej. tu prueba
-// local vs. el sitio ya publicado). Este export/import los mueve a mano.
 function exportLocalData() {
   const payload = {
     exportedAt: new Date().toISOString(),
     version: PORTAL_DATA_VERSION,
-    calendar: JSON.parse(localStorage.getItem('portalCalendar') || JSON.stringify(state.data.calendar)),
-    forum: JSON.parse(localStorage.getItem('portalForum') || JSON.stringify(state.data.forum)),
-    subjectContent: JSON.parse(localStorage.getItem('portalSubjectContent') || JSON.stringify(extractSubjectContent()))
+    calendar: state.data.calendar,
+    forum: state.data.forum,
+    subjectContent: buildSubjectContentSnapshot()
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -437,15 +653,126 @@ function exportLocalData() {
   URL.revokeObjectURL(url);
 }
 
-function importLocalData(file, onDone) {
+// Borra todo lo que puede haberse cargado a mano o por importación: calendario,
+// foro general y, por cascada de foreign keys, unidades/contenido/foro/opiniones/
+// encuestas de cada materia. Las materias en sí y el progreso de los alumnos NO
+// se tocan.
+async function clearAllImportableData() {
+  if (!supabaseClient) throw new Error('No hay sesión con Supabase.');
+  const tables = ['calendar_events', 'forum_posts', 'subject_units', 'subject_forum_posts', 'subject_opinions', 'subject_polls'];
+  for (const table of tables) {
+    const { error } = await supabaseClient.from(table).delete().not('id', 'is', null);
+    if (error) throw error;
+  }
+}
+
+function importLocalData(file, onDone, options) {
+  const clearFirst = !!(options && options.clearFirst);
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const payload = JSON.parse(reader.result);
-      if (payload.calendar) localStorage.setItem('portalCalendar', JSON.stringify(payload.calendar));
-      if (payload.forum) localStorage.setItem('portalForum', JSON.stringify(payload.forum));
-      if (payload.subjectContent) localStorage.setItem('portalSubjectContent', JSON.stringify(payload.subjectContent));
-      localStorage.setItem('portalDataVersion', PORTAL_DATA_VERSION);
+      if (!supabaseClient || !state.currentUser) throw new Error('No hay sesión con Supabase para importar.');
+      const importerId = state.currentUser.id;
+
+      if (clearFirst) await clearAllImportableData();
+
+      if (payload.calendar && payload.calendar.length) {
+        const rows = payload.calendar.map(event => ({
+          title: event.title,
+          date: event.date,
+          type: event.type,
+          end_date: event.endDate || null,
+          start_time: event.startTime || null,
+          end_time: event.endTime || null,
+          created_by: importerId
+        }));
+        const { error } = await supabaseClient.from('calendar_events').insert(rows);
+        if (error) throw error;
+      }
+
+      if (payload.forum && payload.forum.length) {
+        const rows = payload.forum.map(post => ({
+          title: post.title,
+          content: post.content,
+          author_id: importerId,
+          author_name: post.author || 'Desconocido'
+        }));
+        const { error } = await supabaseClient.from('forum_posts').insert(rows);
+        if (error) throw error;
+      }
+
+      if (payload.subjectContent) {
+        for (const subjectId of Object.keys(payload.subjectContent)) {
+          const saved = payload.subjectContent[subjectId];
+          if (!saved || !state.data.subjects.some(s => s.id === subjectId)) continue;
+
+          for (const unit of (saved.units || [])) {
+            const { data: unitRow, error: unitError } = await supabaseClient
+              .from('subject_units').insert({ subject_id: subjectId, title: unit.title }).select().single();
+            if (unitError) throw unitError;
+
+            for (const item of (unit.items || [])) {
+              if (item.type === 'pdf') {
+                let url = item.url;
+                let storagePath = item.storagePath || null;
+                if (!url && item.dataUrl) {
+                  const path = `${subjectId}/${generateLocalId('pdf')}_${sanitizeStorageFilename(item.fileName || item.title)}`;
+                  const { error: uploadError } = await supabaseClient.storage
+                    .from('subject-content').upload(path, dataUrlToBlob(item.dataUrl));
+                  if (uploadError) throw uploadError;
+                  url = supabaseClient.storage.from('subject-content').getPublicUrl(path).data.publicUrl;
+                  storagePath = path;
+                }
+                if (!url) continue;
+                const { error: itemError } = await supabaseClient.from('subject_content_items').insert({
+                  unit_id: unitRow.id, subject_id: subjectId, type: 'pdf', title: item.title,
+                  file_name: item.fileName || null, url, storage_path: storagePath, uploaded_by: item.uploadedBy || null
+                });
+                if (itemError) throw itemError;
+              } else {
+                const { error: itemError } = await supabaseClient.from('subject_content_items').insert({
+                  unit_id: unitRow.id, subject_id: subjectId, type: 'clase', title: item.title,
+                  body: item.body || '', uploaded_by: item.uploadedBy || null
+                });
+                if (itemError) throw itemError;
+              }
+            }
+          }
+
+          if ((saved.forum || []).length) {
+            const rows = saved.forum.map(post => ({
+              subject_id: subjectId, author_id: importerId, author_name: post.author || 'Desconocido', content: post.content
+            }));
+            const { error } = await supabaseClient.from('subject_forum_posts').insert(rows);
+            if (error) throw error;
+          }
+
+          if ((saved.opinions || []).length) {
+            const rows = saved.opinions.map(opinion => ({
+              subject_id: subjectId, author_id: importerId, author_name: opinion.author || 'Desconocido',
+              professor: opinion.professor, rating: opinion.rating, content: opinion.content || ''
+            }));
+            const { error } = await supabaseClient.from('subject_opinions').insert(rows);
+            if (error) throw error;
+          }
+
+          for (const poll of (saved.polls || [])) {
+            const { data: pollRow, error: pollError } = await supabaseClient
+              .from('subject_polls')
+              .insert({ subject_id: subjectId, created_by_id: importerId, created_by_name: poll.createdBy || 'Desconocido', question: poll.question })
+              .select().single();
+            if (pollError) throw pollError;
+
+            const options = (poll.options || []).map((option, index) => ({ poll_id: pollRow.id, label: option.label, position: index }));
+            if (options.length) {
+              const { error: optionsError } = await supabaseClient.from('subject_poll_options').insert(options);
+              if (optionsError) throw optionsError;
+            }
+          }
+        }
+      }
+
       onDone(null);
     } catch (error) {
       onDone(error);
@@ -749,13 +1076,40 @@ function renderForumViews() {
 
 function renderHomeStats() {
   const cursables = document.getElementById('statCursables');
+  const cursando = document.getElementById('statCursando');
   const aprobadas = document.getElementById('statAprobadas');
   if (!state.currentUser) return;
 
   const email = state.currentUser.email;
   const statuses = state.data.subjects.map(subject => getSubjectProgress(email, subject.id).status);
   if (cursables) cursables.textContent = statuses.filter(status => status === 'Cursable').length;
+  if (cursando) cursando.textContent = statuses.filter(status => status === 'Cursando').length;
   if (aprobadas) aprobadas.textContent = statuses.filter(status => status === 'Aprobada').length;
+}
+
+// Deduce si el cuatrimestre activo (evento de calendario tipo "Cuatrimestre" que
+// cubre la fecha de hoy) es el 1° o el 2°, leyendo el título del evento. Se espera
+// que el admin lo titule de forma clara ("1er Cuatrimestre 2026", "2do Cuatrimestre
+// 2026", etc.) — si no hay evento activo, devuelve null y no se bloquea nada por
+// cuatrimestre (para no romper la planificación si todavía no cargaron el calendario).
+function getCurrentSemesterNumber() {
+  const event = getCurrentSemesterEvent();
+  if (!event || !event.title) return null;
+  const title = event.title.toLowerCase();
+  if (/primer|1er|1ero|1°/.test(title)) return '1';
+  if (/segundo|2do|2ndo|2°/.test(title)) return '2';
+  const digitMatch = title.match(/[12](?!\d{3})/);
+  return digitMatch ? digitMatch[0] : null;
+}
+
+// Una materia solo se puede empezar a cursar durante el cuatrimestre en el que
+// se dicta (las de "1er cuatrimestre" solo se habilitan en 1er cuatrimestre, etc).
+// Si no hay forma de saber qué cuatrimestre es (sin evento en el calendario), no
+// se bloquea nada.
+function isEnrollmentWindowOpenFor(subject) {
+  const currentSemester = getCurrentSemesterNumber();
+  if (!currentSemester) return true;
+  return String(subject.semester) === currentSemester;
 }
 
 const STATUS_OPTIONS = ['Cursable', 'No cursable', 'Cursando', 'Aprobada', 'A rendir final'];
@@ -786,9 +1140,12 @@ function enforceCorrelativity(email) {
   while (changed && guard <= state.data.subjects.length) {
     changed = false;
     state.data.subjects.forEach(subject => {
-      const met = correlativesMet(subject, email);
+      const met = correlativesMet(subject, email) && isEnrollmentWindowOpenFor(subject);
       const progress = getSubjectProgress(email, subject.id);
-      if (!met && progress.status !== 'No cursable') {
+      // Solo alternamos entre Cursable/No cursable: nunca tocamos una materia
+      // que ya está Cursando, Aprobada o A rendir final (aunque el cuatrimestre
+      // activo haya cambiado desde que se anotó).
+      if (!met && progress.status === 'Cursable') {
         progress.status = 'No cursable';
         changed = true;
         changedIds.add(subject.id);
@@ -807,6 +1164,108 @@ function enforceCorrelativityAndPersist(email) {
   const changed = enforceCorrelativity(email);
   changed.forEach(id => persistProgress(id));
   return changed;
+}
+
+// Los primeros 5 códigos (Informática I, Aspectos Constitucionales, Elementos
+// del Derecho Penal, Redes de Área Local y Teleinformática) son con los que la
+// facultad anota automáticamente a todo alumno que ingresa, en su 1er cuatrimestre.
+const ROADMAP_FOUNDATION_CODES = [1, 2, 3, 4, 8];
+
+// Arma el roadmap completo de la carrera: arranca siempre con el cuatrimestre
+// de ingreso fijo, sigue con lo que el alumno ya está cursando o puede empezar
+// a cursar, y de ahí en más simula cuatrimestre a cuatrimestre (alternando 1°/2°,
+// como se dictan realmente las materias) asumiendo que todo lo anterior se aprobó,
+// respetando correlativas y los topes que ingresó (materias por cuatrimestre y
+// máximo de presenciales), sin importar si hoy realmente se podría anotar o no.
+function computeRoadmap(email, maxSubjects, maxPresenciales) {
+  const subjects = state.data.subjects;
+  const statusOf = subject => getSubjectProgress(email, subject.id).status;
+
+  const foundation = ROADMAP_FOUNDATION_CODES
+    .map(code => subjects.find(subject => Number(subject.code) === code))
+    .filter(Boolean);
+
+  const scheduled = new Set(foundation.map(subject => subject.id));
+  const virtualApproved = new Set(foundation.map(subject => subject.id));
+
+  subjects.forEach(subject => {
+    const status = statusOf(subject);
+    if (status === 'Aprobada' || status === 'A rendir final') {
+      scheduled.add(subject.id);
+      virtualApproved.add(subject.id);
+    }
+  });
+
+  let pendingCursando = subjects.filter(subject => statusOf(subject) === 'Cursando' && !scheduled.has(subject.id));
+  pendingCursando.forEach(subject => scheduled.add(subject.id));
+
+  const pending = new Map(subjects.filter(subject => !scheduled.has(subject.id)).map(subject => [subject.id, subject]));
+
+  const plan = [{ term: 1, subjects: foundation, fixed: true }];
+
+  let term = 2;
+  let guard = 0;
+
+  while ((pendingCursando.length || pending.size) && guard < 80) {
+    guard += 1;
+    const parity = term % 2 === 0 ? '2' : '1';
+
+    const selected = pendingCursando;
+    let presencialCount = selected.filter(subject => subject.modality === 'Presencial').length;
+
+    const eligible = [...pending.values()]
+      .filter(subject => String(subject.semester) === parity)
+      .filter(subject => subject.correlatives.every(id => virtualApproved.has(id)))
+      .sort((a, b) => Number(a.code) - Number(b.code));
+
+    eligible.forEach(subject => {
+      if (selected.length >= maxSubjects) return;
+      if (subject.modality === 'Presencial') {
+        if (presencialCount >= maxPresenciales) return;
+        presencialCount += 1;
+      }
+      selected.push(subject);
+    });
+
+    selected.forEach(subject => {
+      pending.delete(subject.id);
+      virtualApproved.add(subject.id);
+    });
+
+    if (selected.length) plan.push({ term, subjects: selected });
+
+    pendingCursando = [];
+    term += 1;
+  }
+
+  if (pending.size) {
+    plan.push({ term, blocked: true, remaining: [...pending.values()] });
+  }
+
+  return plan;
+}
+
+function renderRoadmapResult(plan) {
+  const target = document.getElementById('roadmapResult');
+  if (!target) return;
+
+  target.innerHTML = plan.map(step => {
+    if (step.blocked) {
+      const names = step.remaining.map(subject => `${subject.code} · ${subject.name}`).join(', ');
+      return createItemCard(
+        'No se puede seguir con estos límites',
+        'Subí el máximo de materias o de presenciales por cuatrimestre para poder ubicar el resto.',
+        `Quedan sin ubicar: ${names}`
+      );
+    }
+    const presenciales = step.subjects.filter(subject => subject.modality === 'Presencial').length;
+    const items = step.subjects.map(subject => `${subject.code} · ${subject.name} (${subject.modality})`).join('<br>');
+    const title = step.fixed ? `Cuatrimestre ${step.term} (ingreso)` : `Cuatrimestre ${step.term}`;
+    const subtitle = step.fixed
+      ? 'Materias con las que se anota automáticamente todo alumno que ingresa'
+      : `${step.subjects.length} materia${step.subjects.length === 1 ? '' : 's'} · ${presenciales} presencial${presenciales === 1 ? '' : 'es'}`;
+    return createItemCard(title, subtitle, items);
+  }).join('');
 }
 
 function correlativeCodes(subject) {
@@ -843,8 +1302,16 @@ function renderPlanningTable() {
 
   visibleSubjects.forEach(subject => {
     const progress = getSubjectProgress(email, subject.id);
-    const met = correlativesMet(subject, email);
+    const correlMet = correlativesMet(subject, email);
+    // Si ya está Cursando/Aprobada/A rendir final no la volvemos a bloquear por
+    // cuatrimestre (eso solo aplica para decidir si puede empezar a cursarla ahora).
+    const alreadyCommitted = progress.status === 'Cursando' || progress.status === 'Aprobada' || progress.status === 'A rendir final';
+    const windowOpen = alreadyCommitted || isEnrollmentWindowOpenFor(subject);
+    const met = correlMet && windowOpen;
     const availableStatusOptions = met ? STATUS_OPTIONS.filter(option => option !== 'No cursable') : ['No cursable'];
+    const lockedHint = correlMet && !windowOpen
+      ? `Correlativas cumplidas, pero esta materia se dicta en otro cuatrimestre.`
+      : '';
 
     const statusOptions = availableStatusOptions
       .map(option => `<option value="${option}" ${progress.status === option ? 'selected' : ''}>${option}</option>`)
@@ -882,7 +1349,7 @@ function renderPlanningTable() {
           <span class="planning-card-code">#${subject.code}</span>
           <strong class="planning-card-name">${subject.name}</strong>
         </div>
-        <select class="table-select status-select" data-field="status" ${met ? '' : 'disabled'}>${statusOptions}</select>
+        <select class="table-select status-select" data-field="status" ${met ? '' : 'disabled'} ${lockedHint ? `title="${lockedHint}"` : ''}>${statusOptions}</select>
         <div class="planning-card-grades">${gradeInputs}</div>
       </article>
     `;
@@ -925,7 +1392,6 @@ function renderPlanningTable() {
       getSubjectProgress(email, subjectId).status = event.target.value;
       persistProgress(subjectId);
       enforceCorrelativityAndPersist(email);
-      savePortalData();
       renderPlanningTable();
       renderHomeStats();
     });
@@ -936,7 +1402,6 @@ function renderPlanningTable() {
       const subjectId = event.target.closest('[data-subject-id]').dataset.subjectId;
       getSubjectProgress(email, subjectId).grades[event.target.dataset.field] = event.target.value.trim();
       persistProgress(subjectId);
-      savePortalData();
     });
   });
 }
@@ -1206,7 +1671,10 @@ async function deleteContentItem(subject, unitId, itemId) {
   }
   if (state.currentItemId === itemId) state.currentItemId = null;
   state.confirmDeleteItemId = null;
-  savePortalData();
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from('subject_content_items').delete().eq('id', itemId);
+    if (error) console.error('No se pudo borrar el contenido:', error);
+  }
   renderSubjectLists(subject);
 }
 
@@ -1223,7 +1691,11 @@ async function deleteUnit(subject, unitId) {
   if (state.currentUnitId === unitId) state.currentUnitId = null;
   if (removed.items.some(item => item.id === state.currentItemId)) state.currentItemId = null;
   state.confirmDeleteUnitId = null;
-  savePortalData();
+  if (supabaseClient) {
+    // Borra también los items de la unidad por la FK "on delete cascade".
+    const { error } = await supabaseClient.from('subject_units').delete().eq('id', unitId);
+    if (error) console.error('No se pudo borrar la unidad:', error);
+  }
   renderSubjectLists(subject);
   refreshContentUnitSelect(subject);
 }
@@ -1240,7 +1712,7 @@ function renderPolls(subject) {
   target.innerHTML = subject.polls.map(poll => {
     const totalVotes = poll.options.reduce((sum, option) => sum + option.votes.length, 0);
     const myVoteOptionId = state.currentUser
-      ? (poll.options.find(option => option.votes.includes(state.currentUser.email)) || {}).id
+      ? (poll.options.find(option => option.votes.includes(state.currentUser.id)) || {}).id
       : null;
 
     const optionsHtml = poll.options.map(option => {
@@ -1265,16 +1737,22 @@ function renderPolls(subject) {
   }).join('');
 
   target.querySelectorAll('.poll-option').forEach(button => {
-    button.addEventListener('click', () => {
-      if (!state.currentUser) return;
+    button.addEventListener('click', async () => {
+      if (!state.currentUser || !supabaseClient) return;
       const poll = subject.polls.find(item => item.id === button.dataset.pollId);
       if (!poll) return;
+      const optionId = button.dataset.optionId;
+
+      const { error } = await supabaseClient
+        .from('subject_poll_votes')
+        .upsert({ poll_id: poll.id, option_id: optionId, user_id: state.currentUser.id }, { onConflict: 'poll_id,user_id' });
+      if (error) { console.error('No se pudo registrar el voto:', error); return; }
+
       poll.options.forEach(option => {
-        option.votes = option.votes.filter(email => email !== state.currentUser.email);
+        option.votes = option.votes.filter(userId => userId !== state.currentUser.id);
       });
-      const chosen = poll.options.find(option => option.id === button.dataset.optionId);
-      if (chosen) chosen.votes.push(state.currentUser.email);
-      savePortalData();
+      const chosen = poll.options.find(option => option.id === optionId);
+      if (chosen) chosen.votes.push(state.currentUser.id);
       renderPolls(subject);
     });
   });
@@ -1317,12 +1795,58 @@ function renderOpinions(subject) {
     : createItemCard('Sin opiniones', 'No hay opiniones que coincidan con el filtro.', '');
 }
 
+function summaryCard(subject, summary) {
+  const canDelete = state.currentUser && (state.currentUser.id === summary.authorId || isAdminView());
+  const deleteBtn = canDelete
+    ? `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-summary="${summary.id}" title="Eliminar resumen">🗑</button>`
+    : '';
+  return `
+    <article class="item-card summary-card">
+      <div class="summary-card-head">
+        <a href="${summary.url}" target="_blank" rel="noopener"><strong>${summary.title}</strong></a>
+        ${deleteBtn}
+      </div>
+      <span>Por ${summary.author}${summary.fileName ? ` · ${summary.fileName}` : ''}</span>
+    </article>
+  `;
+}
+
+function renderSummaries(subject) {
+  const target = document.getElementById('subjectSummaries');
+  if (!target) return;
+
+  target.innerHTML = subject.summaries.length
+    ? subject.summaries.map(summary => summaryCard(subject, summary)).join('')
+    : createItemCard('Sin resúmenes todavía', 'Sé el primero en compartir un resumen de esta materia.', '');
+
+  target.querySelectorAll('[data-delete-summary]').forEach(button => {
+    button.addEventListener('click', () => deleteSummary(subject, button.dataset.deleteSummary));
+  });
+}
+
+async function deleteSummary(subject, summaryId) {
+  const summary = subject.summaries.find(item => item.id === summaryId);
+  if (!summary || !supabaseClient || !state.currentUser) return;
+  if (state.currentUser.id !== summary.authorId && !isAdminView()) return;
+  if (!confirm('¿Eliminar este resumen?')) return;
+
+  if (summary.storagePath) {
+    await supabaseClient.storage.from('subject-content').remove([summary.storagePath]);
+  }
+  const { error } = await supabaseClient.from('subject_summaries').delete().eq('id', summaryId);
+  if (error) { alert('No se pudo borrar el resumen: ' + error.message); return; }
+
+  subject.summaries = subject.summaries.filter(item => item.id !== summaryId);
+  renderSummaries(subject);
+}
+
 function renderSubjectLists(subject) {
   renderSubjectContent(subject);
   renderList('subjectDates', subject.dates, item => createItemCard(item, 'Fecha relevante', ''));
   renderList('subjectForum', subject.forum, item => createItemCard(item.author, 'Comentario en el foro', item.content));
   renderOpinions(subject);
   renderPolls(subject);
+  renderSummaries(subject);
 }
 
 function setSubjectTab(tab) {
@@ -1374,7 +1898,7 @@ function setView(view) {
     planificacion: 'planificacionView',
     foro: 'foroView',
     alumnos: 'alumnosView',
-    mensajes: 'mensajesView',
+    contacto: 'contactoView',
     materias: 'materiasView',
     materia: 'materiaView'
   };
@@ -1397,7 +1921,6 @@ function setView(view) {
   }
 
   if (view === 'alumnos') loadStudentDirectory();
-  if (view === 'mensajes') loadMessages();
 }
 
 function getFullName(user) {
@@ -1440,7 +1963,7 @@ function updateAdminHeader(user) {
 }
 
 function setAdminView(view) {
-  const map = { panel: 'adminPanelView', materias: 'adminMateriasView', usuarios: 'adminUsuariosView' };
+  const map = { panel: 'adminPanelView', materias: 'adminMateriasView', usuarios: 'adminUsuariosView', discord: 'adminDiscordView' };
 
   Object.values(map).forEach(id => {
     const section = document.getElementById(id);
@@ -1456,6 +1979,14 @@ function setAdminView(view) {
   });
 
   if (view === 'usuarios') loadAndRenderAdminUsers();
+  if (view === 'discord') {
+    loadDiscordChannels().then(() => {
+      loadOutboxHistory();
+      loadScheduledMessages();
+    });
+    loadBulkPostHistory();
+    loadClearChannelHistory();
+  }
 }
 
 function showAuthForm(mode) {
@@ -1565,7 +2096,7 @@ function setupCalendarNavToggle() {
 }
 
 // =========================================================
-// Alumnos: directorio de compañeros + perfil público + mensajes
+// Alumnos: directorio de compañeros + perfil público
 // =========================================================
 
 async function loadStudentDirectory() {
@@ -1704,10 +2235,6 @@ function openStudentProfile(studentId) {
     ? `<a class="whatsapp-btn" target="_blank" rel="noopener" href="https://wa.me/${student.phone.replace(/[^0-9]/g, '')}">💬 Contactar por WhatsApp</a>`
     : '';
 
-  const messageHtml = student.allow_messages
-    ? `<button type="button" id="startConversationBtn" data-message-user="${student.id}">✉ Enviar mensaje</button>`
-    : '<p class="student-profile-empty">Este alumno no recibe mensajes por el portal.</p>';
-
   content.innerHTML = `
     <div class="student-profile-head">
       <div class="avatar large">${renderStudentAvatar(student)}</div>
@@ -1721,153 +2248,17 @@ function openStudentProfile(studentId) {
     <div class="section-head" style="margin-top:16px"><h4>Datos adicionales</h4></div>
     ${extraFieldsHtml}
     <div class="student-profile-actions">
-      ${messageHtml}
       ${whatsappHtml}
     </div>
   `;
 
   modal.classList.remove('hidden');
-
-  const startBtn = document.getElementById('startConversationBtn');
-  if (startBtn) {
-    startBtn.addEventListener('click', () => {
-      closeStudentProfile();
-      setView('mensajes');
-      openConversation(student.id, studentFullName(student));
-    });
-  }
 }
 
 function closeStudentProfile() {
   const modal = document.getElementById('studentProfileModal');
   if (modal) modal.classList.add('hidden');
   state.openStudentProfileId = null;
-}
-
-// =========================================================
-// Mensajes
-// =========================================================
-
-async function loadMessages() {
-  if (!supabaseClient || !state.currentUser) return;
-  if (!state.data.students.length) await loadStudentDirectory();
-
-  const { data, error } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .or(`sender_id.eq.${state.currentUser.id},receiver_id.eq.${state.currentUser.id}`)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    const notice = document.getElementById('mensajesNotice');
-    if (notice) { notice.className = 'notice show error'; notice.textContent = 'No se pudieron cargar los mensajes: ' + error.message; }
-    return;
-  }
-
-  state.data.messages = data || [];
-  updateUnreadBadge();
-  renderConversationsList();
-  if (state.selectedConversationUserId) renderConversationThread();
-}
-
-function getConversationPartners() {
-  const me = state.currentUser.id;
-  const partners = {};
-  state.data.messages.forEach(message => {
-    const otherId = message.sender_id === me ? message.receiver_id : message.sender_id;
-    if (!partners[otherId] || new Date(message.created_at) > new Date(partners[otherId].created_at)) {
-      partners[otherId] = message;
-    }
-  });
-  return partners;
-}
-
-function findStudentName(userId) {
-  const student = state.data.students.find(item => item.id === userId);
-  return student ? studentFullName(student) : 'Usuario';
-}
-
-function renderConversationsList() {
-  const target = document.getElementById('conversationsList');
-  if (!target) return;
-  const me = state.currentUser.id;
-  const partners = getConversationPartners();
-  const entries = Object.entries(partners).sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at));
-
-  if (!entries.length) {
-    target.innerHTML = '<p class="table-empty">Todavía no tenés conversaciones. Escribile a un alumno desde "Alumnos".</p>';
-    return;
-  }
-
-  target.innerHTML = entries.map(([userId, lastMessage]) => {
-    const hasUnread = state.data.messages.some(m => m.sender_id === userId && m.receiver_id === me && !m.read);
-    const name = findStudentName(userId) !== 'Usuario' ? findStudentName(userId) : (lastMessage.sender_id === me ? 'Usuario' : lastMessage.sender_id);
-    return `
-      <div class="conversation-item ${state.selectedConversationUserId === userId ? 'active' : ''}" data-open-conversation="${userId}">
-        <div class="conversation-item-info">
-          <strong>${name}</strong>
-          <span class="conversation-item-preview">${lastMessage.sender_id === me ? 'Vos: ' : ''}${lastMessage.content}</span>
-        </div>
-        ${hasUnread ? '<span class="conversation-unread-dot"></span>' : ''}
-      </div>
-    `;
-  }).join('');
-}
-
-function renderConversationThread() {
-  const thread = document.getElementById('conversationThread');
-  const title = document.getElementById('conversationWithName');
-  const replyForm = document.getElementById('replyMessageForm');
-  if (!thread || !state.selectedConversationUserId) return;
-
-  const me = state.currentUser.id;
-  const partnerId = state.selectedConversationUserId;
-  const messages = state.data.messages.filter(m => m.sender_id === partnerId || m.receiver_id === partnerId);
-
-  if (title) title.textContent = findStudentName(partnerId);
-  if (replyForm) replyForm.classList.remove('hidden');
-
-  thread.innerHTML = messages.map(m => {
-    const mine = m.sender_id === me;
-    const time = new Date(m.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    return `<div class="message-bubble ${mine ? 'mine' : 'theirs'}">${m.content}<time>${time}</time></div>`;
-  }).join('');
-  thread.scrollTop = thread.scrollHeight;
-}
-
-async function openConversation(userId, fallbackName) {
-  state.selectedConversationUserId = userId;
-  renderConversationsList();
-  renderConversationThread();
-
-  const unread = state.data.messages.filter(m => m.sender_id === userId && m.receiver_id === state.currentUser.id && !m.read);
-  if (unread.length && supabaseClient) {
-    await supabaseClient.from('messages').update({ read: true }).in('id', unread.map(m => m.id));
-    unread.forEach(m => { m.read = true; });
-    updateUnreadBadge();
-    renderConversationsList();
-  }
-}
-
-function updateUnreadBadge() {
-  const badge = document.getElementById('unreadBadge');
-  if (!badge || !state.currentUser) return;
-  const count = state.data.messages.filter(m => m.receiver_id === state.currentUser.id && !m.read).length;
-  badge.textContent = count;
-  badge.classList.toggle('hidden', count === 0);
-}
-
-async function sendMessageTo(receiverId, content) {
-  if (!supabaseClient || !state.currentUser || !content.trim()) return { ok: false, message: 'Escribí un mensaje.' };
-  const { data, error } = await supabaseClient
-    .from('messages')
-    .insert({ sender_id: state.currentUser.id, receiver_id: receiverId, content: content.trim() })
-    .select()
-    .single();
-
-  if (error) return { ok: false, message: error.message };
-  state.data.messages.push(data);
-  return { ok: true };
 }
 
 function attachPortalEvents() {
@@ -2286,40 +2677,42 @@ function attachPortalEvents() {
     });
   }
 
-  const conversationsList = document.getElementById('conversationsList');
-  if (conversationsList) {
-    conversationsList.addEventListener('click', event => {
-      const item = event.target.closest('[data-open-conversation]');
-      if (item) openConversation(item.dataset.openConversation);
+  const roadmapBtn = document.getElementById('roadmapBtn');
+  const roadmapModal = document.getElementById('roadmapModal');
+  const closeRoadmapModal = document.getElementById('closeRoadmapModal');
+  const roadmapForm = document.getElementById('roadmapForm');
+
+  if (roadmapBtn && roadmapModal) {
+    roadmapBtn.addEventListener('click', () => roadmapModal.classList.remove('hidden'));
+  }
+  if (closeRoadmapModal && roadmapModal) {
+    closeRoadmapModal.addEventListener('click', () => roadmapModal.classList.add('hidden'));
+  }
+  if (roadmapModal) {
+    roadmapModal.addEventListener('click', event => {
+      if (event.target === roadmapModal) roadmapModal.classList.add('hidden');
     });
   }
-
-  const replyMessageForm = document.getElementById('replyMessageForm');
-  if (replyMessageForm) {
-    replyMessageForm.addEventListener('submit', async event => {
+  if (roadmapForm) {
+    roadmapForm.addEventListener('submit', event => {
       event.preventDefault();
-      if (!state.selectedConversationUserId) return;
-      const input = document.getElementById('replyMessageInput');
-      const submitBtn = replyMessageForm.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.disabled = true;
-      const result = await sendMessageTo(state.selectedConversationUserId, input.value);
-      if (submitBtn) submitBtn.disabled = false;
-      if (!result.ok) return;
-      input.value = '';
-      renderConversationThread();
-      renderConversationsList();
+      if (!state.currentUser) return;
+      const maxSubjects = Math.max(1, Number(document.getElementById('roadmapMaxSubjects').value) || 1);
+      const maxPresenciales = Math.max(0, Number(document.getElementById('roadmapMaxPresenciales').value) || 0);
+      const plan = computeRoadmap(state.currentUser.email, maxSubjects, maxPresenciales);
+      renderRoadmapResult(plan);
     });
   }
 
   if (forumForm) {
-    forumForm.addEventListener('submit', event => {
+    forumForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!state.currentUser) return;
       const title = document.getElementById('forumTitle').value.trim();
       const content = document.getElementById('forumContent').value.trim();
       if (!title || !content) return;
-      state.data.forum.unshift({ id: generateLocalId('post'), title, content, author: getFullName(state.currentUser) });
-      savePortalData();
+      const result = await createForumPost({ title, content });
+      if (!result.ok) { alert('No se pudo publicar: ' + result.message); return; }
       forumForm.reset();
       renderForumViews();
       if (document.getElementById('adminPostsCount')) document.getElementById('adminPostsCount').textContent = state.data.forum.length;
@@ -2348,7 +2741,7 @@ function attachPortalEvents() {
   }
 
   if (newCalendarEventForm) {
-    newCalendarEventForm.addEventListener('submit', event => {
+    newCalendarEventForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!isAdminView()) return;
       const title = document.getElementById('newCalendarEventTitle').value.trim();
@@ -2358,8 +2751,7 @@ function attachPortalEvents() {
       const startTime = document.getElementById('newCalendarEventStartTime').value;
       const endTime = document.getElementById('newCalendarEventEndTime').value;
       if (!title || !date) return;
-      state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime });
-      savePortalData();
+      await createCalendarEvent({ title, date, type, endDate, startTime, endTime });
       newCalendarEventForm.reset();
       newCalendarEventForm.classList.add('hidden');
       renderCalendarViews();
@@ -2384,27 +2776,24 @@ function attachPortalEvents() {
       }
       const deleteBtn = event.target.closest('[data-calendar-delete]');
       if (deleteBtn) {
-        state.data.calendar = state.data.calendar.filter(item => item.id !== deleteBtn.dataset.calendarDelete);
-        savePortalData();
-        renderCalendarViews();
+        deleteCalendarEvent(deleteBtn.dataset.calendarDelete).then(renderCalendarViews);
       }
     });
 
-    calendarFullEl.addEventListener('submit', event => {
+    calendarFullEl.addEventListener('submit', async event => {
       const form = event.target.closest('[data-calendar-edit-form]');
       if (!form || !isAdminView()) return;
       event.preventDefault();
       const id = form.dataset.calendarEditForm;
-      const item = state.data.calendar.find(entry => entry.id === id);
-      if (!item) return;
-      item.title = form.title.value.trim();
-      item.date = form.date.value;
-      item.type = form.type.value;
-      item.endDate = form.endDate.value;
-      item.startTime = form.startTime.value;
-      item.endTime = form.endTime.value;
+      await updateCalendarEvent(id, {
+        title: form.title.value.trim(),
+        date: form.date.value,
+        type: form.type.value,
+        endDate: form.endDate.value,
+        startTime: form.startTime.value,
+        endTime: form.endTime.value
+      });
       state.editingCalendarId = null;
-      savePortalData();
       renderCalendarViews();
     });
   }
@@ -2427,23 +2816,20 @@ function attachPortalEvents() {
       }
       const deleteBtn = event.target.closest('[data-forum-delete]');
       if (deleteBtn) {
-        state.data.forum = state.data.forum.filter(item => item.id !== deleteBtn.dataset.forumDelete);
-        savePortalData();
-        renderForumViews();
+        deleteForumPost(deleteBtn.dataset.forumDelete).then(renderForumViews);
       }
     });
 
-    forumListEl.addEventListener('submit', event => {
+    forumListEl.addEventListener('submit', async event => {
       const form = event.target.closest('[data-forum-edit-form]');
       if (!form || !isAdminView()) return;
       event.preventDefault();
       const id = form.dataset.forumEditForm;
-      const item = state.data.forum.find(entry => entry.id === id);
-      if (!item) return;
-      item.title = form.title.value.trim();
-      item.content = form.content.value.trim();
+      await updateForumPost(id, {
+        title: form.title.value.trim(),
+        content: form.content.value.trim()
+      });
       state.editingForumId = null;
-      savePortalData();
       renderForumViews();
     });
   }
@@ -2486,23 +2872,29 @@ function attachPortalEvents() {
   }
 
   if (unitForm) {
-    unitForm.addEventListener('submit', event => {
+    unitForm.addEventListener('submit', async event => {
       event.preventDefault();
       const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
-      if (!subject || !isAdminView()) return;
+      if (!subject || !isAdminView() || !supabaseClient) return;
       const input = document.getElementById('unitTitleInput');
       const title = input.value.trim();
       if (!title) return;
 
-      const newUnit = { id: generateLocalId('unit'), title, items: [] };
-      subject.units.push(newUnit);
-      state.currentUnitId = newUnit.id;
-      if (!savePortalData()) {
-        subject.units.pop();
-        state.currentUnitId = null;
-        alert('No se pudo guardar la unidad: el almacenamiento local del navegador está lleno. Borrá algún PDF viejo o liberá espacio e intentá de nuevo.');
+      const submitBtn = unitForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      const { data, error } = await supabaseClient
+        .from('subject_units')
+        .insert({ subject_id: subject.id, title })
+        .select().single();
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (error) {
+        alert('No se pudo crear la unidad: ' + error.message);
         return;
       }
+      const newUnit = { id: data.id, title: data.title, items: [] };
+      subject.units.push(newUnit);
+      state.currentUnitId = newUnit.id;
       renderSubjectLists(subject);
       refreshContentUnitSelect(subject);
       unitForm.reset();
@@ -2513,7 +2905,7 @@ function attachPortalEvents() {
     contentItemForm.addEventListener('submit', async event => {
       event.preventDefault();
       const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
-      if (!subject || !isAdminView()) return;
+      if (!subject || !isAdminView() || !supabaseClient) return;
 
       const unitId = document.getElementById('contentUnitSelect').value;
       const unit = subject.units.find(item => item.id === unitId);
@@ -2541,7 +2933,6 @@ function attachPortalEvents() {
           }
           return;
         }
-        if (!supabaseClient) return;
 
         const submitBtn = contentItemForm.querySelector('button[type="submit"]');
         if (submitBtn) submitBtn.textContent = 'Subiendo...';
@@ -2551,9 +2942,8 @@ function attachPortalEvents() {
           .from('subject-content')
           .upload(path, file, { contentType: file.type || 'application/pdf' });
 
-        if (submitBtn) submitBtn.textContent = 'Agregar contenido';
-
         if (uploadError) {
+          if (submitBtn) submitBtn.textContent = 'Agregar contenido';
           if (contentItemNotice) {
             contentItemNotice.className = 'notice show error';
             contentItemNotice.textContent = 'No se pudo subir el PDF: ' + uploadError.message;
@@ -2562,18 +2952,29 @@ function attachPortalEvents() {
         }
 
         const { data: urlData } = supabaseClient.storage.from('subject-content').getPublicUrl(path);
-        const newItem = { id: generateLocalId('item'), type: 'pdf', title, fileName: file.name, url: urlData.publicUrl, storagePath: path, uploadedBy: getFullName(state.currentUser) };
-        unit.items.unshift(newItem);
-        state.currentItemId = newItem.id;
-        if (!savePortalData()) {
-          unit.items.shift();
-          state.currentItemId = null;
+        const uploadedBy = getFullName(state.currentUser);
+        const { data, error } = await supabaseClient
+          .from('subject_content_items')
+          .insert({
+            unit_id: unit.id, subject_id: subject.id, type: 'pdf', title,
+            file_name: file.name, url: urlData.publicUrl, storage_path: path, uploaded_by: uploadedBy
+          })
+          .select().single();
+
+        if (submitBtn) submitBtn.textContent = 'Agregar contenido';
+
+        if (error) {
+          await supabaseClient.storage.from('subject-content').remove([path]);
           if (contentItemNotice) {
             contentItemNotice.className = 'notice show error';
-            contentItemNotice.textContent = 'El PDF se subió pero no se pudo guardar la referencia localmente. Intentá de nuevo.';
+            contentItemNotice.textContent = 'El PDF se subió pero no se pudo guardar la referencia: ' + error.message;
           }
           return;
         }
+
+        const newItem = mapContentItemRow(data);
+        unit.items.unshift(newItem);
+        state.currentItemId = newItem.id;
         renderSubjectLists(subject);
         contentItemForm.reset();
         if (contentItemNotice) contentItemNotice.className = 'notice';
@@ -2581,18 +2982,24 @@ function attachPortalEvents() {
         const editor = getClaseEditorContent();
         const body = (editor ? editor.getContent() : document.getElementById('contentBodyInput').value).trim();
         if (!body) return;
-        const newItem = { id: generateLocalId('item'), type: 'clase', title, body, uploadedBy: getFullName(state.currentUser) };
-        unit.items.unshift(newItem);
-        state.currentItemId = newItem.id;
-        if (!savePortalData()) {
-          unit.items.shift();
-          state.currentItemId = null;
+
+        const uploadedBy = getFullName(state.currentUser);
+        const { data, error } = await supabaseClient
+          .from('subject_content_items')
+          .insert({ unit_id: unit.id, subject_id: subject.id, type: 'clase', title, body, uploaded_by: uploadedBy })
+          .select().single();
+
+        if (error) {
           if (contentItemNotice) {
             contentItemNotice.className = 'notice show error';
-            contentItemNotice.textContent = 'No se pudo guardar la clase: el almacenamiento local del navegador está lleno. Borrá contenido viejo (por ejemplo, algún PDF) e intentá de nuevo.';
+            contentItemNotice.textContent = 'No se pudo guardar la clase: ' + error.message;
           }
           return;
         }
+
+        const newItem = mapContentItemRow(data);
+        unit.items.unshift(newItem);
+        state.currentItemId = newItem.id;
         renderSubjectLists(subject);
         contentItemForm.reset();
         if (editor) editor.setContent('');
@@ -2604,40 +3011,138 @@ function attachPortalEvents() {
   }
 
   if (pollForm) {
-    pollForm.addEventListener('submit', event => {
+    pollForm.addEventListener('submit', async event => {
       event.preventDefault();
       const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
-      if (!subject || !state.currentUser) return;
+      if (!subject || !state.currentUser || !supabaseClient) return;
 
       const question = document.getElementById('pollQuestionInput').value.trim();
       const optionsRaw = document.getElementById('pollOptionsInput').value.trim();
       const optionLabels = optionsRaw.split(',').map(value => value.trim()).filter(Boolean);
       if (!question || optionLabels.length < 2) return;
 
+      const submitBtn = pollForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      const createdByName = getFullName(state.currentUser);
+      const { data: pollRow, error: pollError } = await supabaseClient
+        .from('subject_polls')
+        .insert({ subject_id: subject.id, created_by_id: state.currentUser.id, created_by_name: createdByName, question })
+        .select().single();
+
+      if (pollError) {
+        if (submitBtn) submitBtn.disabled = false;
+        alert('No se pudo crear la encuesta: ' + pollError.message);
+        return;
+      }
+
+      const { data: optionRows, error: optionsError } = await supabaseClient
+        .from('subject_poll_options')
+        .insert(optionLabels.map((label, index) => ({ poll_id: pollRow.id, label, position: index })))
+        .select();
+
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (optionsError) {
+        await supabaseClient.from('subject_polls').delete().eq('id', pollRow.id);
+        alert('No se pudo crear la encuesta: ' + optionsError.message);
+        return;
+      }
+
       subject.polls.unshift({
-        id: generateLocalId('poll'),
-        question,
-        createdBy: getFullName(state.currentUser),
-        options: optionLabels.map(label => ({ id: generateLocalId('opt'), label, votes: [] }))
+        id: pollRow.id,
+        question: pollRow.question,
+        createdBy: pollRow.created_by_name,
+        options: [...optionRows].sort((a, b) => a.position - b.position).map(row => ({ id: row.id, label: row.label, votes: [] }))
       });
-      savePortalData();
       renderPolls(subject);
       pollForm.reset();
     });
   }
 
   if (subjectForumForm) {
-    subjectForumForm.addEventListener('submit', event => {
+    subjectForumForm.addEventListener('submit', async event => {
       event.preventDefault();
       const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
       const input = document.getElementById('subjectForumInput');
       const content = input.value.trim();
-      if (!subject || !state.currentUser || !content) return;
+      if (!subject || !state.currentUser || !content || !supabaseClient) return;
 
-      subject.forum.unshift({ author: getFullName(state.currentUser), content });
-      savePortalData();
+      const { data, error } = await supabaseClient
+        .from('subject_forum_posts')
+        .insert({ subject_id: subject.id, author_id: state.currentUser.id, author_name: getFullName(state.currentUser), content })
+        .select().single();
+      if (error) { alert('No se pudo publicar: ' + error.message); return; }
+
+      subject.forum.unshift({ id: data.id, author: data.author_name, authorId: data.author_id, content: data.content });
       renderSubjectLists(subject);
       subjectForumForm.reset();
+    });
+  }
+
+  const subjectSummaryForm = document.getElementById('subjectSummaryForm');
+  const subjectSummaryNotice = document.getElementById('subjectSummaryNotice');
+
+  if (subjectSummaryForm) {
+    subjectSummaryForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
+      if (!subject || !state.currentUser || !supabaseClient) return;
+
+      const title = document.getElementById('summaryTitleInput').value.trim();
+      const file = document.getElementById('summaryFileInput').files[0];
+      if (!title || !file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        if (subjectSummaryNotice) {
+          subjectSummaryNotice.className = 'notice show error';
+          subjectSummaryNotice.textContent = 'El archivo supera el tamaño máximo permitido (15 MB).';
+        }
+        return;
+      }
+
+      const submitBtn = subjectSummaryForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Subiendo...';
+
+      const path = `summaries/${subject.id}/${state.currentUser.id}/${generateLocalId('summary')}_${sanitizeStorageFilename(file.name)}`;
+      const { error: uploadError } = await supabaseClient.storage
+        .from('subject-content')
+        .upload(path, file, { contentType: file.type || 'application/pdf' });
+
+      if (uploadError) {
+        if (submitBtn) submitBtn.textContent = 'Subir resumen';
+        if (subjectSummaryNotice) {
+          subjectSummaryNotice.className = 'notice show error';
+          subjectSummaryNotice.textContent = 'No se pudo subir el archivo: ' + uploadError.message;
+        }
+        return;
+      }
+
+      const { data: urlData } = supabaseClient.storage.from('subject-content').getPublicUrl(path);
+      const authorName = getFullName(state.currentUser);
+      const { data, error } = await supabaseClient
+        .from('subject_summaries')
+        .insert({
+          subject_id: subject.id, author_id: state.currentUser.id, author_name: authorName,
+          title, file_name: file.name, url: urlData.publicUrl, storage_path: path
+        })
+        .select().single();
+
+      if (submitBtn) submitBtn.textContent = 'Subir resumen';
+
+      if (error) {
+        await supabaseClient.storage.from('subject-content').remove([path]);
+        if (subjectSummaryNotice) {
+          subjectSummaryNotice.className = 'notice show error';
+          subjectSummaryNotice.textContent = 'El archivo se subió pero no se pudo guardar la referencia: ' + error.message;
+        }
+        return;
+      }
+
+      subject.summaries.unshift(mapSummaryRow(data));
+      renderSummaries(subject);
+      subjectSummaryForm.reset();
+      if (subjectSummaryNotice) subjectSummaryNotice.className = 'notice';
     });
   }
 
@@ -2657,7 +3162,7 @@ function attachPortalEvents() {
   }
 
   if (subjectOpinionForm) {
-    subjectOpinionForm.addEventListener('submit', event => {
+    subjectOpinionForm.addEventListener('submit', async event => {
       event.preventDefault();
       const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
       const professorInput = document.getElementById('subjectOpinionProfessor');
@@ -2665,7 +3170,7 @@ function attachPortalEvents() {
       const contentInput = document.getElementById('subjectOpinionInput');
       const content = contentInput.value.trim();
       const rating = Number(subjectOpinionStars ? subjectOpinionStars.dataset.rating : 0);
-      if (!subject || !state.currentUser) return;
+      if (!subject || !state.currentUser || !supabaseClient) return;
 
       if (!professor || !rating) {
         if (subjectOpinionNotice) {
@@ -2675,8 +3180,21 @@ function attachPortalEvents() {
         return;
       }
 
-      subject.opinions.unshift({ id: generateLocalId('opinion'), professor, rating, content, author: getFullName(state.currentUser) });
-      savePortalData();
+      const authorName = getFullName(state.currentUser);
+      const { data, error } = await supabaseClient
+        .from('subject_opinions')
+        .insert({ subject_id: subject.id, author_id: state.currentUser.id, author_name: authorName, professor, rating, content })
+        .select().single();
+
+      if (error) {
+        if (subjectOpinionNotice) {
+          subjectOpinionNotice.className = 'notice show error';
+          subjectOpinionNotice.textContent = 'No se pudo publicar la opinión: ' + error.message;
+        }
+        return;
+      }
+
+      subject.opinions.unshift({ id: data.id, professor: data.professor, rating: data.rating, content: data.content, author: data.author_name, authorId: data.author_id });
       renderSubjectLists(subject);
       subjectOpinionForm.reset();
       subjectOpinionForm.classList.add('hidden');
@@ -2970,14 +3488,631 @@ async function deleteSubject(subjectId) {
   });
 
   if (state.currentUser) enforceCorrelativityAndPersist(state.currentUser.email);
-  savePortalData();
   renderAdminSubjectsTable();
   updateAdminHeader(state.currentUser);
   resetSubjectForm();
 }
 
+// ---- Sección "Discord" del panel de admin: mensajes puntuales,
+// programados y plantilla de PDFs por materia. Todo pasa por Supabase
+// (nunca el token del bot) — el bot de Discord hace polling de estas
+// tablas y ejecuta las acciones. Ver iupfa-bot/src/outbox.js, scheduler.js
+// y autopost.js.
+function populateTemplateSubjectSelect() {
+  const select = document.getElementById('templateSubjectSelect');
+  if (!select) return;
+  select.innerHTML = state.data.subjects.map(s => `<option value="${s.id}">${s.code} — ${s.name}</option>`).join('');
+}
+
+// Espejo de discord_channels (sincronizado por el bot cada 5 min) para
+// mostrar un <select> con nombres reales de canal en vez de pedir el ID a mano.
+let discordChannelsCache = [];
+
+async function loadDiscordChannels() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('discord_channels').select('id, name').order('name');
+  if (error) return;
+  discordChannelsCache = data || [];
+
+  const options = ['<option value="">Elegí un canal…</option>']
+    .concat(discordChannelsCache.map(c => `<option value="${c.id}">#${c.name}</option>`))
+    .join('');
+
+  ['outboxChannelId', 'scheduledChannelId'].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = options;
+    if (current) select.value = current;
+  });
+}
+
+function channelLabel(channelId) {
+  const found = discordChannelsCache.find(c => c.id === channelId);
+  return found ? `#${found.name}` : `Canal #${channelId}`;
+}
+
+// ---- Barra de Markdown para el textarea del mensaje (Discord usa su propio
+// Markdown, no HTML, así que no se reutiliza el editor TinyMCE de las clases).
+function applyMarkdown(textarea, action) {
+  const wraps = { bold: '**', italic: '*', strike: '~~', code: '`' };
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const selected = value.slice(start, end);
+
+  let before = '', after = '', placeholder = 'texto';
+  if (wraps[action]) {
+    before = after = wraps[action];
+  } else if (action === 'link') {
+    before = '['; after = '](https://)'; placeholder = 'texto del enlace';
+  } else if (action === 'quote') {
+    before = '> '; placeholder = '';
+  } else if (action === 'list') {
+    before = '- '; placeholder = '';
+  } else {
+    return;
+  }
+
+  const text = selected || placeholder;
+  textarea.value = value.slice(0, start) + before + text + after + value.slice(end);
+  textarea.focus();
+  textarea.selectionStart = start + before.length;
+  textarea.selectionEnd = start + before.length + text.length;
+}
+
+function setupMarkdownToolbar(prefix) {
+  const toolbar = document.getElementById(`${prefix}MdToolbar`);
+  const textarea = document.getElementById(`${prefix}Content`);
+  if (!toolbar || !textarea) return;
+  toolbar.addEventListener('click', event => {
+    const btn = event.target.closest('.md-btn');
+    if (!btn) return;
+    applyMarkdown(textarea, btn.dataset.md);
+  });
+}
+
+// ---- Constructor de embeds (autor, título, descripción, color, imagen,
+// miniatura, campos y footer). Arma el mismo JSON que espera buildEmbed() del
+// lado del bot (iupfa-bot/src/utils/embed.js).
+function createEmbedFieldRow() {
+  const row = document.createElement('div');
+  row.className = 'embed-field-row';
+
+  const name = document.createElement('input');
+  name.type = 'text'; name.placeholder = 'Nombre'; name.className = 'embed-field-name';
+
+  const value = document.createElement('input');
+  value.type = 'text'; value.placeholder = 'Valor'; value.className = 'embed-field-value';
+
+  const inlineLabel = document.createElement('label');
+  inlineLabel.className = 'checkbox-row small';
+  const inlineCb = document.createElement('input');
+  inlineCb.type = 'checkbox'; inlineCb.className = 'embed-field-inline';
+  inlineLabel.append(inlineCb, document.createTextNode(' En línea'));
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'ghost-btn icon-btn tiny-btn';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => row.remove());
+
+  row.append(name, value, inlineLabel, removeBtn);
+  return row;
+}
+
+function renderEmbedBuilder(prefix) {
+  const container = document.getElementById(`${prefix}EmbedFields`);
+  if (!container) return;
+  container.innerHTML = `
+    <div class="two-cols">
+      <input id="${prefix}EmbedAuthorName" type="text" placeholder="Autor: nombre" />
+      <input id="${prefix}EmbedAuthorIcon" type="url" placeholder="Autor: URL del ícono" />
+    </div>
+    <input id="${prefix}EmbedTitle" type="text" placeholder="Título" />
+    <textarea id="${prefix}EmbedDescription" placeholder="Descripción (admite Markdown de Discord)" rows="3"></textarea>
+    <div class="embed-color-row">
+      <input id="${prefix}EmbedColor" type="color" value="#5865f2" />
+      <span class="form-hint">Color de la barra lateral</span>
+    </div>
+    <div class="two-cols">
+      <input id="${prefix}EmbedImage" type="url" placeholder="URL de imagen grande" />
+      <input id="${prefix}EmbedThumbnail" type="url" placeholder="URL de miniatura" />
+    </div>
+    <div class="field-group-title">Campos</div>
+    <div id="${prefix}EmbedFieldsList" class="stack"></div>
+    <button type="button" id="${prefix}AddFieldBtn" class="ghost-btn small-btn">+ Añadir campo</button>
+    <div class="two-cols">
+      <input id="${prefix}EmbedFooterText" type="text" placeholder="Footer: texto" />
+      <input id="${prefix}EmbedFooterIcon" type="url" placeholder="Footer: URL del ícono" />
+    </div>
+  `;
+  const addFieldBtn = document.getElementById(`${prefix}AddFieldBtn`);
+  if (addFieldBtn) {
+    addFieldBtn.addEventListener('click', () => {
+      document.getElementById(`${prefix}EmbedFieldsList`).appendChild(createEmbedFieldRow());
+    });
+  }
+}
+
+function setupEmbedBuilder(prefix) {
+  renderEmbedBuilder(prefix);
+  const toggle = document.getElementById(`${prefix}EmbedToggle`);
+  const fieldsWrap = document.getElementById(`${prefix}EmbedFields`);
+  if (toggle && fieldsWrap) {
+    toggle.addEventListener('change', () => fieldsWrap.classList.toggle('hidden', !toggle.checked));
+  }
+}
+
+function resetEmbedBuilder(prefix) {
+  const toggle = document.getElementById(`${prefix}EmbedToggle`);
+  const fieldsWrap = document.getElementById(`${prefix}EmbedFields`);
+  if (toggle) toggle.checked = false;
+  if (fieldsWrap) fieldsWrap.classList.add('hidden');
+  renderEmbedBuilder(prefix);
+}
+
+function collectEmbedData(prefix) {
+  const toggle = document.getElementById(`${prefix}EmbedToggle`);
+  if (!toggle || !toggle.checked) return null;
+
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const fields = [...document.querySelectorAll(`#${prefix}EmbedFieldsList .embed-field-row`)].map(row => ({
+    name: row.querySelector('.embed-field-name').value.trim(),
+    value: row.querySelector('.embed-field-value').value.trim(),
+    inline: row.querySelector('.embed-field-inline').checked
+  })).filter(f => f.name && f.value);
+
+  const data = {};
+  const title = val(`${prefix}EmbedTitle`); if (title) data.title = title;
+  const description = val(`${prefix}EmbedDescription`); if (description) data.description = description;
+  const color = val(`${prefix}EmbedColor`); if (color) data.color = color;
+  const authorName = val(`${prefix}EmbedAuthorName`);
+  if (authorName) data.author = { name: authorName, icon_url: val(`${prefix}EmbedAuthorIcon`) || undefined };
+  const imageUrl = val(`${prefix}EmbedImage`); if (imageUrl) data.image = { url: imageUrl };
+  const thumbUrl = val(`${prefix}EmbedThumbnail`); if (thumbUrl) data.thumbnail = { url: thumbUrl };
+  const footerText = val(`${prefix}EmbedFooterText`);
+  if (footerText) data.footer = { text: footerText, icon_url: val(`${prefix}EmbedFooterIcon`) || undefined };
+  if (fields.length) data.fields = fields;
+
+  return Object.keys(data).length ? data : null;
+}
+
+async function loadTemplateForSubject(subjectId) {
+  const textarea = document.getElementById('templateContent');
+  if (!textarea || !supabaseClient || !subjectId) return;
+  const { data } = await supabaseClient.from('subject_message_templates').select('template').eq('subject_id', subjectId).maybeSingle();
+  textarea.value = data ? data.template : '';
+}
+
+function buildCronFromRecurringForm() {
+  const days = Array.from(document.querySelectorAll('.scheduledDay:checked')).map(cb => cb.value);
+  if (!days.length) return null;
+  const time = (document.getElementById('scheduledTime').value || '09:00').split(':');
+  return `${parseInt(time[1], 10)} ${parseInt(time[0], 10)} * * ${days.join(',')}`;
+}
+
+function buildScheduledMessageCard(row) {
+  const when = row.schedule_type === 'once'
+    ? `Una vez · ${new Date(row.run_at).toLocaleString('es-AR')}${row.last_run_at ? ' (ya enviado)' : ''}`
+    : `Recurrente · cron "${row.cron_expression}"${row.last_run_at ? ' · último envío ' + new Date(row.last_run_at).toLocaleString('es-AR') : ''}`;
+  return `<article class="item-card">
+    <strong>${channelLabel(row.channel_id)}</strong>
+    <span>${when}${row.enabled ? '' : ' · desactivado'}</span>
+    <p>${row.content || ''}${row.embed ? ' <span class="pill">embed</span>' : ''}</p>
+    <div class="stack-row">
+      <button type="button" class="ghost-btn small-btn" data-scheduled-toggle="${row.id}" data-enabled="${row.enabled}">${row.enabled ? 'Desactivar' : 'Activar'}</button>
+      <button type="button" class="ghost-btn small-btn danger-btn" data-scheduled-delete="${row.id}">Eliminar</button>
+    </div>
+  </article>`;
+}
+
+async function loadScheduledMessages() {
+  const target = document.getElementById('scheduledList');
+  if (!target || !supabaseClient) return;
+  const { data, error } = await supabaseClient.from('scheduled_messages').select('*').order('created_at', { ascending: false });
+  target.innerHTML = (!error && data && data.length)
+    ? data.map(buildScheduledMessageCard).join('')
+    : createItemCard('Sin mensajes programados', '', '');
+}
+
+async function loadOutboxHistory() {
+  const target = document.getElementById('outboxHistory');
+  if (!target || !supabaseClient) return;
+  const { data, error } = await supabaseClient.from('bot_outbox').select('*').order('created_at', { ascending: false }).limit(10);
+  if (error || !data || !data.length) { target.innerHTML = ''; return; }
+  target.innerHTML = data.map(row => {
+    const status = row.error ? `Error: ${row.error}` : row.sent_at ? 'Enviado ✔' : 'Pendiente...';
+    return `<article class="item-card"><strong>${channelLabel(row.channel_id)}</strong><span>${status}</span><p>${row.content || ''}${row.embed ? ' <span class="pill">embed</span>' : ''}</p></article>`;
+  }).join('');
+}
+
+// Sondea una fila de una tabla de "solicitudes al bot" (bot_outbox,
+// pdf_bulk_post_requests, pdf_channel_clear_requests) hasta que el bot la
+// marque como terminada (processedField no nulo), o hasta agotar los
+// intentos. Evita que la UI se quede pegada en "Procesando..." si el
+// refresco de una sola vez no llega a tiempo.
+async function pollRequestUntilDone(table, id, processedField, { intervalMs = 2000, maxAttempts = 15 } = {}) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+    const { data } = await supabaseClient.from(table).select('*').eq('id', id).maybeSingle();
+    if (data && data[processedField]) return data;
+  }
+  return null;
+}
+
+function initDiscordAdminSection() {
+  loadDiscordChannels();
+  setupMarkdownToolbar('outbox');
+  setupMarkdownToolbar('scheduled');
+  setupEmbedBuilder('outbox');
+  setupEmbedBuilder('scheduled');
+
+  const outboxForm = document.getElementById('outboxForm');
+  const outboxNotice = document.getElementById('outboxNotice');
+  if (outboxForm) {
+    outboxForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+      const channelId = document.getElementById('outboxChannelId').value.trim();
+      const content = document.getElementById('outboxContent').value.trim();
+      const embed = collectEmbedData('outbox');
+      if (!channelId || (!content && !embed)) {
+        if (outboxNotice) {
+          outboxNotice.className = 'notice show error';
+          outboxNotice.textContent = 'Elegí un canal y escribí un mensaje o un embed.';
+        }
+        return;
+      }
+
+      const { data, error } = await supabaseClient.from('bot_outbox')
+        .insert({ channel_id: channelId, content: content || null, embed, created_by: state.currentUser.id })
+        .select().single();
+      if (outboxNotice) {
+        outboxNotice.className = error ? 'notice show error' : 'notice show';
+        outboxNotice.textContent = error ? 'No se pudo encolar el mensaje: ' + error.message : 'Enviando...';
+      }
+      if (error) return;
+
+      outboxForm.reset();
+      resetEmbedBuilder('outbox');
+      loadOutboxHistory();
+
+      const result = await pollRequestUntilDone('bot_outbox', data.id, 'sent_at');
+      loadOutboxHistory();
+      if (outboxNotice) {
+        if (!result) {
+          outboxNotice.className = 'notice show error';
+          outboxNotice.textContent = 'El bot está tardando en procesarlo — revisá el historial abajo en unos segundos, o si el bot está corriendo.';
+        } else if (result.error) {
+          outboxNotice.className = 'notice show error';
+          outboxNotice.textContent = 'El bot no pudo mandarlo: ' + result.error;
+        } else {
+          outboxNotice.className = 'notice show';
+          outboxNotice.textContent = 'Enviado ✔';
+        }
+      }
+    });
+  }
+
+  const scheduledType = document.getElementById('scheduledType');
+  const scheduledRecurringFields = document.getElementById('scheduledRecurringFields');
+  const scheduledOnceAt = document.getElementById('scheduledOnceAt');
+  if (scheduledType) {
+    scheduledType.addEventListener('change', () => {
+      const isRecurring = scheduledType.value === 'recurring';
+      if (scheduledRecurringFields) scheduledRecurringFields.classList.toggle('hidden', !isRecurring);
+      if (scheduledOnceAt) scheduledOnceAt.classList.toggle('hidden', isRecurring);
+    });
+  }
+
+  const scheduledForm = document.getElementById('scheduledForm');
+  const scheduledNotice = document.getElementById('scheduledNotice');
+  if (scheduledForm) {
+    scheduledForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient || !state.currentUser) return;
+      const channelId = document.getElementById('scheduledChannelId').value.trim();
+      const content = document.getElementById('scheduledContent').value.trim();
+      const embed = collectEmbedData('scheduled');
+      const type = scheduledType.value;
+      if (!channelId || (!content && !embed)) {
+        if (scheduledNotice) { scheduledNotice.className = 'notice show error'; scheduledNotice.textContent = 'Elegí un canal y escribí un mensaje o un embed.'; }
+        return;
+      }
+
+      const payload = { channel_id: channelId, content: content || null, embed, schedule_type: type, created_by: state.currentUser.id };
+
+      if (type === 'once') {
+        if (!scheduledOnceAt.value) {
+          if (scheduledNotice) { scheduledNotice.className = 'notice show error'; scheduledNotice.textContent = 'Elegí una fecha y hora.'; }
+          return;
+        }
+        payload.run_at = new Date(scheduledOnceAt.value).toISOString();
+      } else {
+        const cronExpr = buildCronFromRecurringForm();
+        if (!cronExpr) {
+          if (scheduledNotice) { scheduledNotice.className = 'notice show error'; scheduledNotice.textContent = 'Elegí al menos un día de la semana.'; }
+          return;
+        }
+        payload.cron_expression = cronExpr;
+      }
+
+      const { error } = await supabaseClient.from('scheduled_messages').insert(payload);
+      if (scheduledNotice) {
+        scheduledNotice.className = error ? 'notice show error' : 'notice show';
+        scheduledNotice.textContent = error ? 'No se pudo programar: ' + error.message : 'Mensaje programado.';
+      }
+      if (!error) {
+        scheduledForm.reset();
+        resetEmbedBuilder('scheduled');
+        document.querySelectorAll('.scheduledDay').forEach(cb => { cb.checked = false; });
+        loadScheduledMessages();
+      }
+    });
+  }
+
+  const scheduledList = document.getElementById('scheduledList');
+  if (scheduledList) {
+    scheduledList.addEventListener('click', async event => {
+      const toggleBtn = event.target.closest('[data-scheduled-toggle]');
+      if (toggleBtn) {
+        const enabled = toggleBtn.dataset.enabled === 'true';
+        await supabaseClient.from('scheduled_messages').update({ enabled: !enabled }).eq('id', toggleBtn.dataset.scheduledToggle);
+        loadScheduledMessages();
+        return;
+      }
+      const deleteBtn = event.target.closest('[data-scheduled-delete]');
+      if (deleteBtn) {
+        await supabaseClient.from('scheduled_messages').delete().eq('id', deleteBtn.dataset.scheduledDelete);
+        loadScheduledMessages();
+      }
+    });
+  }
+
+  const autopostEnabledToggle = document.getElementById('autopostEnabledToggle');
+  const autopostNotice = document.getElementById('autopostNotice');
+  if (autopostEnabledToggle && supabaseClient) {
+    supabaseClient.from('bot_settings').select('autopost_enabled').eq('id', 1).maybeSingle()
+      .then(({ data }) => { autopostEnabledToggle.checked = !!(data && data.autopost_enabled); });
+
+    autopostEnabledToggle.addEventListener('change', async () => {
+      const enabled = autopostEnabledToggle.checked;
+      autopostEnabledToggle.disabled = true;
+      const { error } = await supabaseClient.from('bot_settings').upsert({ id: 1, autopost_enabled: enabled, updated_at: new Date().toISOString() });
+      autopostEnabledToggle.disabled = false;
+
+      if (error) {
+        autopostEnabledToggle.checked = !enabled;
+        if (autopostNotice) { autopostNotice.className = 'notice show error'; autopostNotice.textContent = 'No se pudo guardar: ' + error.message; }
+        return;
+      }
+      if (autopostNotice) {
+        autopostNotice.className = 'notice show';
+        autopostNotice.textContent = enabled ? 'Publicación automática activada.' : 'Publicación automática desactivada.';
+      }
+    });
+  }
+
+  const defaultTemplateForm = document.getElementById('defaultTemplateForm');
+  const defaultTemplateContent = document.getElementById('defaultTemplateContent');
+  const defaultTemplateNotice = document.getElementById('defaultTemplateNotice');
+  if (defaultTemplateContent && supabaseClient) {
+    supabaseClient.from('pdf_message_template_default').select('template').eq('id', 1).maybeSingle()
+      .then(({ data }) => { defaultTemplateContent.value = data ? data.template : ''; });
+  }
+  if (defaultTemplateForm) {
+    defaultTemplateForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient) return;
+      const template = defaultTemplateContent.value.trim();
+      if (!template) return;
+
+      const { error } = await supabaseClient.from('pdf_message_template_default').upsert({ id: 1, template, updated_at: new Date().toISOString() });
+      if (defaultTemplateNotice) {
+        defaultTemplateNotice.className = error ? 'notice show error' : 'notice show';
+        defaultTemplateNotice.textContent = error ? 'No se pudo guardar: ' + error.message : 'Plantilla general guardada.';
+      }
+    });
+  }
+
+  const templateSubjectSelect = document.getElementById('templateSubjectSelect');
+  const templateForm = document.getElementById('templateForm');
+  const templateNotice = document.getElementById('templateNotice');
+  if (templateSubjectSelect) {
+    populateTemplateSubjectSelect();
+    templateSubjectSelect.addEventListener('change', () => loadTemplateForSubject(templateSubjectSelect.value));
+    loadTemplateForSubject(templateSubjectSelect.value);
+  }
+  if (templateForm) {
+    templateForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient) return;
+      const subjectId = templateSubjectSelect.value;
+      const template = document.getElementById('templateContent').value.trim();
+      if (!subjectId || !template) return;
+
+      const { error } = await supabaseClient.from('subject_message_templates').upsert({ subject_id: subjectId, template, updated_at: new Date().toISOString() });
+      if (templateNotice) {
+        templateNotice.className = error ? 'notice show error' : 'notice show';
+        templateNotice.textContent = error ? 'No se pudo guardar: ' + error.message : 'Plantilla guardada.';
+      }
+    });
+  }
+
+  const bulkPostBtn = document.getElementById('bulkPostBtn');
+  const bulkPostAllBtn = document.getElementById('bulkPostAllBtn');
+  const bulkPostNotice = document.getElementById('bulkPostNotice');
+
+  async function requestBulkPost(subjectId, triggerBtn, busyLabel) {
+    if (!supabaseClient || !state.currentUser) return;
+
+    bulkPostBtn.disabled = true;
+    bulkPostAllBtn.disabled = true;
+    const { data, error } = await supabaseClient.from('pdf_bulk_post_requests')
+      .insert({ subject_id: subjectId, requested_by: state.currentUser.id })
+      .select().single();
+
+    if (bulkPostNotice) {
+      bulkPostNotice.className = error ? 'notice show error' : 'notice show';
+      bulkPostNotice.textContent = error ? 'No se pudo solicitar la publicación: ' + error.message : busyLabel;
+    }
+    if (error) {
+      bulkPostBtn.disabled = false;
+      bulkPostAllBtn.disabled = false;
+      return;
+    }
+
+    loadBulkPostHistory();
+    const result = await pollRequestUntilDone('pdf_bulk_post_requests', data.id, 'processed_at', {
+      maxAttempts: subjectId ? 15 : 60 // "todas las materias" puede tardar bastante más
+    });
+    bulkPostBtn.disabled = false;
+    bulkPostAllBtn.disabled = false;
+    loadBulkPostHistory();
+
+    if (bulkPostNotice) {
+      if (!result) {
+        bulkPostNotice.className = 'notice show error';
+        bulkPostNotice.textContent = 'El bot está tardando en procesarlo — revisá el historial abajo en unos segundos, o si el bot está corriendo.';
+      } else if (result.error) {
+        bulkPostNotice.className = 'notice show error';
+        bulkPostNotice.textContent = 'Terminó con problemas: ' + result.error;
+      } else {
+        bulkPostNotice.className = 'notice show';
+        bulkPostNotice.textContent = result.posted_count > 0
+          ? `Listo. Publicados: ${result.posted_count}.`
+          : 'Listo. No había nada nuevo para publicar (ya estaba todo posteado).';
+      }
+    }
+  }
+
+  if (bulkPostBtn) {
+    bulkPostBtn.addEventListener('click', () => {
+      const subjectId = templateSubjectSelect.value;
+      if (!subjectId) return;
+      requestBulkPost(subjectId, bulkPostBtn, 'Publicando...');
+    });
+  }
+
+  if (bulkPostAllBtn) {
+    bulkPostAllBtn.addEventListener('click', () => {
+      requestBulkPost(null, bulkPostAllBtn, 'Publicando en todas las materias...');
+    });
+  }
+
+  const clearChannelBtn = document.getElementById('clearChannelBtn');
+  const clearChannelAllBtn = document.getElementById('clearChannelAllBtn');
+  const clearChannelNotice = document.getElementById('clearChannelNotice');
+
+  async function requestClearChannel(subjectId, busyLabel) {
+    if (!supabaseClient || !state.currentUser) return;
+
+    clearChannelBtn.disabled = true;
+    clearChannelAllBtn.disabled = true;
+    const { data, error } = await supabaseClient.from('pdf_channel_clear_requests')
+      .insert({ subject_id: subjectId, requested_by: state.currentUser.id })
+      .select().single();
+
+    if (clearChannelNotice) {
+      clearChannelNotice.className = error ? 'notice show error' : 'notice show';
+      clearChannelNotice.textContent = error ? 'No se pudo solicitar el borrado: ' + error.message : busyLabel;
+    }
+    if (error) {
+      clearChannelBtn.disabled = false;
+      clearChannelAllBtn.disabled = false;
+      return;
+    }
+
+    loadClearChannelHistory();
+    const result = await pollRequestUntilDone('pdf_channel_clear_requests', data.id, 'processed_at', {
+      maxAttempts: subjectId ? 15 : 60 // "todas las materias" puede tardar bastante más
+    });
+    clearChannelBtn.disabled = false;
+    clearChannelAllBtn.disabled = false;
+    loadClearChannelHistory();
+
+    if (clearChannelNotice) {
+      if (!result) {
+        clearChannelNotice.className = 'notice show error';
+        clearChannelNotice.textContent = 'El bot está tardando en procesarlo — revisá el historial abajo en unos segundos, o si el bot está corriendo.';
+      } else if (result.error) {
+        clearChannelNotice.className = 'notice show error';
+        clearChannelNotice.textContent = 'Terminó con problemas: ' + result.error;
+      } else {
+        clearChannelNotice.className = 'notice show';
+        clearChannelNotice.textContent = `Listo. Mensajes borrados: ${result.deleted_count}.`;
+      }
+    }
+  }
+
+  if (clearChannelBtn) {
+    clearChannelBtn.addEventListener('click', () => {
+      const subjectId = templateSubjectSelect.value;
+      if (!subjectId) return;
+      const subjectLabel = templateSubjectSelect.options[templateSubjectSelect.selectedIndex].text;
+      if (!confirm(`¿Borrar todas las publicaciones del bot para "${subjectLabel}"? Esta acción no se puede deshacer.`)) return;
+      requestClearChannel(subjectId, 'Borrando...');
+    });
+  }
+
+  if (clearChannelAllBtn) {
+    clearChannelAllBtn.addEventListener('click', () => {
+      if (!confirm('¿Borrar TODAS las publicaciones del bot en TODAS las materias? Esta acción no se puede deshacer.')) return;
+      requestClearChannel(null, 'Borrando en todas las materias...');
+    });
+  }
+
+  loadBulkPostHistory();
+  loadClearChannelHistory();
+}
+
+async function loadClearChannelHistory() {
+  const target = document.getElementById('clearChannelHistory');
+  if (!target || !supabaseClient) return;
+  const { data, error } = await supabaseClient
+    .from('pdf_channel_clear_requests')
+    .select('*, subjects(code, name)')
+    .order('requested_at', { ascending: false })
+    .limit(5);
+  if (error || !data || !data.length) { target.innerHTML = ''; return; }
+
+  target.innerHTML = data.map(row => {
+    const subjectLabel = row.subjects ? `${row.subjects.code} — ${row.subjects.name}` : (row.subject_id || 'Todas las materias');
+    let status;
+    if (row.error) status = `Error: ${row.error}`;
+    else if (row.processed_at) status = `Borrados: ${row.deleted_count}`;
+    else status = 'Procesando...';
+    return `<article class="item-card"><strong>${subjectLabel}</strong><span>${status}</span></article>`;
+  }).join('');
+}
+
+async function loadBulkPostHistory() {
+  const target = document.getElementById('bulkPostHistory');
+  if (!target || !supabaseClient) return;
+  const { data, error } = await supabaseClient
+    .from('pdf_bulk_post_requests')
+    .select('*, subjects(code, name)')
+    .order('requested_at', { ascending: false })
+    .limit(5);
+  if (error || !data || !data.length) { target.innerHTML = ''; return; }
+
+  target.innerHTML = data.map(row => {
+    const subjectLabel = row.subjects ? `${row.subjects.code} — ${row.subjects.name}` : (row.subject_id || 'Todas las materias');
+    let status;
+    if (row.error) status = `Error: ${row.error}`;
+    else if (row.processed_at) {
+      status = row.posted_count > 0
+        ? `Publicados: ${row.posted_count}`
+        : 'No había nada nuevo para publicar (ya estaba todo posteado).';
+    } else status = 'Procesando...';
+    return `<article class="item-card"><strong>${subjectLabel}</strong><span>${status}</span></article>`;
+  }).join('');
+}
+
 function attachAdminEvents() {
   setupSidebarToggle('adminScreen');
+  initDiscordAdminSection();
   const logoutBtn = document.getElementById('adminLogoutBtn');
   const subjectForm = document.getElementById('subjectForm');
   const subjectFormCancel = document.getElementById('subjectFormCancel');
@@ -2990,6 +4125,8 @@ function attachAdminEvents() {
 
   const exportLocalDataBtn = document.getElementById('exportLocalDataBtn');
   const importLocalDataInput = document.getElementById('importLocalDataInput');
+  const clearImportedDataBtn = document.getElementById('clearImportedDataBtn');
+  const clearBeforeImportCheckbox = document.getElementById('clearBeforeImportCheckbox');
   const dataTransferNotice = document.getElementById('dataTransferNotice');
 
   if (exportLocalDataBtn) {
@@ -3002,10 +4139,27 @@ function attachAdminEvents() {
     });
   }
 
+  if (clearImportedDataBtn) {
+    clearImportedDataBtn.addEventListener('click', async () => {
+      if (!confirm('¿Vaciar el calendario, el foro general y todo el contenido de materias (unidades, PDFs, clases, foro, opiniones, encuestas)? Esta acción no se puede deshacer.')) return;
+      try {
+        await clearAllImportableData();
+        alert('Datos vaciados. La página se va a recargar.');
+        window.location.reload();
+      } catch (error) {
+        if (dataTransferNotice) {
+          dataTransferNotice.className = 'notice show error';
+          dataTransferNotice.textContent = 'No se pudo vaciar: ' + error.message;
+        }
+      }
+    });
+  }
+
   if (importLocalDataInput) {
     importLocalDataInput.addEventListener('change', event => {
       const file = event.target.files[0];
       if (!file) return;
+      const clearFirst = !!(clearBeforeImportCheckbox && clearBeforeImportCheckbox.checked);
       importLocalData(file, error => {
         if (error) {
           if (dataTransferNotice) {
@@ -3016,7 +4170,7 @@ function attachAdminEvents() {
         }
         alert('Datos importados. La página se va a recargar.');
         window.location.reload();
-      });
+      }, { clearFirst });
     });
   }
 
@@ -3093,7 +4247,6 @@ function attachAdminEvents() {
 
       if (state.currentUser) enforceCorrelativityAndPersist(state.currentUser.email);
 
-      savePortalData();
       renderAdminSubjectsTable();
       updateAdminHeader(state.currentUser);
       resetSubjectForm();
@@ -3150,7 +4303,6 @@ function initPortalPage() {
     if (portalScreen) portalScreen.classList.remove('hidden');
     updatePortalHeader(user);
     setView('inicio');
-    loadMessages();
   } else if (state.authError) {
     showAuthForm('login');
     const notice = document.getElementById('notice');
@@ -3216,12 +4368,10 @@ function fillUserProfileForm(user) {
   const accountLastName = document.getElementById('accountLastName');
   const accountBirthDate = document.getElementById('accountBirthDate');
   const accountEmail = document.getElementById('accountEmail');
-  const allowMessages = document.getElementById('allowMessages');
   if (accountName) accountName.value = user.name || '';
   if (accountLastName) accountLastName.value = user.lastName || '';
   if (accountBirthDate) accountBirthDate.value = user.birthDate || '';
   if (accountEmail) accountEmail.value = '••••••••••••';
-  if (allowMessages) allowMessages.checked = !!user.allowMessages;
 
   const contactPhone = document.getElementById('contactPhone');
   const contactInstagram = document.getElementById('contactInstagram');
@@ -3348,7 +4498,6 @@ function attachUserPageEvents() {
       const name = document.getElementById('accountName').value.trim();
       const lastName = document.getElementById('accountLastName').value.trim();
       const birthDate = document.getElementById('accountBirthDate').value;
-      const allowMessages = document.getElementById('allowMessages').checked;
       const submitBtn = accountForm.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
 
@@ -3358,7 +4507,6 @@ function attachUserPageEvents() {
           name,
           last_name: lastName,
           birth_date: birthDate || null,
-          allow_messages: allowMessages,
           avatar: name.charAt(0).toUpperCase() || state.currentUser.avatar
         })
         .eq('id', state.currentUser.id);
@@ -3377,7 +4525,6 @@ function attachUserPageEvents() {
       state.currentUser.name = name;
       state.currentUser.lastName = lastName;
       state.currentUser.birthDate = birthDate;
-      state.currentUser.allowMessages = allowMessages;
     });
   }
 
@@ -3467,6 +4614,8 @@ function attachUserPageEvents() {
     });
   }
 
+  initDiscordLinkSection();
+
   const extraForm = document.getElementById('extraForm');
   const extraNotice = document.getElementById('extraNotice');
   if (extraForm) {
@@ -3517,7 +4666,24 @@ function initUserPage() {
   attachUserPageEvents();
 }
 
+function setupThemeToggle() {
+  const toggle = document.getElementById('darkModeToggle');
+  if (!toggle) return;
+  const isDark = localStorage.getItem('theme') === 'dark';
+  toggle.checked = isDark;
+  toggle.addEventListener('change', () => {
+    if (toggle.checked) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  });
+}
+
 async function init() {
+  setupThemeToggle();
   if (supabaseClient) {
     supabaseClient.auth.onAuthStateChange(event => {
       if (event === 'PASSWORD_RECOVERY') state.passwordRecovery = true;
@@ -3525,8 +4691,9 @@ async function init() {
   }
 
   await loadSubjectsFromSupabase();
-  loadLocalContent();
-  mergeLocalSubjectContent();
+  await loadCalendarFromSupabase();
+  await loadForumFromSupabase();
+  await loadSubjectContentFromSupabase();
   await restoreSession();
 
   const page = document.body.dataset.page;

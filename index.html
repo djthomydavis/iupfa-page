@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cybersecurity Students IUPFA</title>
+  <script>(function () { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); })();</script>
   <link rel="icon" type="image/png" href="img/IUPFA Logo Alumnos.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -226,13 +227,21 @@
         <button class="nav-link" data-view="planificacion">Planificación</button>
         <button class="nav-link" data-view="foro">Foro General</button>
         <button class="nav-link" data-view="alumnos">Alumnos</button>
-        <button class="nav-link" data-view="mensajes">Mensajes <span id="unreadBadge" class="nav-badge hidden">0</span></button>
+        <button class="nav-link" data-view="contacto">Contacto</button>
         <a id="adminShortcut" class="nav-link hidden" href="admin.html">Ir a Admin</a>
       </nav>
 
       <div class="sidebar-group">
         <span class="sidebar-label">Materias por año</span>
         <div id="yearList" class="year-nav"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <label class="theme-toggle">
+          <span>🌙 Modo oscuro</span>
+          <input type="checkbox" id="darkModeToggle" />
+          <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+        </label>
       </div>
     </aside>
 
@@ -278,6 +287,13 @@
               <div>
                 <span>Materias cursables</span>
                 <strong id="statCursables">0</strong>
+              </div>
+            </article>
+            <article class="card stat-card">
+              <div class="stat-icon">📚</div>
+              <div>
+                <span>Materias cursando</span>
+                <strong id="statCursando">0</strong>
               </div>
             </article>
             <article class="card stat-card">
@@ -353,6 +369,7 @@
           <section class="card">
             <div class="section-head">
               <h3>Planificación de carrera</h3>
+              <button type="button" id="roadmapBtn" class="ghost-btn small-btn">🗺 Roadmap Recomendado</button>
             </div>
             <div class="planning-filters">
               <input id="planningSearch" type="text" class="table-search" placeholder="Buscar por código, materia, modalidad o estado..." />
@@ -405,21 +422,39 @@
           </section>
         </section>
 
-        <section id="mensajesView" class="view-section hidden">
-          <div class="split-grid">
-            <section class="card">
-              <div class="section-head"><h3>Conversaciones</h3></div>
-              <div id="conversationsList" class="stack"></div>
+        <section id="contactoView" class="view-section hidden">
+          <div class="hero card compact">
+            <div>
+              <span class="pill blue">Ayuda</span>
+              <h2>Contacto</h2>
+              <p>¿Problemas técnicos, con tu usuario o con la conectividad del campus? Comunicate con el área de Telecomunicaciones.</p>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <section class="card stat-card">
+              <div class="stat-icon">☎️</div>
+              <div>
+                <span>Teléfono (línea fija, no WhatsApp)</span>
+                <strong class="contact-value"><a href="tel:1149055060">4905-5060</a></strong>
+              </div>
             </section>
-            <section class="card">
-              <div class="section-head"><h3 id="conversationWithName">Seleccioná una conversación</h3></div>
-              <div id="conversationThread" class="stack"></div>
-              <form id="replyMessageForm" class="inline-form hidden">
-                <textarea id="replyMessageInput" placeholder="Escribí tu mensaje..." required></textarea>
-                <button type="submit">Enviar</button>
-              </form>
+            <section class="card stat-card">
+              <div class="stat-icon">✉️</div>
+              <div>
+                <span>Correo electrónico</span>
+                <strong class="contact-value"><a href="mailto:telecomunicaciones@iupfa.edu.ar">telecomunicaciones@iupfa.edu.ar</a></strong>
+              </div>
             </section>
           </div>
+          <section class="card claim-card">
+            <div>
+              <div class="section-head"><h3>Formulario de reclamos</h3></div>
+              <p>Para reclamos formales, completá el formulario oficial de Google del área. Se abre en una pestaña nueva.</p>
+            </div>
+            <a class="claim-btn" href="https://docs.google.com/forms/d/e/1FAIpQLScMUK1SEV83h3twEnJoNh5xEctq_jrO4fABjYfVLOhTuPKNmg/viewform?usp=dialog" target="_blank" rel="noopener">
+              📝 Abrir formulario de reclamo <span class="claim-btn-arrow">→</span>
+            </a>
+          </section>
         </section>
 
         <section id="materiasView" class="view-section hidden">
@@ -446,6 +481,7 @@
           </div>
           <div class="subject-tabs">
             <button type="button" class="subject-tab active" data-subject-tab="contenido">Contenido</button>
+            <button type="button" class="subject-tab" data-subject-tab="resumenes">Resúmenes</button>
             <button type="button" class="subject-tab" data-subject-tab="fechas">Fechas</button>
             <button type="button" class="subject-tab" data-subject-tab="foro">Foro</button>
             <button type="button" class="subject-tab" data-subject-tab="opiniones">Opiniones</button>
@@ -486,6 +522,18 @@
                 <div id="unitNavList" class="stack"></div>
               </aside>
             </div>
+          </section>
+
+          <section class="card subject-panel hidden" data-subject-panel="resumenes">
+            <div class="section-head"><h3>Resúmenes de alumnos</h3></div>
+            <p class="form-hint">Subí un PDF con tu resumen o apunte de la materia para compartirlo con el resto. Podés borrar los que subiste vos; los admins pueden borrar cualquiera.</p>
+            <form id="subjectSummaryForm" class="inline-form">
+              <div id="subjectSummaryNotice" class="notice"></div>
+              <input id="summaryTitleInput" type="text" placeholder="Título del resumen" required />
+              <input id="summaryFileInput" type="file" accept="application/pdf" required />
+              <button type="submit">Subir resumen</button>
+            </form>
+            <div id="subjectSummaries" class="stack"></div>
           </section>
 
           <section class="card subject-panel hidden" data-subject-panel="fechas">
@@ -560,6 +608,28 @@
       <div class="modal-card card">
         <button type="button" id="closeStudentModal" class="ghost-btn icon-btn tiny-btn modal-close-btn" aria-label="Cerrar">✕</button>
         <div id="studentProfileContent"></div>
+      </div>
+    </div>
+
+    <div id="roadmapModal" class="modal-overlay hidden">
+      <div class="modal-card card">
+        <button type="button" id="closeRoadmapModal" class="ghost-btn icon-btn tiny-btn modal-close-btn" aria-label="Cerrar">✕</button>
+        <div class="section-head"><h3>Roadmap recomendado</h3></div>
+        <p class="form-hint">Genera el camino completo de la carrera: arranca con el cuatrimestre de ingreso, sigue con lo que ya estás cursando o podrías anotarte, y de ahí en más simula cuatrimestre a cuatrimestre (alternando 1° y 2°, como se dictan realmente las materias) respetando correlativas y los límites que pongas.</p>
+        <form id="roadmapForm" class="stack">
+          <div class="two-cols">
+            <div class="field">
+              <input id="roadmapMaxSubjects" type="number" min="1" max="12" value="4" placeholder=" " required />
+              <label for="roadmapMaxSubjects">Materias por cuatrimestre</label>
+            </div>
+            <div class="field">
+              <input id="roadmapMaxPresenciales" type="number" min="0" max="12" value="2" placeholder=" " required />
+              <label for="roadmapMaxPresenciales">Máximo de presenciales</label>
+            </div>
+          </div>
+          <button type="submit">Generar roadmap</button>
+        </form>
+        <div id="roadmapResult" class="stack"></div>
       </div>
     </div>
   </section>

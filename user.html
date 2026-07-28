@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mi perfil | Cybersecurity Students IUPFA</title>
+  <script>(function () { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); })();</script>
   <link rel="icon" type="image/png" href="img/IUPFA Logo Alumnos.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -27,6 +28,14 @@
       <nav class="sidebar-nav">
         <a class="nav-link" href="index.html">&larr; Volver al portal</a>
       </nav>
+
+      <div class="sidebar-footer">
+        <label class="theme-toggle">
+          <span>🌙 Modo oscuro</span>
+          <input type="checkbox" id="darkModeToggle" />
+          <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+        </label>
+      </div>
     </aside>
 
     <div class="main-column">
@@ -90,7 +99,6 @@
                 <button type="button" id="toggleEmailBtn" class="ghost-btn small-btn">Ver</button>
               </div>
 
-              <label class="checkbox-row"><input type="checkbox" id="allowMessages" /> Permitir que otros usuarios me envíen mensajes</label>
 
               <button type="submit">Guardar datos principales</button>
             </form>
@@ -136,6 +144,16 @@
               <label class="checkbox-row"><input type="checkbox" id="contactVisible" /> Mostrar mis datos de contacto a otros alumnos</label>
               <button type="submit">Guardar contacto</button>
             </form>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Discord</h3></div>
+            <p class="form-hint">Vinculá tu cuenta para recibir recordatorios de fechas por mensaje privado en el bot de Discord del curso. Generá un código acá y escribile <code>/vincular &lt;código&gt;</code> al bot dentro de los 10 minutos.</p>
+            <div id="discordLinkStatus" class="notice"></div>
+            <div class="stack-row">
+              <button type="button" id="generateDiscordCodeBtn" class="ghost-btn small-btn">Generar código de vinculación</button>
+              <button type="button" id="unlinkDiscordBtn" class="ghost-btn small-btn danger-btn hidden">Desvincular</button>
+            </div>
           </section>
 
           <section class="card">
