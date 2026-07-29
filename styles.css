@@ -11,6 +11,7 @@
   --shadow: 0 18px 40px rgba(13, 70, 145, 0.12);
   --radius: 22px;
   --topbar-bg: rgba(255, 255, 255, 0.88);
+  --link-color: #3b82f6;
 }
 
 :root[data-theme="dark"] {
@@ -25,6 +26,7 @@
   --border: #253453;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   --topbar-bg: rgba(19, 27, 44, 0.88);
+  --link-color: #38bdf8;
 }
 
 /* La landing (pantalla previa a iniciar sesión) mantiene siempre su
@@ -799,6 +801,8 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 }
 .subject-tab:hover { background: var(--surface-soft); transform: none; }
 .subject-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+.discord-tabs { margin-bottom: 22px; }
+.new-pill { background: #22c55e; color: white; font-size: 10px; padding: 2px 8px; margin-left: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Admin content form */
 .content-admin {
@@ -1109,6 +1113,27 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   .claim-card { flex-direction: column; align-items: stretch; }
   .claim-btn { justify-content: center; }
 }
+
+.faq-item { padding: 0; overflow: hidden; }
+.faq-question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 16px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+.faq-question:hover { background: var(--surface-soft); transform: none; box-shadow: none; }
+.faq-arrow { color: var(--primary); flex-shrink: 0; }
+.faq-answer { padding: 0 16px 16px; color: var(--muted); line-height: 1.55; white-space: pre-wrap; }
+.faq-answer a, .faq-answer-preview a { color: var(--link-color); font-weight: 600; text-decoration: underline; }
+.faq-answer a:hover, .faq-answer-preview a:hover { text-decoration: none; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .section-head h3 { margin: 0; font-size: 22px; }
 .item-card {
@@ -1202,6 +1227,8 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .feature-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .auth-switch { margin-top: 34px; text-align: center; color: var(--muted); font-size: 14px; }
 .auth-switch button { background: none; border: none; padding: 0; color: var(--primary); font-weight: 700; cursor: pointer; }
+.inline-link-btn { background: none; border: none; padding: 0; margin: 0; color: var(--primary); font-weight: 700; font-size: inherit; cursor: pointer; display: inline; }
+.inline-link-btn:hover { background: none; text-decoration: underline; transform: none; box-shadow: none; }
 
 @media (max-width: 1100px) {
   .auth-screen, .split-grid, .subject-grid { grid-template-columns: 1fr; }

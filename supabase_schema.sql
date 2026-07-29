@@ -181,7 +181,11 @@ create policy "Users manage their own progress"
 -- lógica de abajo decide exponer — la RLS de las tablas base sigue
 -- restringida a "uno mismo o admin".
 -- =========================================================
-create or replace view public.student_directory as
+-- CREATE OR REPLACE VIEW no permite sacar columnas (solo agregar al final),
+-- así que si esta vista ya existía con más columnas (ej. allow_messages, que
+-- se dio de baja) hay que borrarla y recrearla en vez de reemplazarla.
+drop view if exists public.student_directory;
+create view public.student_directory as
 select
   id,
   name,
@@ -253,6 +257,29 @@ drop policy if exists "Admins can delete forum posts" on public.forum_posts;
 create policy "Admins can delete forum posts"
   on public.forum_posts for delete to authenticated
   using (public.is_admin());
+
+-- =========================================================
+-- PREGUNTAS FRECUENTES: las carga un admin desde admin.html, se muestran
+-- en el portal ordenadas por "position" (menor primero).
+-- =========================================================
+create table if not exists public.faq_items (
+  id uuid primary key default gen_random_uuid(),
+  question text not null,
+  answer text not null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.faq_items enable row level security;
+
+drop policy if exists "Faq items are viewable by authenticated users" on public.faq_items;
+create policy "Faq items are viewable by authenticated users"
+  on public.faq_items for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify faq items" on public.faq_items;
+create policy "Only admins can modify faq items"
+  on public.faq_items for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- =========================================================
 -- CONTENIDO DE MATERIAS: unidades + items (PDF/clase). Solo un admin

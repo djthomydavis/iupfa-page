@@ -106,13 +106,15 @@ const state = {
     subjects: [],
     studentProgress: {},
     students: [],
-    studentSubjects: {}
+    studentSubjects: {},
+    faq: []
   },
   currentUser: null,
   authError: null,
   alumnosSearch: '',
   alumnosSubjectFilter: 'all',
   openStudentProfileId: null,
+  openFaqId: null,
   currentSubjectId: null,
   currentUnitId: null,
   currentItemId: null,
@@ -516,6 +518,17 @@ async function loadForumFromSupabase() {
   const { data, error } = await supabaseClient.from('forum_posts').select('*').order('created_at', { ascending: false });
   if (error || !data) return;
   state.data.forum = data.map(mapForumRow);
+}
+
+function mapFaqRow(row) {
+  return { id: row.id, question: row.question, answer: row.answer, position: row.position };
+}
+
+async function loadFaqFromSupabase() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('faq_items').select('*').order('position', { ascending: true });
+  if (error || !data) return;
+  state.data.faq = data.map(mapFaqRow);
 }
 
 function mapContentItemRow(row) {
@@ -1840,6 +1853,135 @@ async function deleteSummary(subject, summaryId) {
   renderSummaries(subject);
 }
 
+// =========================================================
+// Preguntas Frecuentes: lectura para todos los alumnos (index.html) +
+// carga/edición solo para admins (admin.html).
+// =========================================================
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Convierte texto plano en HTML seguro, soportando negrita/cursiva y links en
+// formato Markdown (**negrita**, *cursiva*, [texto](https://...), los que
+// insertan los botones del admin) y también URLs sueltas escritas directo.
+function renderRichText(text) {
+  const escaped = escapeHtml(text);
+  const withBold = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const withItalic = withBold.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  const withMdLinks = withItalic.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (match, label, url) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`
+  );
+  const withBareLinks = withMdLinks.replace(
+    /(^|[^"'>])(https?:\/\/[^\s<]+)/g,
+    (match, prefix, url) => `${prefix}<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+  );
+  return withBareLinks.replace(/\n/g, '<br>');
+}
+
+function renderFaqList() {
+  const target = document.getElementById('faqList');
+  if (!target) return;
+
+  if (!state.data.faq.length) {
+    target.innerHTML = createItemCard('Todavía no hay preguntas cargadas', 'Esta sección se está preparando.', '');
+    return;
+  }
+
+  target.innerHTML = state.data.faq.map(item => {
+    const open = state.openFaqId === item.id;
+    return `
+      <article class="item-card faq-item">
+        <button type="button" class="faq-question" data-faq-toggle="${item.id}">
+          <span>${escapeHtml(item.question)}</span>
+          <span class="faq-arrow">${open ? '▾' : '▸'}</span>
+        </button>
+        ${open ? `<div class="faq-answer">${renderRichText(item.answer)}</div>` : ''}
+      </article>
+    `;
+  }).join('');
+
+  target.querySelectorAll('[data-faq-toggle]').forEach(button => {
+    button.addEventListener('click', () => {
+      const id = button.dataset.faqToggle;
+      state.openFaqId = state.openFaqId === id ? null : id;
+      renderFaqList();
+    });
+  });
+}
+
+function buildFaqAdminCard(item) {
+  return `
+    <article class="item-card">
+      <strong>${escapeHtml(item.question)}</strong>
+      <p class="faq-answer-preview">${renderRichText(item.answer)}</p>
+      <div class="stack-row">
+        <button type="button" class="ghost-btn small-btn" data-faq-edit="${item.id}">Editar</button>
+        <button type="button" class="ghost-btn small-btn danger-btn" data-faq-delete="${item.id}">Eliminar</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderFaqAdminList() {
+  const target = document.getElementById('faqAdminList');
+  if (!target) return;
+
+  target.innerHTML = state.data.faq.length
+    ? state.data.faq.map(buildFaqAdminCard).join('')
+    : createItemCard('Sin preguntas cargadas', 'Agregá la primera con el formulario de arriba.', '');
+
+  target.querySelectorAll('[data-faq-edit]').forEach(button => {
+    button.addEventListener('click', () => startEditFaq(button.dataset.faqEdit));
+  });
+  target.querySelectorAll('[data-faq-delete]').forEach(button => {
+    button.addEventListener('click', () => deleteFaqItem(button.dataset.faqDelete));
+  });
+}
+
+function resetFaqForm() {
+  const form = document.getElementById('faqForm');
+  const notice = document.getElementById('faqFormNotice');
+  const submitBtn = document.getElementById('faqFormSubmit');
+  const cancelBtn = document.getElementById('faqFormCancel');
+  const editId = document.getElementById('faqEditId');
+
+  if (form) form.reset();
+  if (notice) notice.className = 'notice';
+  if (editId) editId.value = '';
+  if (submitBtn) submitBtn.textContent = 'Agregar pregunta';
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+function startEditFaq(faqId) {
+  const item = state.data.faq.find(entry => entry.id === faqId);
+  if (!item) return;
+
+  document.getElementById('faqEditId').value = item.id;
+  document.getElementById('faqQuestionInput').value = item.question;
+  document.getElementById('faqAnswerInput').value = item.answer;
+  const submitBtn = document.getElementById('faqFormSubmit');
+  const cancelBtn = document.getElementById('faqFormCancel');
+  if (submitBtn) submitBtn.textContent = 'Guardar cambios';
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+  document.getElementById('faqQuestionInput').focus();
+}
+
+async function deleteFaqItem(faqId) {
+  if (!supabaseClient) return;
+  if (!confirm('¿Eliminar esta pregunta frecuente?')) return;
+
+  const { error } = await supabaseClient.from('faq_items').delete().eq('id', faqId);
+  if (error) { alert('No se pudo borrar: ' + error.message); return; }
+
+  state.data.faq = state.data.faq.filter(item => item.id !== faqId);
+  renderFaqAdminList();
+}
+
 function renderSubjectLists(subject) {
   renderSubjectContent(subject);
   renderList('subjectDates', subject.dates, item => createItemCard(item, 'Fecha relevante', ''));
@@ -1898,6 +2040,7 @@ function setView(view) {
     planificacion: 'planificacionView',
     foro: 'foroView',
     alumnos: 'alumnosView',
+    faq: 'faqView',
     contacto: 'contactoView',
     materias: 'materiasView',
     materia: 'materiaView'
@@ -1921,6 +2064,7 @@ function setView(view) {
   }
 
   if (view === 'alumnos') loadStudentDirectory();
+  if (view === 'faq') renderFaqList();
 }
 
 function getFullName(user) {
@@ -1980,6 +2124,7 @@ function setAdminView(view) {
 
   if (view === 'usuarios') loadAndRenderAdminUsers();
   if (view === 'discord') {
+    setDiscordTab('mensajes');
     loadDiscordChannels().then(() => {
       loadOutboxHistory();
       loadScheduledMessages();
@@ -1987,6 +2132,16 @@ function setAdminView(view) {
     loadBulkPostHistory();
     loadClearChannelHistory();
   }
+}
+
+function setDiscordTab(tab) {
+  document.querySelectorAll('[data-discord-tab]').forEach(button => {
+    button.classList.toggle('active', button.dataset.discordTab === tab);
+  });
+  document.querySelectorAll('[data-discord-panel]').forEach(panel => {
+    panel.classList.toggle('hidden', panel.dataset.discordPanel !== tab);
+  });
+  if (tab === 'faq') renderFaqAdminList();
 }
 
 function showAuthForm(mode) {
@@ -4121,7 +4276,64 @@ function attachAdminEvents() {
     button.addEventListener('click', () => setAdminView(button.dataset.adminView));
   });
 
+  document.querySelectorAll('[data-discord-tab]').forEach(button => {
+    button.addEventListener('click', () => setDiscordTab(button.dataset.discordTab));
+  });
+
   if (subjectFormCancel) subjectFormCancel.addEventListener('click', resetSubjectForm);
+
+  const faqForm = document.getElementById('faqForm');
+  const faqFormCancel = document.getElementById('faqFormCancel');
+  const faqFormNotice = document.getElementById('faqFormNotice');
+  const faqMdToolbar = document.getElementById('faqMdToolbar');
+  const faqAnswerInput = document.getElementById('faqAnswerInput');
+
+  if (faqFormCancel) faqFormCancel.addEventListener('click', resetFaqForm);
+
+  if (faqMdToolbar && faqAnswerInput) {
+    faqMdToolbar.addEventListener('click', event => {
+      const btn = event.target.closest('.md-btn');
+      if (!btn) return;
+      applyMarkdown(faqAnswerInput, btn.dataset.md);
+    });
+  }
+
+  if (faqForm) {
+    faqForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient) return;
+      const editId = document.getElementById('faqEditId').value;
+      const question = document.getElementById('faqQuestionInput').value.trim();
+      const answer = document.getElementById('faqAnswerInput').value.trim();
+      if (!question || !answer) return;
+
+      const submitBtn = document.getElementById('faqFormSubmit');
+      if (submitBtn) submitBtn.disabled = true;
+
+      if (editId) {
+        const { error } = await supabaseClient.from('faq_items').update({ question, answer }).eq('id', editId);
+        if (submitBtn) submitBtn.disabled = false;
+        if (error) {
+          if (faqFormNotice) { faqFormNotice.className = 'notice show error'; faqFormNotice.textContent = 'No se pudo guardar: ' + error.message; }
+          return;
+        }
+        const item = state.data.faq.find(entry => entry.id === editId);
+        if (item) { item.question = question; item.answer = answer; }
+      } else {
+        const position = state.data.faq.length;
+        const { data, error } = await supabaseClient.from('faq_items').insert({ question, answer, position }).select().single();
+        if (submitBtn) submitBtn.disabled = false;
+        if (error) {
+          if (faqFormNotice) { faqFormNotice.className = 'notice show error'; faqFormNotice.textContent = 'No se pudo agregar: ' + error.message; }
+          return;
+        }
+        state.data.faq.push(mapFaqRow(data));
+      }
+
+      resetFaqForm();
+      renderFaqAdminList();
+    });
+  }
 
   const exportLocalDataBtn = document.getElementById('exportLocalDataBtn');
   const importLocalDataInput = document.getElementById('importLocalDataInput');
@@ -4694,6 +4906,7 @@ async function init() {
   await loadCalendarFromSupabase();
   await loadForumFromSupabase();
   await loadSubjectContentFromSupabase();
+  await loadFaqFromSupabase();
   await restoreSession();
 
   const page = document.body.dataset.page;

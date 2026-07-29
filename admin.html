@@ -158,7 +158,13 @@
         </section>
 
         <section id="adminDiscordView" class="admin-view-section hidden">
-          <h4 class="view-group-title">Mensajes</h4>
+          <div class="subject-tabs discord-tabs">
+            <button type="button" class="subject-tab active" data-discord-tab="mensajes">Mensajes</button>
+            <button type="button" class="subject-tab" data-discord-tab="contenido">Contenido de Materias</button>
+            <button type="button" class="subject-tab" data-discord-tab="faq">Preguntas Frecuentes <span class="pill new-pill">Nuevo</span></button>
+          </div>
+
+          <section class="subject-panel stack" data-discord-panel="mensajes">
 
           <section class="card">
             <div class="section-head"><h3>Enviar mensaje ahora</h3></div>
@@ -229,7 +235,9 @@
             <div id="scheduledList" class="stack"></div>
           </section>
 
-          <h4 class="view-group-title">Contenido de materias (PDFs)</h4>
+          </section>
+
+          <section class="subject-panel stack hidden" data-discord-panel="contenido">
 
           <section class="card">
             <div class="section-head"><h3>Publicación automática</h3></div>
@@ -284,6 +292,35 @@
               <button type="button" id="clearChannelAllBtn" class="ghost-btn danger-btn">Borrar de todas las materias</button>
             </div>
             <div id="clearChannelHistory" class="stack"></div>
+          </section>
+
+          </section>
+
+          <section class="subject-panel stack hidden" data-discord-panel="faq">
+            <section class="card">
+              <div class="section-head"><h3>Agregar pregunta frecuente</h3></div>
+              <p class="form-hint">Esto se muestra en la sección "Preguntas Frecuentes" del portal de los alumnos. Más adelante el bot de Discord también va a poder responder con estas mismas preguntas.</p>
+              <div id="faqFormNotice" class="notice"></div>
+              <form id="faqForm" class="stack">
+                <input type="hidden" id="faqEditId" value="" />
+                <input id="faqQuestionInput" type="text" placeholder="Pregunta" required />
+                <div class="md-toolbar" id="faqMdToolbar">
+                  <button type="button" class="md-btn" data-md="bold" title="Negrita"><b>N</b></button>
+                  <button type="button" class="md-btn" data-md="italic" title="Cursiva"><i>C</i></button>
+                  <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+                </div>
+                <textarea id="faqAnswerInput" placeholder="Respuesta. Para poner un link seleccioná el texto y apretá 🔗, o escribí [texto](https://...)" rows="3" required></textarea>
+                <div class="stack-row">
+                  <button type="submit" id="faqFormSubmit">Agregar pregunta</button>
+                  <button type="button" id="faqFormCancel" class="ghost-btn hidden">Cancelar edición</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="card">
+              <div class="section-head"><h3>Preguntas cargadas</h3></div>
+              <div id="faqAdminList" class="stack"></div>
+            </section>
           </section>
         </section>
       </main>
