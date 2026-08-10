@@ -667,6 +667,12 @@ alter table public.calendar_events add column if not exists subject_id text refe
 alter table public.calendar_events add column if not exists modality text check (modality in ('Presencial','Virtual'));
 alter table public.calendar_events add column if not exists series_id uuid;
 alter table public.calendar_events add column if not exists room text;
+alter table public.calendar_events add column if not exists class_code text;
+
+-- Materias como "Inglés Técnico" no pertenecen a un cuatrimestre fijo: se
+-- pueden cursar en cualquier momento de la carrera, sin importar si el
+-- cuatrimestre activo es 1° o 2°.
+alter table public.subjects add column if not exists any_semester boolean not null default false;
 
 -- =========================================================
 -- DISCORD_LINKS: vincula una cuenta del portal con un usuario de Discord,
@@ -802,6 +808,21 @@ alter table public.discord_channels enable row level security;
 drop policy if exists "Discord channels viewable by authenticated users" on public.discord_channels;
 create policy "Discord channels viewable by authenticated users"
   on public.discord_channels for select to authenticated using (true);
+
+-- =========================================================
+-- CLASS_ANNOUNCEMENT_LOG: registra cada aviso de "hoy tenés clase" que el
+-- bot postea en el canal de una materia (ver iupfa-bot/src/classSchedule.js),
+-- para poder borrarlo automáticamente 24hs después de publicado. Solo la
+-- usa el bot con la service_role key, no hace falta que la web la lea.
+-- =========================================================
+create table if not exists public.class_announcement_log (
+  id uuid primary key default gen_random_uuid(),
+  channel_id text not null,
+  message_id text not null,
+  posted_at timestamptz not null default now()
+);
+
+alter table public.class_announcement_log enable row level security;
 
 -- =========================================================
 -- SUBJECT_MESSAGE_TEMPLATES: plantilla de texto (con variables tipo

@@ -128,6 +128,7 @@ const state = {
   opinionProfessorFilter: 'all',
   opinionStarFilter: 'all',
   editingCalendarId: null,
+  editingClassSeriesId: null,
   editingForumId: null,
   pendingConfirmEmail: null,
   pendingConfirmUserId: null,
@@ -227,6 +228,7 @@ function mapSubjectRow(row) {
     libre: row.libre,
     examFinal: row.exam_final,
     correlatives: row.correlatives || [],
+    anySemester: !!row.any_semester,
     units: [], dates: [], forum: [], opinions: [], polls: []
   };
 }
@@ -265,7 +267,8 @@ function mapCalendarRow(row) {
     subjectId: row.subject_id || '',
     modality: row.modality || '',
     seriesId: row.series_id || '',
-    room: row.room || ''
+    room: row.room || '',
+    classCode: row.class_code || ''
   };
 }
 
@@ -276,9 +279,9 @@ async function loadCalendarFromSupabase() {
   state.data.calendar = data.map(mapCalendarRow);
 }
 
-async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room }) {
+async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room, classCode }) {
   if (!supabaseClient) {
-    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', seriesId: '', room: room || '' });
+    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', seriesId: '', room: room || '', classCode: classCode || '' });
     return;
   }
   const { data, error } = await supabaseClient.from('calendar_events').insert({
@@ -289,15 +292,16 @@ async function createCalendarEvent({ title, date, type, endDate, startTime, endT
     subject_id: subjectId || null,
     modality: modality || null,
     room: room || null,
+    class_code: classCode || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }).select().single();
   if (error) { console.error('No se pudo crear el evento:', error); return; }
   state.data.calendar.unshift(mapCalendarRow(data));
 }
 
-async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId, modality, room }) {
+async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId, modality, room, classCode }) {
   const item = state.data.calendar.find(entry => entry.id === id);
-  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', room: room || '' });
+  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', room: room || '', classCode: classCode || '' });
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').update({
     title, date, type,
@@ -306,7 +310,8 @@ async function updateCalendarEvent(id, { title, date, type, endDate, startTime, 
     end_time: endTime || null,
     subject_id: subjectId || null,
     modality: modality || null,
-    room: room || null
+    room: room || null,
+    class_code: classCode || null
   }).eq('id', id);
   if (error) console.error('No se pudo actualizar el evento:', error);
 }
@@ -358,11 +363,18 @@ async function deleteCalendarSeries(seriesId) {
   if (error) console.error('No se pudo borrar la serie:', error);
 }
 
+async function updateCalendarSeriesRoomAndCode(seriesId, room, classCode) {
+  state.data.calendar.forEach(item => { if (item.seriesId === seriesId) { item.room = room || ''; item.classCode = classCode || ''; } });
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('calendar_events').update({ room: room || null, class_code: classCode || null }).eq('series_id', seriesId);
+  if (error) console.error('No se pudo actualizar el aula/código de la serie:', error);
+}
+
 // Genera una tanda de "Clase" para una materia, una por cada día de la semana
 // elegido dentro del rango del cuatrimestre activo, alternando modalidad según
 // el patrón (ej. 1 presencial + 2 virtuales => P, V, V, P, V, V...). Todas
 // comparten un series_id para poder borrarlas juntas después.
-async function generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room }) {
+async function generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room, classCode }) {
   const semesterEvent = getCurrentSemesterEvent();
   if (!semesterEvent) return { ok: false, message: 'No hay un cuatrimestre activo cargado en el calendario.' };
 
@@ -398,13 +410,14 @@ async function generateRecurringClasses({ subjectId, weekday, startTime, endTime
     modality: pattern[index % pattern.length],
     series_id: seriesId,
     room: room || null,
+    class_code: classCode || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }));
 
   if (!supabaseClient) {
     rows.forEach(row => state.data.calendar.unshift({
       id: generateLocalId('event'), title: row.title, type: row.type, date: row.date,
-      endDate: '', startTime, endTime, subjectId: row.subject_id, modality: row.modality, seriesId, room: room || ''
+      endDate: '', startTime, endTime, subjectId: row.subject_id, modality: row.modality, seriesId, room: room || '', classCode: classCode || ''
     }));
     return { ok: true, count: rows.length };
   }
@@ -1041,6 +1054,24 @@ function isHolidayDate(iso) {
   return state.data.calendar.some(event => event.type === 'Feriado' && eventCoversDate(event, iso));
 }
 
+function zoomLinkFor(code) {
+  const trimmed = (code || '').trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://zoom.us/j/${encodeURIComponent(trimmed.replace(/\s+/g, ''))}`;
+}
+
+// Aula solo aplica a clases presenciales, código de clase (link de Zoom) solo a
+// virtuales — se muestra uno u otro según la modalidad real del evento/ocurrencia.
+function buildRoomOrCodeBadge(item) {
+  if (item.modality === 'Presencial' && item.room) {
+    return `<span class="event-room-badge">📍 ${escapeHtml(item.room)}</span>`;
+  }
+  if (item.modality === 'Virtual' && item.classCode) {
+    return `<a class="event-room-badge event-zoom-link" href="${zoomLinkFor(item.classCode)}" target="_blank" rel="noopener">🔗 ${escapeHtml(item.classCode)}</a>`;
+  }
+  return '';
+}
+
 function addDaysISO(iso, delta) {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1, d);
@@ -1190,7 +1221,10 @@ function buildCalendarCard(item) {
         <option value="Presencial" ${item.modality === 'Presencial' ? 'selected' : ''}>Presencial</option>
         <option value="Virtual" ${item.modality === 'Virtual' ? 'selected' : ''}>Virtual</option>
       </select>
-      <input type="text" name="room" value="${item.room || ''}" placeholder="${item.modality === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)'}" />
+      <label class="checkbox-row small"><input type="checkbox" class="room-toggle" ${item.room ? 'checked' : ''} /> Aula (clase presencial)</label>
+      <input type="text" name="room" value="${item.room || ''}" placeholder="Aula" class="${item.room ? '' : 'hidden'}" />
+      <label class="checkbox-row small"><input type="checkbox" class="code-toggle" ${item.classCode ? 'checked' : ''} /> Código de clase (link de Zoom, clase virtual)</label>
+      <input type="text" name="classCode" value="${item.classCode || ''}" placeholder="Código o link de Zoom" class="${item.classCode ? '' : 'hidden'}" />
       <label class="field-label">Fecha fin<input type="date" name="endDate" value="${item.endDate || ''}" /></label>
       <div class="two-cols">
         <label class="field-label">Hora inicio<input type="time" name="startTime" value="${item.startTime || ''}" /></label>
@@ -1213,7 +1247,7 @@ function buildCalendarCard(item) {
   const subject = item.subjectId ? state.data.subjects.find(entry => entry.id === item.subjectId) : null;
   const subjectBadge = subject ? `<span class="event-subject-badge">${subject.code} · ${subject.name}</span>` : '';
   const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality}</span>` : '';
-  const roomBadge = item.room ? `<span class="event-room-badge">📍 ${item.room}</span>` : '';
+  const roomBadge = buildRoomOrCodeBadge(item);
   const isHoliday = item.type !== 'Feriado' && item.type !== 'Cuatrimestre' && isHolidayDate(item.date);
   const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
   return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${subjectBadge}${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
@@ -1244,11 +1278,28 @@ function buildRecurringClassSummaryCard(item) {
   const subject = item.subjectId ? state.data.subjects.find(entry => entry.id === item.subjectId) : null;
   const name = subject ? subject.name : item.title;
   const timeLabel = item.startTime && item.endTime ? `${item.startTime} a ${item.endTime}` : (item.startTime || '');
+  if (item.seriesId && state.editingClassSeriesId === item.seriesId) {
+    return `<form class="item-card inline-edit-form" data-class-series-edit-form="${item.seriesId}">
+      <strong>${name}</strong>
+      <span>${item.weekdayLabel} · ${timeLabel} · Clase</span>
+      <p class="form-hint">Se aplica a toda la serie: se usa el Aula en las ocurrencias presenciales y el Código de clase en las virtuales.</p>
+      <label class="checkbox-row small"><input type="checkbox" class="room-toggle" ${item.room ? 'checked' : ''} /> Aula (clase presencial)</label>
+      <input type="text" name="room" value="${item.room || ''}" placeholder="Aula" class="${item.room ? '' : 'hidden'}" />
+      <label class="checkbox-row small"><input type="checkbox" class="code-toggle" ${item.classCode ? 'checked' : ''} /> Código de clase (link de Zoom, clase virtual)</label>
+      <input type="text" name="classCode" value="${item.classCode || ''}" placeholder="Código o link de Zoom" class="${item.classCode ? '' : 'hidden'}" />
+      <div class="stack-row">
+        <button type="submit" class="small-btn">Guardar</button>
+        <button type="button" class="ghost-btn small-btn" data-class-series-cancel="${item.seriesId}">Cancelar</button>
+        <button type="button" class="ghost-btn small-btn danger-btn" data-calendar-delete-series="${item.seriesId}">Borrar serie</button>
+      </div>
+    </form>`;
+  }
   const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality} esta semana</span>` : '';
-  const roomBadge = item.room ? `<span class="event-room-badge">📍 ${item.room}</span>` : '';
+  const roomBadge = buildRoomOrCodeBadge(item);
   const isHoliday = isHolidayDate(item.date);
   const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
   const adminControls = (isAdminView() && item.seriesId) ? `<div class="stack-row">
+      <button type="button" class="ghost-btn small-btn" data-class-series-edit="${item.seriesId}">Editar</button>
       <button type="button" class="ghost-btn small-btn danger-btn" data-calendar-delete-series="${item.seriesId}">Borrar serie</button>
     </div>` : '';
   return `<article class="item-card"><strong>${name}</strong><span><i class="event-dot" style="background:${EVENT_TYPE_COLORS.Clase}"></i>${item.weekdayLabel} · ${timeLabel} · Clase</span>${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
@@ -1376,6 +1427,7 @@ function getCurrentSemesterNumber() {
 // Si no hay forma de saber qué cuatrimestre es (sin evento en el calendario), no
 // se bloquea nada.
 function isEnrollmentWindowOpenFor(subject) {
+  if (subject.anySemester) return true;
   const currentSemester = getCurrentSemesterNumber();
   if (!currentSemester) return true;
   return String(subject.semester) === currentSemester;
@@ -1483,7 +1535,7 @@ function computeRoadmap(email, maxSubjects, maxPresenciales) {
     let presencialCount = selected.filter(subject => subject.modality === 'Presencial').length;
 
     const eligible = [...pending.values()]
-      .filter(subject => String(subject.semester) === parity)
+      .filter(subject => subject.anySemester || String(subject.semester) === parity)
       .filter(subject => subject.correlatives.every(id => virtualApproved.has(id)))
       .sort((a, b) => Number(a.code) - Number(b.code));
 
@@ -3167,13 +3219,19 @@ function attachPortalEvents() {
   const addCalendarEventBtn = document.getElementById('addCalendarEventBtn');
   const newCalendarEventForm = document.getElementById('newCalendarEventForm');
   const cancelNewCalendarEvent = document.getElementById('cancelNewCalendarEvent');
-  const newCalendarEventModality = document.getElementById('newCalendarEventModality');
-  const newCalendarEventRoom = document.getElementById('newCalendarEventRoom');
-  if (newCalendarEventModality && newCalendarEventRoom) {
-    newCalendarEventModality.addEventListener('change', () => {
-      newCalendarEventRoom.placeholder = newCalendarEventModality.value === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)';
+  function wireRoomCodeToggle(toggleId, inputId) {
+    const toggle = document.getElementById(toggleId);
+    const input = document.getElementById(inputId);
+    if (!toggle || !input) return;
+    toggle.addEventListener('change', () => {
+      input.classList.toggle('hidden', !toggle.checked);
+      if (!toggle.checked) input.value = '';
     });
   }
+  wireRoomCodeToggle('newCalendarEventRoomToggle', 'newCalendarEventRoom');
+  wireRoomCodeToggle('newCalendarEventCodeToggle', 'newCalendarEventCode');
+  wireRoomCodeToggle('recurringRoomToggle', 'recurringRoom');
+  wireRoomCodeToggle('recurringCodeToggle', 'recurringCode');
 
   if (addCalendarEventBtn && newCalendarEventForm) {
     addCalendarEventBtn.addEventListener('click', () => {
@@ -3188,9 +3246,15 @@ function attachPortalEvents() {
     });
   }
 
+  function resetRoomCodeFields(form) {
+    form.querySelectorAll('.room-toggle, .code-toggle').forEach(toggle => { toggle.checked = false; });
+    form.querySelectorAll('[id$="Room"], [id$="Code"]').forEach(input => input.classList.add('hidden'));
+  }
+
   if (cancelNewCalendarEvent && newCalendarEventForm) {
     cancelNewCalendarEvent.addEventListener('click', () => {
       newCalendarEventForm.reset();
+      resetRoomCodeFields(newCalendarEventForm);
       newCalendarEventForm.classList.add('hidden');
     });
   }
@@ -3208,9 +3272,11 @@ function attachPortalEvents() {
       const subjectId = document.getElementById('newCalendarEventSubject').value;
       const modality = document.getElementById('newCalendarEventModality').value;
       const room = document.getElementById('newCalendarEventRoom').value.trim();
+      const classCode = document.getElementById('newCalendarEventCode').value.trim();
       if (!title || !date) return;
-      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room });
+      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room, classCode });
       newCalendarEventForm.reset();
+      resetRoomCodeFields(newCalendarEventForm);
       newCalendarEventForm.classList.add('hidden');
       renderCalendarViews();
     });
@@ -3235,6 +3301,7 @@ function attachPortalEvents() {
   if (cancelRecurringClass && recurringClassForm) {
     cancelRecurringClass.addEventListener('click', () => {
       recurringClassForm.reset();
+      resetRoomCodeFields(recurringClassForm);
       recurringClassForm.classList.add('hidden');
       if (recurringNotice) recurringNotice.className = 'notice';
     });
@@ -3251,11 +3318,12 @@ function attachPortalEvents() {
       const presencialCount = Number(document.getElementById('recurringPresencialCount').value) || 0;
       const virtualCount = Number(document.getElementById('recurringVirtualCount').value) || 0;
       const room = document.getElementById('recurringRoom').value.trim();
+      const classCode = document.getElementById('recurringCode').value.trim();
       if (!subjectId || !startTime || !endTime) return;
 
       const submitBtn = recurringClassForm.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
-      const result = await generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room });
+      const result = await generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room, classCode });
       if (submitBtn) submitBtn.disabled = false;
 
       if (!result.ok) {
@@ -3263,6 +3331,7 @@ function attachPortalEvents() {
         return;
       }
       recurringClassForm.reset();
+      resetRoomCodeFields(recurringClassForm);
       recurringClassForm.classList.add('hidden');
       if (recurringNotice) recurringNotice.className = 'notice';
       renderCalendarViews();
@@ -3344,15 +3413,31 @@ function attachPortalEvents() {
       if (deleteSeriesBtn) {
         if (!confirm('¿Borrar todas las clases de esta serie recurrente?')) return;
         state.editingCalendarId = null;
+        state.editingClassSeriesId = null;
         deleteCalendarSeries(deleteSeriesBtn.dataset.calendarDeleteSeries).then(renderCalendarViews);
+        return;
+      }
+      const seriesEditBtn = event.target.closest('[data-class-series-edit]');
+      if (seriesEditBtn) {
+        state.editingClassSeriesId = seriesEditBtn.dataset.classSeriesEdit;
+        renderCalendarList();
+        return;
+      }
+      const seriesCancelBtn = event.target.closest('[data-class-series-cancel]');
+      if (seriesCancelBtn) {
+        state.editingClassSeriesId = null;
+        renderCalendarList();
       }
     });
 
     calendarFullEl.addEventListener('change', event => {
-      const modalitySelect = event.target.closest('[data-calendar-edit-form] select[name="modality"]');
-      if (!modalitySelect) return;
-      const roomInput = modalitySelect.closest('form').querySelector('input[name="room"]');
-      if (roomInput) roomInput.placeholder = modalitySelect.value === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)';
+      const toggle = event.target.closest('.room-toggle, .code-toggle');
+      if (!toggle) return;
+      const inputName = toggle.classList.contains('room-toggle') ? 'room' : 'classCode';
+      const input = toggle.closest('form').querySelector(`input[name="${inputName}"]`);
+      if (!input) return;
+      input.classList.toggle('hidden', !toggle.checked);
+      if (!toggle.checked) input.value = '';
     });
 
     calendarFullEl.addEventListener('submit', async event => {
@@ -3369,9 +3454,20 @@ function attachPortalEvents() {
         endTime: form.endTime.value,
         subjectId: form.subjectId.value,
         modality: form.modality.value,
-        room: form.room.value.trim()
+        room: form.room.value.trim(),
+        classCode: form.classCode.value.trim()
       });
       state.editingCalendarId = null;
+      renderCalendarViews();
+    });
+
+    calendarFullEl.addEventListener('submit', async event => {
+      const seriesForm = event.target.closest('[data-class-series-edit-form]');
+      if (!seriesForm || !isAdminView()) return;
+      event.preventDefault();
+      const seriesId = seriesForm.dataset.classSeriesEditForm;
+      await updateCalendarSeriesRoomAndCode(seriesId, seriesForm.room.value.trim(), seriesForm.classCode.value.trim());
+      state.editingClassSeriesId = null;
       renderCalendarViews();
     });
   }
@@ -4069,6 +4165,7 @@ function startEditSubject(subjectId) {
   document.getElementById('subjectCorrelatives').value = correlativeCodes(subject) === 'Sin correlativas' ? '' : correlativeCodes(subject);
   document.getElementById('subjectLibre').value = subject.libre;
   document.getElementById('subjectExamFinal').value = subject.examFinal;
+  document.getElementById('subjectAnySemester').checked = !!subject.anySemester;
 
   document.getElementById('subjectFormTitle').textContent = `Editar materia (código ${subject.code})`;
   document.getElementById('subjectFormSubmit').textContent = 'Guardar cambios';
@@ -4851,6 +4948,7 @@ function attachAdminEvents() {
       const modality = document.getElementById('subjectModality').value;
       const libre = document.getElementById('subjectLibre').value;
       const examFinal = document.getElementById('subjectExamFinal').value;
+      const anySemester = document.getElementById('subjectAnySemester').checked;
       const correlativeInput = document.getElementById('subjectCorrelatives').value.trim();
 
       const duplicate = state.data.subjects.find(item => item.code === code && item.id !== editId);
@@ -4874,7 +4972,8 @@ function attachAdminEvents() {
       const row = {
         id, code, name, year, semester, hours, modality, libre,
         exam_final: examFinal,
-        correlatives: correlativeIds
+        correlatives: correlativeIds,
+        any_semester: anySemester
       };
 
       if (supabaseClient) {
@@ -4900,11 +4999,13 @@ function attachAdminEvents() {
           subject.libre = libre;
           subject.examFinal = examFinal;
           subject.correlatives = correlativeIds;
+          subject.anySemester = anySemester;
         }
       } else {
         state.data.subjects.push({
           id, code, year, semester, name, hours, modality, libre, examFinal,
           correlatives: correlativeIds,
+          anySemester,
           units: [], dates: [], forum: [], opinions: [], polls: []
         });
       }

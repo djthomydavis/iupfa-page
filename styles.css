@@ -635,6 +635,13 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
   background: var(--surface-soft);
   color: var(--muted);
 }
+a.event-zoom-link {
+  text-decoration: none;
+  background: rgba(37, 99, 235, 0.14);
+  color: var(--link-color);
+  cursor: pointer;
+}
+a.event-zoom-link:hover { text-decoration: underline; }
 .subject-card-name {
   font-size: 15px;
   line-height: 1.35;
