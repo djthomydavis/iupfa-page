@@ -334,6 +334,7 @@
                 <h3>Calendario académico</h3>
                 <div class="stack-row">
                   <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
+                  <button type="button" id="addRecurringClassBtn" class="ghost-btn icon-btn hidden" aria-label="Generar clases recurrentes" title="Generar clases recurrentes del cuatrimestre">🔁</button>
                   <button type="button" id="calendarNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar calendario académico">✕</button>
                 </div>
               </div>
@@ -348,8 +349,10 @@
                     <option>Feriado</option>
                     <option>Entrega</option>
                     <option>Cuatrimestre</option>
+                    <option>Clase</option>
                   </select>
                 </div>
+                <select id="newCalendarEventSubject"><option value="">Sin materia</option></select>
                 <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
                 <label class="field-label">Fecha fin<input id="newCalendarEventEndDate" type="date" /></label>
                 <div class="two-cols">
@@ -361,6 +364,35 @@
                   <button type="button" id="cancelNewCalendarEvent" class="ghost-btn small-btn">Cancelar</button>
                 </div>
               </form>
+
+              <form id="recurringClassForm" class="stack inline-edit-form hidden">
+                <p class="form-hint">Genera una clase por cada día elegido dentro del cuatrimestre activo (según el evento "Cuatrimestre" cargado en el calendario), alternando modalidad si querés.</p>
+                <div id="recurringNotice" class="notice"></div>
+                <select id="recurringSubjectSelect" required><option value="">Elegí una materia…</option></select>
+                <select id="recurringWeekday" required>
+                  <option value="1">Todos los lunes</option>
+                  <option value="2">Todos los martes</option>
+                  <option value="3">Todos los miércoles</option>
+                  <option value="4">Todos los jueves</option>
+                  <option value="5">Todos los viernes</option>
+                  <option value="6">Todos los sábados</option>
+                  <option value="0">Todos los domingos</option>
+                </select>
+                <div class="two-cols">
+                  <label class="field-label">Hora inicio<input id="recurringStartTime" type="time" required /></label>
+                  <label class="field-label">Hora fin<input id="recurringEndTime" type="time" required /></label>
+                </div>
+                <p class="form-hint">Patrón de modalidad: cuántas clases seguidas son presenciales y cuántas virtuales (se repite en ese orden hasta el final del cuatrimestre). Ej: 1 y 2 = Presencial, Virtual, Virtual, Presencial, Virtual, Virtual…</p>
+                <div class="two-cols">
+                  <label class="field-label">Presenciales seguidas<input id="recurringPresencialCount" type="number" min="0" value="1" /></label>
+                  <label class="field-label">Virtuales seguidas<input id="recurringVirtualCount" type="number" min="0" value="0" /></label>
+                </div>
+                <div class="stack-row">
+                  <button type="submit" class="small-btn">Generar clases del cuatrimestre</button>
+                  <button type="button" id="cancelRecurringClass" class="ghost-btn small-btn">Cancelar</button>
+                </div>
+              </form>
+
               <div id="calendarFull" class="stack"></div>
             </aside>
           </div>

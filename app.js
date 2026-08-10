@@ -261,7 +261,10 @@ function mapCalendarRow(row) {
     date: row.date,
     endDate: row.end_date || '',
     startTime: row.start_time ? row.start_time.slice(0, 5) : '',
-    endTime: row.end_time ? row.end_time.slice(0, 5) : ''
+    endTime: row.end_time ? row.end_time.slice(0, 5) : '',
+    subjectId: row.subject_id || '',
+    modality: row.modality || '',
+    seriesId: row.series_id || ''
   };
 }
 
@@ -272,9 +275,9 @@ async function loadCalendarFromSupabase() {
   state.data.calendar = data.map(mapCalendarRow);
 }
 
-async function createCalendarEvent({ title, date, type, endDate, startTime, endTime }) {
+async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId }) {
   if (!supabaseClient) {
-    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime });
+    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: '', seriesId: '' });
     return;
   }
   const { data, error } = await supabaseClient.from('calendar_events').insert({
@@ -282,21 +285,23 @@ async function createCalendarEvent({ title, date, type, endDate, startTime, endT
     end_date: endDate || null,
     start_time: startTime || null,
     end_time: endTime || null,
+    subject_id: subjectId || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }).select().single();
   if (error) { console.error('No se pudo crear el evento:', error); return; }
   state.data.calendar.unshift(mapCalendarRow(data));
 }
 
-async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime }) {
+async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId }) {
   const item = state.data.calendar.find(entry => entry.id === id);
-  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime });
+  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '' });
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').update({
     title, date, type,
     end_date: endDate || null,
     start_time: startTime || null,
-    end_time: endTime || null
+    end_time: endTime || null,
+    subject_id: subjectId || null
   }).eq('id', id);
   if (error) console.error('No se pudo actualizar el evento:', error);
 }
@@ -306,6 +311,70 @@ async function deleteCalendarEvent(id) {
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').delete().eq('id', id);
   if (error) console.error('No se pudo borrar el evento:', error);
+}
+
+async function deleteCalendarSeries(seriesId) {
+  state.data.calendar = state.data.calendar.filter(item => item.seriesId !== seriesId);
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('calendar_events').delete().eq('series_id', seriesId);
+  if (error) console.error('No se pudo borrar la serie:', error);
+}
+
+// Genera una tanda de "Clase" para una materia, una por cada día de la semana
+// elegido dentro del rango del cuatrimestre activo, alternando modalidad según
+// el patrón (ej. 1 presencial + 2 virtuales => P, V, V, P, V, V...). Todas
+// comparten un series_id para poder borrarlas juntas después.
+async function generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount }) {
+  const semesterEvent = getCurrentSemesterEvent();
+  if (!semesterEvent) return { ok: false, message: 'No hay un cuatrimestre activo cargado en el calendario.' };
+
+  const subject = state.data.subjects.find(item => item.id === subjectId);
+  if (!subject) return { ok: false, message: 'Elegí una materia.' };
+
+  const pattern = [
+    ...Array(Math.max(0, presencialCount)).fill('Presencial'),
+    ...Array(Math.max(0, virtualCount)).fill('Virtual')
+  ];
+  if (!pattern.length) return { ok: false, message: 'Ingresá al menos una clase presencial o virtual.' };
+
+  const rangeStart = semesterEvent.date;
+  const rangeEnd = semesterEvent.endDate || semesterEvent.date;
+
+  const dates = [];
+  let cursor = rangeStart;
+  while (cursor <= rangeEnd) {
+    const [y, m, d] = cursor.split('-').map(Number);
+    if (new Date(y, m - 1, d).getDay() === weekday) dates.push(cursor);
+    cursor = addDaysISO(cursor, 1);
+  }
+  if (!dates.length) return { ok: false, message: 'No hay ninguna fecha con ese día de la semana dentro del cuatrimestre activo.' };
+
+  const seriesId = (crypto.randomUUID ? crypto.randomUUID() : generateLocalId('series'));
+  const rows = dates.map((date, index) => ({
+    title: subject.name,
+    type: 'Clase',
+    date,
+    start_time: startTime || null,
+    end_time: endTime || null,
+    subject_id: subject.id,
+    modality: pattern[index % pattern.length],
+    series_id: seriesId,
+    created_by: state.currentUser ? state.currentUser.id : null
+  }));
+
+  if (!supabaseClient) {
+    rows.forEach(row => state.data.calendar.unshift({
+      id: generateLocalId('event'), title: row.title, type: row.type, date: row.date,
+      endDate: '', startTime, endTime, subjectId: row.subject_id, modality: row.modality, seriesId
+    }));
+    return { ok: true, count: rows.length };
+  }
+
+  const { data, error } = await supabaseClient.from('calendar_events').insert(rows).select();
+  if (error) return { ok: false, message: error.message };
+
+  data.map(mapCalendarRow).forEach(item => state.data.calendar.unshift(item));
+  return { ok: true, count: data.length };
 }
 
 // =========================================================
@@ -487,13 +556,17 @@ function applyViewMode() {
   const contentAddCard = document.getElementById('subjectContentAdmin');
   const toggleBtn = document.getElementById('viewModeToggle');
   const addCalendarEventBtn = document.getElementById('addCalendarEventBtn');
+  const addRecurringClassBtn = document.getElementById('addRecurringClassBtn');
   const newCalendarEventForm = document.getElementById('newCalendarEventForm');
+  const recurringClassForm = document.getElementById('recurringClassForm');
   const isAdminAccount = !!(state.currentUser && state.currentUser.role === 'admin');
 
   if (adminShortcut) adminShortcut.classList.toggle('hidden', !isAdminView());
   if (contentAddCard && state.currentSubjectId) contentAddCard.classList.toggle('hidden', !isAdminView());
   if (addCalendarEventBtn) addCalendarEventBtn.classList.toggle('hidden', !isAdminView());
+  if (addRecurringClassBtn) addRecurringClassBtn.classList.toggle('hidden', !isAdminView());
   if (newCalendarEventForm && !isAdminView()) newCalendarEventForm.classList.add('hidden');
+  if (recurringClassForm && !isAdminView()) recurringClassForm.classList.add('hidden');
 
   if (toggleBtn) {
     toggleBtn.classList.toggle('hidden', !isAdminAccount);
@@ -986,15 +1059,26 @@ function renderCalendarMonth() {
   }
 }
 
-const CALENDAR_EVENT_TYPES = ['Académico', 'Examen', 'Inscripción', 'Feriado', 'Entrega', 'Cuatrimestre'];
+const CALENDAR_EVENT_TYPES = ['Académico', 'Examen', 'Inscripción', 'Feriado', 'Entrega', 'Cuatrimestre', 'Clase'];
 const EVENT_TYPE_COLORS = {
   'Académico': '#0d6efd',
   'Examen': '#dc2626',
   'Inscripción': '#7c3aed',
   'Feriado': '#16a34a',
   'Entrega': '#f59e0b',
-  'Cuatrimestre': '#38bdf8'
+  'Cuatrimestre': '#38bdf8',
+  'Clase': '#059669'
 };
+
+function populateCalendarSubjectSelect(select, selectedId) {
+  if (!select) return;
+  const options = state.data.subjects
+    .slice()
+    .sort((a, b) => Number(a.code) - Number(b.code))
+    .map(subject => `<option value="${subject.id}" ${selectedId === subject.id ? 'selected' : ''}>${subject.code} · ${subject.name}</option>`)
+    .join('');
+  select.innerHTML = `<option value="">Sin materia</option>${options}`;
+}
 
 function buildCalendarCard(item) {
   if (state.editingCalendarId === item.id) {
@@ -1006,11 +1090,13 @@ function buildCalendarCard(item) {
           ${CALENDAR_EVENT_TYPES.map(type => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${type}</option>`).join('')}
         </select>
       </div>
+      <select name="subjectId" class="calendar-edit-subject-select"></select>
       <label class="field-label">Fecha fin<input type="date" name="endDate" value="${item.endDate || ''}" /></label>
       <div class="two-cols">
         <label class="field-label">Hora inicio<input type="time" name="startTime" value="${item.startTime || ''}" /></label>
         <label class="field-label">Hora fin<input type="time" name="endTime" value="${item.endTime || ''}" /></label>
       </div>
+      ${item.seriesId ? `<p class="form-hint">Es parte de una serie de clases recurrentes. <button type="button" class="ghost-btn small-btn danger-btn" data-calendar-delete-series="${item.seriesId}">Borrar toda la serie</button></p>` : ''}
       <div class="stack-row">
         <button type="submit" class="small-btn">Guardar</button>
         <button type="button" class="ghost-btn small-btn" data-calendar-cancel="${item.id}">Cancelar</button>
@@ -1024,7 +1110,10 @@ function buildCalendarCard(item) {
   const color = EVENT_TYPE_COLORS[item.type] || 'var(--primary)';
   const current = getCurrentSemesterEvent();
   const stickyClass = current && item.id === current.id ? ' calendar-sticky-current' : '';
-  return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${adminControls}</article>`;
+  const subject = item.subjectId ? state.data.subjects.find(entry => entry.id === item.subjectId) : null;
+  const subjectBadge = subject ? `<span class="event-subject-badge">${subject.code} · ${subject.name}</span>` : '';
+  const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality}</span>` : '';
+  return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${subjectBadge}${modalityBadge}${adminControls}</article>`;
 }
 
 function renderCalendarList() {
@@ -1034,6 +1123,12 @@ function renderCalendarList() {
   const target = document.getElementById('calendarFull');
   if (!target) return;
   target.innerHTML = sorted.length ? sorted.map(buildCalendarCard).join('') : createItemCard('Sin datos', 'No hay información cargada.', '');
+
+  if (state.editingCalendarId) {
+    const editingItem = state.data.calendar.find(item => item.id === state.editingCalendarId);
+    const select = target.querySelector('.calendar-edit-subject-select');
+    if (editingItem && select) populateCalendarSubjectSelect(select, editingItem.subjectId);
+  }
 }
 
 function changeCalendarMonth(delta) {
@@ -2881,8 +2976,11 @@ function attachPortalEvents() {
   if (addCalendarEventBtn && newCalendarEventForm) {
     addCalendarEventBtn.addEventListener('click', () => {
       if (!isAdminView()) return;
+      const recurringForm = document.getElementById('recurringClassForm');
+      if (recurringForm) recurringForm.classList.add('hidden');
       newCalendarEventForm.classList.toggle('hidden');
       if (!newCalendarEventForm.classList.contains('hidden')) {
+        populateCalendarSubjectSelect(document.getElementById('newCalendarEventSubject'), '');
         document.getElementById('newCalendarEventTitle').focus();
       }
     });
@@ -2905,11 +3003,65 @@ function attachPortalEvents() {
       const endDate = document.getElementById('newCalendarEventEndDate').value;
       const startTime = document.getElementById('newCalendarEventStartTime').value;
       const endTime = document.getElementById('newCalendarEventEndTime').value;
+      const subjectId = document.getElementById('newCalendarEventSubject').value;
       if (!title || !date) return;
-      await createCalendarEvent({ title, date, type, endDate, startTime, endTime });
+      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId });
       newCalendarEventForm.reset();
       newCalendarEventForm.classList.add('hidden');
       renderCalendarViews();
+    });
+  }
+
+  const addRecurringClassBtn = document.getElementById('addRecurringClassBtn');
+  const recurringClassForm = document.getElementById('recurringClassForm');
+  const cancelRecurringClass = document.getElementById('cancelRecurringClass');
+  const recurringNotice = document.getElementById('recurringNotice');
+
+  if (addRecurringClassBtn && recurringClassForm) {
+    addRecurringClassBtn.addEventListener('click', () => {
+      if (!isAdminView()) return;
+      if (newCalendarEventForm) newCalendarEventForm.classList.add('hidden');
+      recurringClassForm.classList.toggle('hidden');
+      if (!recurringClassForm.classList.contains('hidden')) {
+        populateCalendarSubjectSelect(document.getElementById('recurringSubjectSelect'), '');
+      }
+    });
+  }
+
+  if (cancelRecurringClass && recurringClassForm) {
+    cancelRecurringClass.addEventListener('click', () => {
+      recurringClassForm.reset();
+      recurringClassForm.classList.add('hidden');
+      if (recurringNotice) recurringNotice.className = 'notice';
+    });
+  }
+
+  if (recurringClassForm) {
+    recurringClassForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!isAdminView()) return;
+      const subjectId = document.getElementById('recurringSubjectSelect').value;
+      const weekday = Number(document.getElementById('recurringWeekday').value);
+      const startTime = document.getElementById('recurringStartTime').value;
+      const endTime = document.getElementById('recurringEndTime').value;
+      const presencialCount = Number(document.getElementById('recurringPresencialCount').value) || 0;
+      const virtualCount = Number(document.getElementById('recurringVirtualCount').value) || 0;
+      if (!subjectId || !startTime || !endTime) return;
+
+      const submitBtn = recurringClassForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      const result = await generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount });
+      if (submitBtn) submitBtn.disabled = false;
+
+      if (!result.ok) {
+        if (recurringNotice) { recurringNotice.className = 'notice show error'; recurringNotice.textContent = result.message; }
+        return;
+      }
+      recurringClassForm.reset();
+      recurringClassForm.classList.add('hidden');
+      if (recurringNotice) recurringNotice.className = 'notice';
+      renderCalendarViews();
+      alert(`Se generaron ${result.count} clases para el cuatrimestre activo.`);
     });
   }
 
@@ -2932,6 +3084,13 @@ function attachPortalEvents() {
       const deleteBtn = event.target.closest('[data-calendar-delete]');
       if (deleteBtn) {
         deleteCalendarEvent(deleteBtn.dataset.calendarDelete).then(renderCalendarViews);
+        return;
+      }
+      const deleteSeriesBtn = event.target.closest('[data-calendar-delete-series]');
+      if (deleteSeriesBtn) {
+        if (!confirm('¿Borrar todas las clases de esta serie recurrente?')) return;
+        state.editingCalendarId = null;
+        deleteCalendarSeries(deleteSeriesBtn.dataset.calendarDeleteSeries).then(renderCalendarViews);
       }
     });
 
@@ -2946,7 +3105,8 @@ function attachPortalEvents() {
         type: form.type.value,
         endDate: form.endDate.value,
         startTime: form.startTime.value,
-        endTime: form.endTime.value
+        endTime: form.endTime.value,
+        subjectId: form.subjectId.value
       });
       state.editingCalendarId = null;
       renderCalendarViews();

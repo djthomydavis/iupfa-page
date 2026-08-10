@@ -655,6 +655,18 @@ create policy "Only admins can modify calendar events"
   using (public.is_admin())
   with check (public.is_admin());
 
+-- Eventos de una materia en particular (ej. "Examen" con su materia), y
+-- clases recurrentes generadas para el cuatrimestre activo: subject_id linkea
+-- la materia, modality distingue Presencial/Virtual, series_id agrupa todas
+-- las clases generadas por una misma corrida del generador (para poder
+-- borrarlas todas juntas si hace falta).
+alter table public.calendar_events drop constraint if exists calendar_events_type_check;
+alter table public.calendar_events add constraint calendar_events_type_check
+  check (type in ('Académico','Examen','Inscripción','Feriado','Entrega','Cuatrimestre','Clase'));
+alter table public.calendar_events add column if not exists subject_id text references public.subjects(id) on delete set null;
+alter table public.calendar_events add column if not exists modality text check (modality in ('Presencial','Virtual'));
+alter table public.calendar_events add column if not exists series_id uuid;
+
 -- =========================================================
 -- DISCORD_LINKS: vincula una cuenta del portal con un usuario de Discord,
 -- para poder mandarle recordatorios por DM. El flujo es:
