@@ -333,8 +333,10 @@
               <div class="section-head">
                 <h3>Calendario académico</h3>
                 <div class="stack-row">
+                  <button type="button" id="toggleHolidaysBtn" class="ghost-btn icon-btn" aria-label="Ver feriados" title="Ver todos los feriados">🟠</button>
                   <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
                   <button type="button" id="addRecurringClassBtn" class="ghost-btn icon-btn hidden" aria-label="Generar clases recurrentes" title="Generar clases recurrentes del cuatrimestre">🔁</button>
+                  <button type="button" id="importHolidaysBtn" class="ghost-btn icon-btn hidden" aria-label="Importar feriados" title="Importar feriados nacionales de un año">📥</button>
                   <button type="button" id="calendarNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar calendario académico">✕</button>
                 </div>
               </div>
@@ -353,6 +355,7 @@
                   </select>
                 </div>
                 <select id="newCalendarEventSubject"><option value="">Sin materia</option></select>
+                <input id="newCalendarEventRoom" type="text" placeholder="Aula (opcional)" />
                 <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
                 <label class="field-label">Fecha fin<input id="newCalendarEventEndDate" type="date" /></label>
                 <div class="two-cols">
@@ -382,6 +385,7 @@
                   <label class="field-label">Hora inicio<input id="recurringStartTime" type="time" required /></label>
                   <label class="field-label">Hora fin<input id="recurringEndTime" type="time" required /></label>
                 </div>
+                <input id="recurringRoom" type="text" placeholder="Aula (opcional)" />
                 <p class="form-hint">Patrón de modalidad: cuántas clases seguidas son presenciales y cuántas virtuales (se repite en ese orden hasta el final del cuatrimestre). Ej: 1 y 2 = Presencial, Virtual, Virtual, Presencial, Virtual, Virtual…</p>
                 <div class="two-cols">
                   <label class="field-label">Presenciales seguidas<input id="recurringPresencialCount" type="number" min="0" value="1" /></label>
@@ -391,6 +395,16 @@
                   <button type="submit" class="small-btn">Generar clases del cuatrimestre</button>
                   <button type="button" id="cancelRecurringClass" class="ghost-btn small-btn">Cancelar</button>
                 </div>
+              </form>
+
+              <form id="importHolidaysForm" class="stack inline-edit-form hidden">
+                <p class="form-hint">Trae los feriados nacionales de Argentina de un año desde un servicio público (Nager.Date) y los agrega como eventos "Feriado". Ese servicio no distingue entre inamovible/trasladable/no laborable/turístico como <a href="https://www.argentina.gob.ar/feriados" target="_blank" rel="noopener">argentina.gob.ar/feriados</a> — si necesitás esa distinción exacta, revisá ahí y ajustá el título a mano después de importar.</p>
+                <div id="importHolidaysNotice" class="notice"></div>
+                <div class="two-cols">
+                  <input id="importHolidaysYear" type="number" min="2020" max="2100" required />
+                  <button type="submit" class="small-btn">Importar</button>
+                </div>
+                <button type="button" id="cancelImportHolidays" class="ghost-btn small-btn">Cancelar</button>
               </form>
 
               <div id="calendarFull" class="stack"></div>
@@ -581,6 +595,18 @@
           </section>
 
           <section class="card subject-panel hidden" data-subject-panel="fechas">
+            <div id="subjectExamAdmin" class="content-admin hidden">
+              <div class="section-head"><h4>Agregar fecha de examen <span class="admin-only-tag">(solo admin)</span></h4></div>
+              <form id="subjectExamForm" class="inline-form">
+                <input id="subjectExamTitle" type="text" placeholder="Título (opcional, ej. Primer parcial)" />
+                <div class="two-cols">
+                  <input id="subjectExamDate" type="date" required />
+                  <input id="subjectExamTime" type="time" />
+                </div>
+                <button type="submit">Agregar fecha</button>
+              </form>
+            </div>
+            <p class="form-hint">Estas fechas también aparecen en el Calendario académico y se borran solas 3 meses después de la fecha del examen.</p>
             <div id="subjectDates" class="stack"></div>
           </section>
 

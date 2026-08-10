@@ -666,6 +666,7 @@ alter table public.calendar_events add constraint calendar_events_type_check
 alter table public.calendar_events add column if not exists subject_id text references public.subjects(id) on delete set null;
 alter table public.calendar_events add column if not exists modality text check (modality in ('Presencial','Virtual'));
 alter table public.calendar_events add column if not exists series_id uuid;
+alter table public.calendar_events add column if not exists room text;
 
 -- =========================================================
 -- DISCORD_LINKS: vincula una cuenta del portal con un usuario de Discord,

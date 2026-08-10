@@ -285,6 +285,7 @@ button:hover { background: var(--primary-dark); transform: translateY(-2px); box
 button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .ghost-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .ghost-btn:hover { background: var(--surface-soft); box-shadow: none; }
+.ghost-btn.active-toggle { background: rgba(234, 88, 12, 0.16); border-color: rgba(234, 88, 12, 0.4); color: #ea580c; }
 .notice {
   display: none;
   padding: 12px 14px;
@@ -612,6 +613,28 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .event-subject-badge { background: var(--surface-soft); color: var(--primary-dark); }
 .event-modality-badge.presencial { background: rgba(5, 150, 105, 0.16); color: #059669; }
 .event-modality-badge.virtual { background: rgba(124, 58, 237, 0.16); color: #7c3aed; }
+.event-holiday-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: fit-content;
+  background: rgba(234, 88, 12, 0.16);
+  color: #ea580c;
+}
+.event-room-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: fit-content;
+  background: var(--surface-soft);
+  color: var(--muted);
+}
 .subject-card-name {
   font-size: 15px;
   line-height: 1.35;
@@ -669,6 +692,8 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 .calendar-cell:hover:not(.empty) { background: var(--surface-soft); }
 .calendar-cell.empty { visibility: hidden; pointer-events: none; }
 .calendar-cell.today { border-color: var(--primary); color: var(--primary-dark); }
+.calendar-cell.holiday:not(.selected) { background: rgba(234, 88, 12, 0.16); border-color: rgba(234, 88, 12, 0.4); }
+.calendar-cell.holiday:not(.selected):hover { background: rgba(234, 88, 12, 0.26); }
 .calendar-cell.selected { background: var(--primary); color: white; }
 .calendar-cell.selected:hover { background: var(--primary-dark); }
 .calendar-cell.selected .event-dot { background: white; }
@@ -695,6 +720,10 @@ button:active { transform: translateY(0) scale(0.97); box-shadow: none; }
 }
 .calendar-cell.semester-range.semester-bridge-left::before { left: -6px; }
 .calendar-cell.semester-range.semester-bridge-right::after { right: -6px; }
+/* El feriado tiene que ganarle al tinte celeste del rango de cuatrimestre
+   (la mayoría de los feriados caen dentro de ese rango). */
+.calendar-cell.holiday.semester-range:not(.selected) { background: rgba(234, 88, 12, 0.22); }
+.calendar-cell.holiday.semester-range:not(.selected):hover { background: rgba(234, 88, 12, 0.3); }
 
 /* Planning table (excel-like) */
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; }

@@ -121,7 +121,7 @@ const state = {
   confirmDeleteUnitId: null,
   confirmDeleteItemId: null,
   viewMode: 'admin',
-  calendarView: { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: null },
+  calendarView: { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: null, holidaysListOpen: false },
   planningSearch: '',
   planningYearFilter: 'all',
   planningStatusFilter: 'all',
@@ -264,7 +264,8 @@ function mapCalendarRow(row) {
     endTime: row.end_time ? row.end_time.slice(0, 5) : '',
     subjectId: row.subject_id || '',
     modality: row.modality || '',
-    seriesId: row.series_id || ''
+    seriesId: row.series_id || '',
+    room: row.room || ''
   };
 }
 
@@ -275,9 +276,9 @@ async function loadCalendarFromSupabase() {
   state.data.calendar = data.map(mapCalendarRow);
 }
 
-async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId }) {
+async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, room }) {
   if (!supabaseClient) {
-    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: '', seriesId: '' });
+    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: '', seriesId: '', room: room || '' });
     return;
   }
   const { data, error } = await supabaseClient.from('calendar_events').insert({
@@ -286,22 +287,24 @@ async function createCalendarEvent({ title, date, type, endDate, startTime, endT
     start_time: startTime || null,
     end_time: endTime || null,
     subject_id: subjectId || null,
+    room: room || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }).select().single();
   if (error) { console.error('No se pudo crear el evento:', error); return; }
   state.data.calendar.unshift(mapCalendarRow(data));
 }
 
-async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId }) {
+async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId, room }) {
   const item = state.data.calendar.find(entry => entry.id === id);
-  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '' });
+  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', room: room || '' });
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').update({
     title, date, type,
     end_date: endDate || null,
     start_time: startTime || null,
     end_time: endTime || null,
-    subject_id: subjectId || null
+    subject_id: subjectId || null,
+    room: room || null
   }).eq('id', id);
   if (error) console.error('No se pudo actualizar el evento:', error);
 }
@@ -311,6 +314,39 @@ async function deleteCalendarEvent(id) {
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').delete().eq('id', id);
   if (error) console.error('No se pudo borrar el evento:', error);
+}
+
+// Un evento se considera vencido (y se deja de mostrar) X días después de
+// terminar, según el tipo: "Cuatrimestre" dura 1 mes (para no perder la
+// referencia del cuatrimestre activo apenas termina), "Examen" dura 3 meses
+// (para que las fechas de examen de la pestaña "Fechas" de cada materia no
+// desaparezcan enseguida) y el resto (Académico, Inscripción, Entrega, Clase)
+// 1 semana. "Feriado" es un caso aparte: no tiene un plazo fijo, se borra
+// cuando arranca un año nuevo (es decir, en cuanto cambia el año calendario
+// respecto a la fecha del feriado). Si quien tiene la sesión abierta es
+// admin, además se borra de verdad en Supabase — no hay un cron en este sitio
+// estático, así que la limpieza real en la base ocurre recién la primera vez
+// que un admin visita la página después de ese plazo.
+const CALENDAR_RETENTION_DAYS = { 'Examen': 90, 'Cuatrimestre': 30 };
+const CALENDAR_RETENTION_DAYS_DEFAULT = 7;
+
+function isCalendarEventExpired(event, todayISO) {
+  if (event.type === 'Feriado') return Number(event.date.slice(0, 4)) < Number(todayISO.slice(0, 4));
+  const retentionDays = CALENDAR_RETENTION_DAYS[event.type] ?? CALENDAR_RETENTION_DAYS_DEFAULT;
+  const end = event.endDate || event.date;
+  return addDaysISO(end, retentionDays) < todayISO;
+}
+
+async function cleanupExpiredCalendarEvents() {
+  const todayISO = toISODate(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const expired = state.data.calendar.filter(event => isCalendarEventExpired(event, todayISO));
+  if (!expired.length) return;
+
+  state.data.calendar = state.data.calendar.filter(event => !isCalendarEventExpired(event, todayISO));
+  if (!supabaseClient || !isAdminView()) return;
+
+  const { error } = await supabaseClient.from('calendar_events').delete().in('id', expired.map(event => event.id));
+  if (error) console.error('No se pudieron borrar eventos vencidos:', error);
 }
 
 async function deleteCalendarSeries(seriesId) {
@@ -324,7 +360,7 @@ async function deleteCalendarSeries(seriesId) {
 // elegido dentro del rango del cuatrimestre activo, alternando modalidad según
 // el patrón (ej. 1 presencial + 2 virtuales => P, V, V, P, V, V...). Todas
 // comparten un series_id para poder borrarlas juntas después.
-async function generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount }) {
+async function generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room }) {
   const semesterEvent = getCurrentSemesterEvent();
   if (!semesterEvent) return { ok: false, message: 'No hay un cuatrimestre activo cargado en el calendario.' };
 
@@ -359,13 +395,14 @@ async function generateRecurringClasses({ subjectId, weekday, startTime, endTime
     subject_id: subject.id,
     modality: pattern[index % pattern.length],
     series_id: seriesId,
+    room: room || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }));
 
   if (!supabaseClient) {
     rows.forEach(row => state.data.calendar.unshift({
       id: generateLocalId('event'), title: row.title, type: row.type, date: row.date,
-      endDate: '', startTime, endTime, subjectId: row.subject_id, modality: row.modality, seriesId
+      endDate: '', startTime, endTime, subjectId: row.subject_id, modality: row.modality, seriesId, room: room || ''
     }));
     return { ok: true, count: rows.length };
   }
@@ -375,6 +412,46 @@ async function generateRecurringClasses({ subjectId, weekday, startTime, endTime
 
   data.map(mapCalendarRow).forEach(item => state.data.calendar.unshift(item));
   return { ok: true, count: data.length };
+}
+
+// Trae los feriados nacionales de Argentina de un año desde Nager.Date (servicio
+// público gratuito, sin API key, habilitado para pedirse directo desde el
+// navegador). No reproduce las 4 categorías de argentina.gob.ar/feriados
+// (inamovible/trasladable/no laborable/turístico), solo nombre + fecha.
+async function importArgentinaHolidays(year) {
+  if (!supabaseClient) return { ok: false, message: 'No hay sesión con Supabase.' };
+
+  let holidays;
+  try {
+    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/AR`);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    holidays = await response.json();
+  } catch (error) {
+    return { ok: false, message: 'No se pudo consultar el servicio de feriados: ' + error.message };
+  }
+  if (!Array.isArray(holidays) || !holidays.length) {
+    return { ok: false, message: 'No se encontraron feriados para ese año.' };
+  }
+
+  const existingDates = new Set(
+    state.data.calendar.filter(event => event.type === 'Feriado').map(event => event.date)
+  );
+  const toInsert = holidays
+    .filter(holiday => !existingDates.has(holiday.date))
+    .map(holiday => ({
+      title: holiday.localName,
+      type: 'Feriado',
+      date: holiday.date,
+      created_by: state.currentUser ? state.currentUser.id : null
+    }));
+
+  if (!toInsert.length) return { ok: true, added: 0, skipped: holidays.length };
+
+  const { data, error } = await supabaseClient.from('calendar_events').insert(toInsert).select();
+  if (error) return { ok: false, message: error.message };
+
+  data.map(mapCalendarRow).forEach(item => state.data.calendar.unshift(item));
+  return { ok: true, added: data.length, skipped: holidays.length - data.length };
 }
 
 // =========================================================
@@ -554,19 +631,25 @@ function isAdminView() {
 function applyViewMode() {
   const adminShortcut = document.getElementById('adminShortcut');
   const contentAddCard = document.getElementById('subjectContentAdmin');
+  const examAddCard = document.getElementById('subjectExamAdmin');
   const toggleBtn = document.getElementById('viewModeToggle');
   const addCalendarEventBtn = document.getElementById('addCalendarEventBtn');
   const addRecurringClassBtn = document.getElementById('addRecurringClassBtn');
+  const importHolidaysBtn = document.getElementById('importHolidaysBtn');
   const newCalendarEventForm = document.getElementById('newCalendarEventForm');
   const recurringClassForm = document.getElementById('recurringClassForm');
+  const importHolidaysForm = document.getElementById('importHolidaysForm');
   const isAdminAccount = !!(state.currentUser && state.currentUser.role === 'admin');
 
   if (adminShortcut) adminShortcut.classList.toggle('hidden', !isAdminView());
   if (contentAddCard && state.currentSubjectId) contentAddCard.classList.toggle('hidden', !isAdminView());
+  if (examAddCard && state.currentSubjectId) examAddCard.classList.toggle('hidden', !isAdminView());
   if (addCalendarEventBtn) addCalendarEventBtn.classList.toggle('hidden', !isAdminView());
   if (addRecurringClassBtn) addRecurringClassBtn.classList.toggle('hidden', !isAdminView());
+  if (importHolidaysBtn) importHolidaysBtn.classList.toggle('hidden', !isAdminView());
   if (newCalendarEventForm && !isAdminView()) newCalendarEventForm.classList.add('hidden');
   if (recurringClassForm && !isAdminView()) recurringClassForm.classList.add('hidden');
+  if (importHolidaysForm && !isAdminView()) importHolidaysForm.classList.add('hidden');
 
   if (toggleBtn) {
     toggleBtn.classList.toggle('hidden', !isAdminAccount);
@@ -952,6 +1035,10 @@ function eventCoversDate(event, iso) {
   return iso >= event.date && iso <= end;
 }
 
+function isHolidayDate(iso) {
+  return state.data.calendar.some(event => event.type === 'Feriado' && eventCoversDate(event, iso));
+}
+
 function addDaysISO(iso, delta) {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1, d);
@@ -1033,9 +1120,11 @@ function renderCalendarMonth() {
     const dayEvents = state.data.calendar.filter(event => eventCoversDate(event, iso));
     const semesterEvents = dayEvents.filter(event => event.type === 'Cuatrimestre');
     const dotEvents = dayEvents.filter(event => event.type !== 'Cuatrimestre');
+    const isHoliday = dayEvents.some(event => event.type === 'Feriado');
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'calendar-cell';
+    if (isHoliday) cell.classList.add('holiday');
     if (iso === todayISO) cell.classList.add('today');
     if (iso === selectedDate) cell.classList.add('selected');
     if (semesterEvents.length) {
@@ -1052,6 +1141,9 @@ function renderCalendarMonth() {
     cell.innerHTML = `<span>${day}</span>${dots ? `<span class="event-dots">${dots}</span>` : ''}`;
     cell.addEventListener('click', () => {
       state.calendarView.selectedDate = state.calendarView.selectedDate === iso ? null : iso;
+      state.calendarView.holidaysListOpen = false;
+      const toggleBtn = document.getElementById('toggleHolidaysBtn');
+      if (toggleBtn) toggleBtn.classList.remove('active-toggle');
       renderCalendarMonth();
       renderCalendarList();
     });
@@ -1064,7 +1156,7 @@ const EVENT_TYPE_COLORS = {
   'Académico': '#0d6efd',
   'Examen': '#dc2626',
   'Inscripción': '#7c3aed',
-  'Feriado': '#16a34a',
+  'Feriado': '#ea580c',
   'Entrega': '#f59e0b',
   'Cuatrimestre': '#38bdf8',
   'Clase': '#059669'
@@ -1091,6 +1183,7 @@ function buildCalendarCard(item) {
         </select>
       </div>
       <select name="subjectId" class="calendar-edit-subject-select"></select>
+      <input type="text" name="room" value="${item.room || ''}" placeholder="Aula (opcional)" />
       <label class="field-label">Fecha fin<input type="date" name="endDate" value="${item.endDate || ''}" /></label>
       <div class="two-cols">
         <label class="field-label">Hora inicio<input type="time" name="startTime" value="${item.startTime || ''}" /></label>
@@ -1113,16 +1206,77 @@ function buildCalendarCard(item) {
   const subject = item.subjectId ? state.data.subjects.find(entry => entry.id === item.subjectId) : null;
   const subjectBadge = subject ? `<span class="event-subject-badge">${subject.code} · ${subject.name}</span>` : '';
   const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality}</span>` : '';
-  return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${subjectBadge}${modalityBadge}${adminControls}</article>`;
+  const roomBadge = item.room ? `<span class="event-room-badge">📍 ${item.room}</span>` : '';
+  const isHoliday = item.type !== 'Feriado' && item.type !== 'Cuatrimestre' && isHolidayDate(item.date);
+  const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
+  return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${subjectBadge}${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
+}
+
+// Resume cada serie de clases recurrentes en una sola card (materia, día de la
+// semana, horario y si esta semana toca presencial o virtual) en vez de listar
+// cada fecha individual — eso solo se ve al clickear un día puntual del calendario.
+const WEEKDAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+function summarizeRecurringClasses(classEvents) {
+  const todayISO = toISODate(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const groups = {};
+  classEvents.forEach(event => {
+    const key = event.seriesId || `${event.subjectId}_${event.startTime}_${event.endTime}`;
+    (groups[key] = groups[key] || []).push(event);
+  });
+
+  return Object.values(groups).map(occurrences => {
+    occurrences.sort((a, b) => a.date.localeCompare(b.date));
+    const current = occurrences.find(entry => entry.date >= todayISO) || occurrences[occurrences.length - 1];
+    const [y, m, d] = current.date.split('-').map(Number);
+    return { ...current, weekdayLabel: WEEKDAY_LABELS[new Date(y, m - 1, d).getDay()] };
+  });
+}
+
+function buildRecurringClassSummaryCard(item) {
+  const subject = item.subjectId ? state.data.subjects.find(entry => entry.id === item.subjectId) : null;
+  const name = subject ? subject.name : item.title;
+  const timeLabel = item.startTime && item.endTime ? `${item.startTime} a ${item.endTime}` : (item.startTime || '');
+  const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality} esta semana</span>` : '';
+  const roomBadge = item.room ? `<span class="event-room-badge">📍 ${item.room}</span>` : '';
+  const isHoliday = isHolidayDate(item.date);
+  const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
+  const adminControls = (isAdminView() && item.seriesId) ? `<div class="stack-row">
+      <button type="button" class="ghost-btn small-btn danger-btn" data-calendar-delete-series="${item.seriesId}">Borrar serie</button>
+    </div>` : '';
+  return `<article class="item-card"><strong>${name}</strong><span><i class="event-dot" style="background:${EVENT_TYPE_COLORS.Clase}"></i>${item.weekdayLabel} · ${timeLabel} · Clase</span>${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
 }
 
 function renderCalendarList() {
-  const { selectedDate } = state.calendarView;
-  const events = selectedDate ? state.data.calendar.filter(event => eventCoversDate(event, selectedDate)) : state.data.calendar;
-  const sorted = sortEventsForDisplay(events);
+  const { selectedDate, holidaysListOpen } = state.calendarView;
   const target = document.getElementById('calendarFull');
   if (!target) return;
-  target.innerHTML = sorted.length ? sorted.map(buildCalendarCard).join('') : createItemCard('Sin datos', 'No hay información cargada.', '');
+
+  let html;
+  if (holidaysListOpen) {
+    // Todos los feriados cargados, del más reciente al más antiguo.
+    const holidays = state.data.calendar
+      .filter(event => event.type === 'Feriado')
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date));
+    html = holidays.map(buildCalendarCard).join('');
+  } else if (selectedDate) {
+    // Un día puntual: se ve tal cual, incluido el feriado o la clase específica de ese día si la hay.
+    const events = state.data.calendar.filter(event => eventCoversDate(event, selectedDate));
+    const sorted = sortEventsForDisplay(events);
+    html = sorted.map(buildCalendarCard).join('');
+  } else {
+    // Vista general: ni los feriados ni las "Clase" se listan uno por uno (serían
+    // decenas); las clases se resumen por serie y los feriados se ven con el
+    // botón dedicado. Igual siguen coloreados en la grilla del mes.
+    const classEvents = state.data.calendar.filter(event => event.type === 'Clase');
+    const otherEvents = state.data.calendar.filter(event => event.type !== 'Clase' && event.type !== 'Feriado');
+    const summaries = summarizeRecurringClasses(classEvents);
+    const sorted = sortEventsForDisplay(otherEvents);
+    html = summaries.map(buildRecurringClassSummaryCard).join('') + sorted.map(buildCalendarCard).join('');
+  }
+
+  target.innerHTML = html || createItemCard('Sin datos', 'No hay información cargada.', '');
 
   if (state.editingCalendarId) {
     const editingItem = state.data.calendar.find(item => item.id === state.editingCalendarId);
@@ -2077,9 +2231,30 @@ async function deleteFaqItem(faqId) {
   renderFaqAdminList();
 }
 
+function buildSubjectExamCard(item) {
+  const timeLabel = item.startTime ? ` · ${item.startTime}` : '';
+  const adminControls = isAdminView()
+    ? `<button type="button" class="ghost-btn small-btn danger-btn" data-subject-exam-delete="${item.id}">Eliminar</button>`
+    : '';
+  return `<article class="item-card"><strong>${item.title}</strong><span>${item.date}${timeLabel}</span>${adminControls}</article>`;
+}
+
+function renderSubjectDates(subject) {
+  const target = document.getElementById('subjectDates');
+  if (!target) return;
+  const exams = state.data.calendar
+    .filter(event => event.type === 'Examen' && event.subjectId === subject.id)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  target.innerHTML = exams.length
+    ? exams.map(buildSubjectExamCard).join('')
+    : createItemCard('Sin fechas de examen cargadas', 'Todavía no hay fechas de examen para esta materia.', '');
+}
+
 function renderSubjectLists(subject) {
   renderSubjectContent(subject);
-  renderList('subjectDates', subject.dates, item => createItemCard(item, 'Fecha relevante', ''));
+  renderSubjectDates(subject);
   renderList('subjectForum', subject.forum, item => createItemCard(item.author, 'Comentario en el foro', item.content));
   renderOpinions(subject);
   renderPolls(subject);
@@ -2109,6 +2284,7 @@ function openSubject(subjectId) {
   const title = document.getElementById('subjectTitle');
   const summary = document.getElementById('subjectSummary');
   const contentAddCard = document.getElementById('subjectContentAdmin');
+  const examAddCard = document.getElementById('subjectExamAdmin');
 
   if (year) year.textContent = `${subject.year}° año · ${subject.semester}° cuatrimestre`;
   if (title) title.textContent = subject.name;
@@ -2117,6 +2293,7 @@ function openSubject(subjectId) {
     summary.textContent = `Estado: ${progress.status} · Nota final: ${progress.grades.notaFinal || '-'} · Correlativas: ${correlativeCodes(subject)}`;
   }
   if (contentAddCard) contentAddCard.classList.toggle('hidden', !isAdminView());
+  if (examAddCard) examAddCard.classList.toggle('hidden', !isAdminView());
 
   renderSubjectLists(subject);
   refreshContentUnitSelect(subject);
@@ -2531,6 +2708,17 @@ function attachPortalEvents() {
 
   if (calPrevMonth) calPrevMonth.addEventListener('click', () => changeCalendarMonth(-1));
   if (calNextMonth) calNextMonth.addEventListener('click', () => changeCalendarMonth(1));
+
+  const toggleHolidaysBtn = document.getElementById('toggleHolidaysBtn');
+  if (toggleHolidaysBtn) {
+    toggleHolidaysBtn.addEventListener('click', () => {
+      state.calendarView.holidaysListOpen = !state.calendarView.holidaysListOpen;
+      toggleHolidaysBtn.classList.toggle('active-toggle', state.calendarView.holidaysListOpen);
+      toggleHolidaysBtn.title = state.calendarView.holidaysListOpen ? 'Volver al calendario' : 'Ver todos los feriados';
+      renderCalendarList();
+    });
+  }
+
   if (calToday) {
     calToday.addEventListener('click', () => {
       const today = new Date();
@@ -3004,8 +3192,9 @@ function attachPortalEvents() {
       const startTime = document.getElementById('newCalendarEventStartTime').value;
       const endTime = document.getElementById('newCalendarEventEndTime').value;
       const subjectId = document.getElementById('newCalendarEventSubject').value;
+      const room = document.getElementById('newCalendarEventRoom').value.trim();
       if (!title || !date) return;
-      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId });
+      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, room });
       newCalendarEventForm.reset();
       newCalendarEventForm.classList.add('hidden');
       renderCalendarViews();
@@ -3046,11 +3235,12 @@ function attachPortalEvents() {
       const endTime = document.getElementById('recurringEndTime').value;
       const presencialCount = Number(document.getElementById('recurringPresencialCount').value) || 0;
       const virtualCount = Number(document.getElementById('recurringVirtualCount').value) || 0;
+      const room = document.getElementById('recurringRoom').value.trim();
       if (!subjectId || !startTime || !endTime) return;
 
       const submitBtn = recurringClassForm.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
-      const result = await generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount });
+      const result = await generateRecurringClasses({ subjectId, weekday, startTime, endTime, presencialCount, virtualCount, room });
       if (submitBtn) submitBtn.disabled = false;
 
       if (!result.ok) {
@@ -3062,6 +3252,55 @@ function attachPortalEvents() {
       if (recurringNotice) recurringNotice.className = 'notice';
       renderCalendarViews();
       alert(`Se generaron ${result.count} clases para el cuatrimestre activo.`);
+    });
+  }
+
+  const importHolidaysBtn = document.getElementById('importHolidaysBtn');
+  const importHolidaysForm = document.getElementById('importHolidaysForm');
+  const cancelImportHolidays = document.getElementById('cancelImportHolidays');
+  const importHolidaysNotice = document.getElementById('importHolidaysNotice');
+
+  if (importHolidaysBtn && importHolidaysForm) {
+    importHolidaysBtn.addEventListener('click', () => {
+      if (!isAdminView()) return;
+      if (newCalendarEventForm) newCalendarEventForm.classList.add('hidden');
+      if (recurringClassForm) recurringClassForm.classList.add('hidden');
+      importHolidaysForm.classList.toggle('hidden');
+      if (!importHolidaysForm.classList.contains('hidden')) {
+        const yearInput = document.getElementById('importHolidaysYear');
+        if (yearInput && !yearInput.value) yearInput.value = new Date().getFullYear();
+      }
+    });
+  }
+
+  if (cancelImportHolidays && importHolidaysForm) {
+    cancelImportHolidays.addEventListener('click', () => {
+      importHolidaysForm.classList.add('hidden');
+      if (importHolidaysNotice) importHolidaysNotice.className = 'notice';
+    });
+  }
+
+  if (importHolidaysForm) {
+    importHolidaysForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!isAdminView()) return;
+      const year = Number(document.getElementById('importHolidaysYear').value);
+      if (!year) return;
+
+      const submitBtn = importHolidaysForm.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Importando...'; }
+      const result = await importArgentinaHolidays(year);
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Importar'; }
+
+      if (!result.ok) {
+        if (importHolidaysNotice) { importHolidaysNotice.className = 'notice show error'; importHolidaysNotice.textContent = result.message; }
+        return;
+      }
+      if (importHolidaysNotice) {
+        importHolidaysNotice.className = 'notice show';
+        importHolidaysNotice.textContent = `Se agregaron ${result.added} feriados${result.skipped ? ` (${result.skipped} ya estaban cargados)` : ''}.`;
+      }
+      renderCalendarViews();
     });
   }
 
@@ -3106,7 +3345,8 @@ function attachPortalEvents() {
         endDate: form.endDate.value,
         startTime: form.startTime.value,
         endTime: form.endTime.value,
-        subjectId: form.subjectId.value
+        subjectId: form.subjectId.value,
+        room: form.room.value.trim()
       });
       state.editingCalendarId = null;
       renderCalendarViews();
@@ -3392,6 +3632,35 @@ function attachPortalEvents() {
       subject.forum.unshift({ id: data.id, author: data.author_name, authorId: data.author_id, content: data.content });
       renderSubjectLists(subject);
       subjectForumForm.reset();
+    });
+  }
+
+  const subjectExamForm = document.getElementById('subjectExamForm');
+  if (subjectExamForm) {
+    subjectExamForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
+      if (!subject || !isAdminView()) return;
+
+      const title = document.getElementById('subjectExamTitle').value.trim() || `Examen · ${subject.name}`;
+      const date = document.getElementById('subjectExamDate').value;
+      const startTime = document.getElementById('subjectExamTime').value;
+      if (!date) return;
+
+      await createCalendarEvent({ title, date, type: 'Examen', endDate: '', startTime, endTime: '', subjectId: subject.id });
+      subjectExamForm.reset();
+      renderSubjectDates(subject);
+    });
+  }
+
+  const subjectDatesEl = document.getElementById('subjectDates');
+  if (subjectDatesEl) {
+    subjectDatesEl.addEventListener('click', event => {
+      const deleteBtn = event.target.closest('[data-subject-exam-delete]');
+      if (!deleteBtn || !isAdminView()) return;
+      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
+      if (!subject) return;
+      deleteCalendarEvent(deleteBtn.dataset.subjectExamDelete).then(() => renderSubjectDates(subject));
     });
   }
 
@@ -5068,6 +5337,7 @@ async function init() {
   await loadSubjectContentFromSupabase();
   await loadFaqFromSupabase();
   await restoreSession();
+  await cleanupExpiredCalendarEvents();
 
   const page = document.body.dataset.page;
   if (page === 'portal') initPortalPage();
