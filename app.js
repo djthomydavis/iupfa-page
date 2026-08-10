@@ -276,9 +276,9 @@ async function loadCalendarFromSupabase() {
   state.data.calendar = data.map(mapCalendarRow);
 }
 
-async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, room }) {
+async function createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room }) {
   if (!supabaseClient) {
-    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: '', seriesId: '', room: room || '' });
+    state.data.calendar.unshift({ id: generateLocalId('event'), title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', seriesId: '', room: room || '' });
     return;
   }
   const { data, error } = await supabaseClient.from('calendar_events').insert({
@@ -287,6 +287,7 @@ async function createCalendarEvent({ title, date, type, endDate, startTime, endT
     start_time: startTime || null,
     end_time: endTime || null,
     subject_id: subjectId || null,
+    modality: modality || null,
     room: room || null,
     created_by: state.currentUser ? state.currentUser.id : null
   }).select().single();
@@ -294,9 +295,9 @@ async function createCalendarEvent({ title, date, type, endDate, startTime, endT
   state.data.calendar.unshift(mapCalendarRow(data));
 }
 
-async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId, room }) {
+async function updateCalendarEvent(id, { title, date, type, endDate, startTime, endTime, subjectId, modality, room }) {
   const item = state.data.calendar.find(entry => entry.id === id);
-  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', room: room || '' });
+  if (item) Object.assign(item, { title, date, type, endDate, startTime, endTime, subjectId: subjectId || '', modality: modality || '', room: room || '' });
   if (!supabaseClient) return;
   const { error } = await supabaseClient.from('calendar_events').update({
     title, date, type,
@@ -304,6 +305,7 @@ async function updateCalendarEvent(id, { title, date, type, endDate, startTime, 
     start_time: startTime || null,
     end_time: endTime || null,
     subject_id: subjectId || null,
+    modality: modality || null,
     room: room || null
   }).eq('id', id);
   if (error) console.error('No se pudo actualizar el evento:', error);
@@ -1183,7 +1185,12 @@ function buildCalendarCard(item) {
         </select>
       </div>
       <select name="subjectId" class="calendar-edit-subject-select"></select>
-      <input type="text" name="room" value="${item.room || ''}" placeholder="Aula (opcional)" />
+      <select name="modality">
+        <option value="" ${!item.modality ? 'selected' : ''}>Sin modalidad</option>
+        <option value="Presencial" ${item.modality === 'Presencial' ? 'selected' : ''}>Presencial</option>
+        <option value="Virtual" ${item.modality === 'Virtual' ? 'selected' : ''}>Virtual</option>
+      </select>
+      <input type="text" name="room" value="${item.room || ''}" placeholder="${item.modality === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)'}" />
       <label class="field-label">Fecha fin<input type="date" name="endDate" value="${item.endDate || ''}" /></label>
       <div class="two-cols">
         <label class="field-label">Hora inicio<input type="time" name="startTime" value="${item.startTime || ''}" /></label>
@@ -3160,6 +3167,13 @@ function attachPortalEvents() {
   const addCalendarEventBtn = document.getElementById('addCalendarEventBtn');
   const newCalendarEventForm = document.getElementById('newCalendarEventForm');
   const cancelNewCalendarEvent = document.getElementById('cancelNewCalendarEvent');
+  const newCalendarEventModality = document.getElementById('newCalendarEventModality');
+  const newCalendarEventRoom = document.getElementById('newCalendarEventRoom');
+  if (newCalendarEventModality && newCalendarEventRoom) {
+    newCalendarEventModality.addEventListener('change', () => {
+      newCalendarEventRoom.placeholder = newCalendarEventModality.value === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)';
+    });
+  }
 
   if (addCalendarEventBtn && newCalendarEventForm) {
     addCalendarEventBtn.addEventListener('click', () => {
@@ -3192,9 +3206,10 @@ function attachPortalEvents() {
       const startTime = document.getElementById('newCalendarEventStartTime').value;
       const endTime = document.getElementById('newCalendarEventEndTime').value;
       const subjectId = document.getElementById('newCalendarEventSubject').value;
+      const modality = document.getElementById('newCalendarEventModality').value;
       const room = document.getElementById('newCalendarEventRoom').value.trim();
       if (!title || !date) return;
-      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, room });
+      await createCalendarEvent({ title, date, type, endDate, startTime, endTime, subjectId, modality, room });
       newCalendarEventForm.reset();
       newCalendarEventForm.classList.add('hidden');
       renderCalendarViews();
@@ -3333,6 +3348,13 @@ function attachPortalEvents() {
       }
     });
 
+    calendarFullEl.addEventListener('change', event => {
+      const modalitySelect = event.target.closest('[data-calendar-edit-form] select[name="modality"]');
+      if (!modalitySelect) return;
+      const roomInput = modalitySelect.closest('form').querySelector('input[name="room"]');
+      if (roomInput) roomInput.placeholder = modalitySelect.value === 'Virtual' ? 'Código de clase (opcional)' : 'Aula (opcional)';
+    });
+
     calendarFullEl.addEventListener('submit', async event => {
       const form = event.target.closest('[data-calendar-edit-form]');
       if (!form || !isAdminView()) return;
@@ -3346,6 +3368,7 @@ function attachPortalEvents() {
         startTime: form.startTime.value,
         endTime: form.endTime.value,
         subjectId: form.subjectId.value,
+        modality: form.modality.value,
         room: form.room.value.trim()
       });
       state.editingCalendarId = null;
