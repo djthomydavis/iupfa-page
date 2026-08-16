@@ -390,14 +390,18 @@ async function generateRecurringClasses({ subjectId, weekday, startTime, endTime
   const rangeStart = semesterEvent.date;
   const rangeEnd = semesterEvent.endDate || semesterEvent.date;
 
+  // Los feriados se excluyen antes de repartir el patrón P/V/V, así una
+  // semana de feriado no consume un turno del ciclo: si la 2da semana es
+  // feriado, la 3ra sigue con lo que le tocaba a la 2da (el ciclo se corre,
+  // no se "pisa" un turno con el feriado).
   const dates = [];
   let cursor = rangeStart;
   while (cursor <= rangeEnd) {
     const [y, m, d] = cursor.split('-').map(Number);
-    if (new Date(y, m - 1, d).getDay() === weekday) dates.push(cursor);
+    if (new Date(y, m - 1, d).getDay() === weekday && !isHolidayDate(cursor)) dates.push(cursor);
     cursor = addDaysISO(cursor, 1);
   }
-  if (!dates.length) return { ok: false, message: 'No hay ninguna fecha con ese día de la semana dentro del cuatrimestre activo.' };
+  if (!dates.length) return { ok: false, message: 'No hay ninguna fecha con ese día de la semana (sin contar feriados) dentro del cuatrimestre activo.' };
 
   const seriesId = (crypto.randomUUID ? crypto.randomUUID() : generateLocalId('series'));
   const rows = dates.map((date, index) => ({
