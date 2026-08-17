@@ -825,6 +825,22 @@ create table if not exists public.class_announcement_log (
 alter table public.class_announcement_log enable row level security;
 
 -- =========================================================
+-- REMINDER_MESSAGE_LOG: registra cada mensaje que el sistema de
+-- "Recordatorios" manda (canal general + DMs) para poder borrarlo
+-- automáticamente 24hs después de publicado (ver iupfa-bot/src/reminders.js).
+-- Igual que class_announcement_log, channel_id también puede ser el canal
+-- de un DM (el mismo mecanismo de borrado sirve para ambos).
+-- =========================================================
+create table if not exists public.reminder_message_log (
+  id uuid primary key default gen_random_uuid(),
+  channel_id text not null,
+  message_id text not null,
+  posted_at timestamptz not null default now()
+);
+
+alter table public.reminder_message_log enable row level security;
+
+-- =========================================================
 -- SUBJECT_MESSAGE_TEMPLATES: plantilla de texto (con variables tipo
 -- {{materia}}) que usa el bot al postear un PDF nuevo de esa materia en su
 -- canal "<código>_material". Si una materia no tiene fila acá, el bot usa
