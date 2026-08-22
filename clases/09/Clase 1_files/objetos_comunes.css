@@ -1,0 +1,610 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*-----------------------------------------------------------------------------------------------------*/
+
+ /**
+  * @objeto: Caja Recuadro
+  *
+  */
+
+    div.ContenidoSeccion-CajaRecuadro {
+    	margin: 2em 0em;
+    	padding:3px;
+    	border: 1px #333 solid;
+    	font-size: 11px;
+    	text-align: center;
+    	background-color: #f6f6f6;
+    }
+
+
+ /*------------------------------------------------------------------------------------------------------*/
+
+ /**
+  * @objeto: Glosario
+  *
+  */
+
+    /* termino glosarizado */
+    .TerminoGlosarizado     { color: #000; text-decoration: none; border-bottom : 1px solid #eaea00; border-top : 1px solid #eaea00; background-color : #FFFFD1; cursor: pointer; transition-duration: .4s; }
+    .TerminoGlosarizado:hover   { border-color: #000 transparent; background-color: #fff; }
+
+    .desc_term_glosarizado {
+        border: solid 3px #fff;
+        max-width: 350px;
+        padding: 2px;
+        z-index: 99;
+        background-color: #f5f5f5;
+        font-size: .85rem;
+        position: absolute;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+    .desc_term_glosarizado div      { overflow: auto; max-height: 230px; padding: 10px; background-color: #fff; }
+    .desc_term_glosarizado h6       { margin: 0; padding: 5px; font-size: 1.1rem; }
+
+    /* glosario */
+    .glosario       { padding: 10px 10px 40px; background-color: #fff; }
+    .glosario h1    { border-bottom: 2px solid #C7C7C7; font-size: 1.3rem; font-family: 'Roboto Condensed'; font-weight: normal; padding: 5px 0; margin: 0 0 20px; }
+
+    .glosario .lista_terminos { list-style: none; padding: 0; margin: 0; } /* css reset */
+    .glosario .lista_terminos > li      { border-bottom: 1px dashed #C7C7C7; margin-bottom: 6px; }
+    .glosario .lista_terminos .letra    { margin-bottom: 10px; font-size: 1.1rem; font-weight: bold; color: #C7C7C7; }
+    .glosario .lista_terminos .palabra      { font-weight: bold; }
+
+    .glosario .close    { position: fixed; left: 0; bottom: 0; width: 100%; text-align: right; }
+
+ /*------------------------------------------------------------------------------------------------------*/
+
+ /**
+  * Clases extras
+  *
+  */
+
+    /* color para los no-leidos */
+    .ElementoNoLeido, .texto-noLeido { color: #990000; }
+
+    /* texto resaltado */
+    .resaltar { font-weight:bold; }
+
+    /* link a mail to */
+    a.Contenido-LinkMailTo { color: #000; }
+    a.Contenido-LinkMailTo:hover { text-decoration: none; }
+
+    a.LinkSugerencia { color: #c0c0c0; text-decoration: underline; }
+    a.LinkSugerencia:hover { text-decoration: none; }
+
+    /* comentarios en abm's (informacio'n sobre categorias pu'blicas, etc) */
+    .comentario { text-align: center; }
+
+    /* clases para limpiar floats hr */
+    hr.clr { display: block; clear: both; margin: -2px; visibility: hidden; }
+
+    /* indicador para ajax */
+    .ajax_indicator {
+        padding: 0 !important;
+        margin:  0 !important;
+        position: absolute  !important;
+        height:   20px      !important;
+        width:    20px      !important;
+        background: transparent url(../img/comunes/spinner.gif) 50% 50% no-repeat;
+        z-index: 5;
+    }
+
+    /* spinner en javascript con font-awesome - usado en Educativa.OverlayedSpinner - DEPRECADO - Cambiar a Comunes.js */
+    .cont_spinner_fa{
+        position: absolute;
+        z-index: 99;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(225,225,225,0.85);
+    }
+
+    .cont_spinner_fa .fast-spin {
+      -webkit-animation: fa-spin 0.6s infinite linear;
+      animation: fa-spin 0.6s infinite linear;
+    }
+
+    /* spinner en vanilla javascript con font-awesome - Comunes.js - */
+    .center_spinner {
+        position: absolute;
+        top:0; right:0; bottom:0; left:0;
+        z-index: 98;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(225,225,225,0.85);
+    }
+
+    .center_spinner .fast-spin {
+        -webkit-animation: fa-spin 0.6s infinite linear;
+        animation: fa-spin 0.6s infinite linear;
+    }
+
+    /* al dar de alta en las ABM */
+    .abm div.ajax_indicator { right: -10px; top: 0; }
+
+    /* clase para inputs deshabilitados */
+    .abm .inputDeshabilitado, .inputDeshabilitado {
+        color: #a7a6aa;
+        background-color: #d6d5d9;
+        border: 1px solid #a7a6aa;
+    }
+
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/**
+ * Estilos utilizados por el modulo Paginador.pm
+ *
+ *
+/*-----------------------------------------------------------------------------------------------------*/
+
+ /**
+  * @Objeto: paginas
+  *
+  */
+
+    div#paginador { margin-top: .6em; }
+    #paginador .paginas { float: right; margin: 0; padding: 0; }
+    #paginador .paginas a { border: 1px solid #999; text-decoration: none; color: #999; }
+    #paginador .siguiente { background-color: #fff; }
+    #paginador .paginas a:hover,
+    #paginador span.selected a:hover,
+    #paginador span.selected a { /* clase para marcar la pagina actual */
+    	background-color: #ddd;
+    	color: #000;
+    }
+     /* clase para deshabilitados */
+    #paginador .siguiente.disabled { margin-right: 3px; border: 1px solid #ddd; color: #ccc; }
+     /* damos layout para IE */
+    #paginador .paginas a, #paginador .siguiente.disabled { position: relative; }
+    #paginador .paginas a, #paginador .siguiente.disabled { padding: 2px 5px 2px 5px; }
+    /* paginas y registros totales */
+    #paginador .totales { float: left; padding: 0  2px 0  0; margin: 0; color: #999; }
+
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+ /**
+  * @Objeto: listado
+  *
+  */
+    .control-paginador table caption, .control-paginador thead th,
+    .control-paginador thead th a {
+        color: #000;
+        text-decoration: none;
+    }
+
+    /* TODO: font-size .7em es para compatibilidad pero debe mejorarse*/
+    .listado { font-size: .7em; background-color: #fff; color: #000000; }
+
+    /* titulo del listado */
+    .listado caption { padding: 3px 0; text-align: center; font-weight: bold; background-color: #ccc; }
+    /* headers del listado */
+    .listado th {
+        border-bottom: 1px solid black;
+        padding: 3px .5em;
+        font-weight: bold;
+        text-align: center;
+        background-color: #f9f9f4;
+    }
+    .listado th a { display: block; margin: 0 .2em; width: auto; }
+    .listado th a:hover { color:#666; }
+    .control-paginador .listado td { padding: .2em .5em; border-bottom: 1px solid #999999; }
+    .listado td a { font-weight: bold; text-decoration: none; color: #000000; }
+    .listado td a:hover { color: #cc0000; }
+    .listado tbody tr:hover td,
+    .listado tbody tr:hover th,
+    .listado tbody tr.hover td {
+        background-color: #f3f2eb;
+    }
+    /* destaca la columna elegida segund orden */
+    .listado th.selected { background-color: #ccc }
+    /* imagen para la columna elegida segun orden ascendente */
+    .listado th.selected a.asc { background: transparent url(../img/comunes/s_asc__.png)  95% 50% no-repeat; }
+    .listado th.selected a.asc:hover { background: transparent url(../img/comunes/s_desc_.png)  95% 50% no-repeat; }
+    /* imagen para la columna elegida segun orden descendente */
+    .listado th.selected a.desc { background: transparent url(../img/comunes/s_desc__.png) 95% 50% no-repeat; }
+    .listado th.selected a.desc:hover { background: transparent url(../img/comunes/s_asc_.png)   95% 50% no-repeat; }
+    /* columna a la cual se le aplico el filtro */
+    .listado th.filtro { background: #ddc url(../img/comunes/filtro.gif) 5% 50% no-repeat !important; }
+
+    .listado th.selected a, .listado th.filtro a  { padding: 0 14px; }
+    .listado caption, .control-paginador form fieldset, .control-paginador table {
+        border: 1px solid #000;
+    }
+    .listado caption {border-bottom: none }
+
+    /* TODO: font-size .7em es para compatibilidad pero debe mejorarse*/
+    #paginador { font-size: .7em; margin-top: 10px; }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+ /**
+  * @Objeto: cuadro de busqueda
+  *
+  */
+
+    .busqueda, .busqueda fieldset {
+        margin : 0;
+    	border: none;
+    	background-color: white;
+    	width: auto;
+    }
+    .busqueda div { clear: none; float: right; width: 50%; text-align: right; }
+    .busqueda .label { float: none; display: inline; }
+    .busqueda .control { float: none; vertical-align: middle; }
+    .busqueda .inputTextLargo { width: 135px; margin-right: .3em; height: 1.95em;}
+    .busqueda .selectSimple { width: 8em; }
+    .busqueda input[class~="inputTextLargo"] { height: 1.4em; }
+    .busqueda .line { padding: 0; margin:  0; }
+    .busqueda .line { width: 100%; }
+
+    .busqueda .focus .control { background-color: transparent; }
+    .busqueda .suggest {
+        width: 12em;
+        padding-right: 2em;
+        background: white url(../img/comunes/s_desc.png)  95% 50% no-repeat;
+    }
+    .busqueda ul.suggest {
+        position:absolute;
+        padding-right: 0;
+        background: white none;
+        border: 1px solid #999;
+        list-style: none;
+
+    }
+    .busqueda .suggest li a { padding: .2em; display: block; text-decoration: none; color: #333; }
+    .busqueda .suggest li a.hover { background-color: #EEE; color: #000; }
+/*-----------------------------------------------------------------------------------------------------*/
+
+
+.solo-contenido {
+    margin: 0;
+    background: #F9F9F4;
+}
+.Referencias {
+    font-size: .8em;
+    margin-top: 1em;
+}
+.Referencias  ul,
+.Referencias  li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.Referencias .Referencias-Item {
+	padding-left: 20px;
+	background-position: 2px 50%;
+	background-repeat: no-repeat;
+	margin: .2em;
+}
+.Referencias .Contenido-Titulo {
+    padding-left: .2em;
+    text-align: left;
+    border: none;
+    background-color: #EEE;
+}
+.Referencias div.Contenido-Contenido {
+    border: none;
+    background-color: #F6F6F6;
+}
+
+/* Vista de items con foto de usuario */
+
+.inputClearWrapper input.inputFile,
+.inputClearWrapper .inputClearButton {
+    float: left;
+}
+/* Para cuando el archivo tiene nombre largo */
+.inputClearWrapper .inputFile { width: 76%; }
+
+.inputClearButton {
+    display: block;
+    background: transparent url(../img/comunes/btn_delete.gif) top left no-repeat;
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 1px 4px ;
+}
+
+.inputClearButton:hover {
+    background-position: top right;
+}
+
+.MantenerQuitarArchivo .MantenerQuitarArchivoRadio{
+    vertical-align: middle;
+    margin: 0 4px 0 0;
+}
+.MantenerQuitarArchivo label {
+    height: auto;
+    display: block;
+}
+
+.MantenerQuitarArchivo #fotografia-file { width: auto }
+
+
+.inputMantenerQuitarArchivoText{
+    float:left;
+}
+
+.boxamarillo {
+	position: relative;
+	font-size: 1.1em;
+	min-height: 1.7em;
+	border: 1px solid #96965E;
+	background-color:#F5F1C1;
+	text-align: left;
+	padding: 8px 4px 6px 36px;
+	background-position: 8px 6px;
+	background-repeat:no-repeat;
+	font-weight: normal;
+}
+
+.atencion {
+    background-image:url(../img/comunes/txt_atencion.gif)
+}
+.info {
+    background-image:url(../img/comunes/txt_info.gif)
+}
+.error {
+    background-image:url(../img/comunes/txt_error.gif)
+}
+
+.px9 {font-family: Tahoma, Verdana, Arial; font-size:11px;}
+
+
+.formSection {
+    margin-top: 10px;
+}
+
+.formSection a {
+    display: block;
+    color:#666666;
+    border-bottom:1px solid black;
+    font-size:1.09em;
+    padding:0.2em;
+    text-align:center;
+    cursor:pointer;
+    width: auto;
+}
+
+.formSection a.formSection-replegado {
+    font-size: .8em;
+    font-weight:normal;
+    background: #DDC url(../img/comunes/flecha_desc_gris.gif) no-repeat scroll 98% 50%;
+}
+.formSection a.formSection-desplegado {
+    font-size: .8em;
+    font-weight:bold;
+    background: #CCC url(../img/comunes/flecha_asc_gris.gif) no-repeat scroll 98% 50%;
+}
+
+
+.hack_vertical_align{
+    vertical-align: middle;
+}
+
+
+
+
+/***********************************
+ ***********  Control::Tag *********
+ ***********************************/
+
+.TagControl-frame {
+    display: inline-block;
+    width: 200px;
+    background: white;
+    border-color: #6a6a6a #ececec #ececec #6a6a6a;
+    border-style: solid;
+    border-width: 1px;
+    padding: 2px;
+}
+
+#abm2-ev_estructura .TagControl-frame { font-size: 1.25em; }
+
+.TagControl-frame .TagControl {
+    display: inline-block;
+    position: relative;
+    margin: 2px 3px 2px 0;
+    border: 1px dotted #aaa;
+    padding: 1px 18px 1px 2px;
+    background: #f3f3f3;
+    cursor: default;
+    text-transform: capitalize;
+}
+
+.TagControl-frame .TagControl a {
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    display: block;
+    cursor: pointer;
+
+    background: transparent url(../img/comunes/btn_delete.gif) top left no-repeat;
+    width: 18px;
+    height: 18px;
+    margin: 0px ;
+}
+
+.TagControl-frame .TagControl a:hover {
+    background-image: url(../img/comunes/btn_delete_hover.gif);
+}
+
+.TagControl-trigger {
+    font-size: .8em;
+    color: #999;
+    border-bottom: 1px solid #a7a7a7;
+    padding: 2px 5px;
+    cursor: pointer;
+}
+
+.TagControl-container {
+    font-size: .8em;
+    padding: 2px 5px;
+}
+
+/*** Dialog Control::Tag ***/
+
+.TagSelectDialog {
+	position: absolute;
+	font-size: 12px;
+	background-color: white;
+	border: 2px solid #24496F !important;
+	padding: .2em;
+	width: 270px;
+    z-index: 150;
+}
+
+.TagSelectDialog-input {
+    width: 270px;
+    margin-top: 18px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid black;
+}
+
+.TagSelectDialog-input .TagSelectDialog-input-text {
+    width: 205px;
+    color: #c8c8c8;
+    padding: 1px;
+    margin-bottom: 2px;
+    margin-right: 2px;
+}
+
+.TagSelectDialog-input .TagSelectDialog-input-button {
+    width: 55px;
+    height: 19px;
+    font-size: .8em;
+    border: 1px solid black;
+    margin-bottom: 2px;
+    padding: 2px;
+    background-color: white;
+}
+
+.TagSelectDialog .TagSelectDialog_container {
+    padding: 0 0 0 0em;
+    margin: 0px 0 5px 0;
+    overflow: auto !important;
+}
+
+.TagSelectDialog ul{
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+	height: 14.5em;
+    overflow: auto !important;
+}
+
+.TagSelectDialog ul li{
+    position: relative;
+    margin: 0 ;
+    padding: 1px 0;
+    color: #003311;
+    font-size: 1em;
+    text-decoration: none;
+    list-style: none;
+    padding-left: 8px;
+    text-transform: capitalize;
+}
+
+.TagSelectDialog ul li span {
+    display: inline-block;
+    width: 248px;
+    padding: 0;
+    margin: 0;
+}
+
+.TagSelectDialog_item_par {
+    background-color: #F7FFFA;
+}
+
+.TagSelectDialog_item_impar {
+    background-color: #F9FFFE;
+}
+
+.TagSelectDialog ul li:hover {
+    background-color: #E4FFFD;
+}
+
+.TagSelectDialog ul li span:hover {
+    color: #001F0A;
+    background: url(../img/comunes/list_add.gif) no-repeat right center;
+    cursor: pointer
+}
+
+.TagSelectDialog_item_par, .TagSelectDialog_item_impar{
+    border-bottom: 1px solid #F1F0FF;
+}
+
+.TagSelectDialog-eliminar_item {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: 18px;
+    height: 18px;
+    background: transparent url(../img/comunes/btn_delete.gif) top left no-repeat;
+    cursor: pointer;
+}
+
+.TagSelectDialog-eliminar_item:hover {
+    background-image: url(../img/comunes/btn_delete_hover.gif);
+}
+
+.TagSelectDialog .TagSelectDialog_close_button {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 16px;
+    height: 16px;
+    background: #43678B url(../img/comunes/close_window.gif) top center no-repeat;
+    cursor: pointer;
+}
+.TagSelectDialog .TagSelectDialog_close_button:hover {
+    background-position: center center;
+}
+.TagSelectDialog .TagSelectDialog_title_bar {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 19px;
+    background: #369;
+    /* title */
+    text-align: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.TagSelectDialog_spinner {
+    margin: 20px auto;
+    width: 128px;
+    height: 128px;
+    background: transparent url(../img/comunes/spinner.gif) no-repeat center;
+}
+
+.TagSelectDialog_footer {
+    text-align: right;
+    cursor: auto;
+}
+
+.TagSelectDialog_back, .TagSelectDialog_next {
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+.TagSelectDialog_next:hover, .TagSelectDialog_back:hover {
+    color: #777;
+}
+
+/* fixme reubicar */
+.buttonDelete {
+    cursor: pointer;
+    display: block;
+}
+.buttonDelete:hover { color: #2766be; }

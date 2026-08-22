@@ -1,0 +1,71 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+
+function unidad_toggle(id) {
+    Effect.toggle(
+        `orden_unidad_${id}`,
+        'blind',
+        {
+            duration: 0.3,
+            beforeSetup: () => {
+                Element.toggleClassName(`unidad_${id}`, 'show');
+            }
+        }
+    );
+}
+
+// Funcion para actualizar estado de indice_resumido
+function update_estado( estado, id_curso ){
+    new Ajax.Request( '?', {
+        parameters :    {
+            wAccion : 'set_estado_indice',
+            estado_indice : estado,
+            id_curso : id_curso
+        }
+    });
+}
+
+// Funcion para mostrar el indice resumido y setear el texto acorde en el boton
+function mostrar_indice({id_curso}){
+
+    if( Educativa.Aula.SimulandoPopup ){
+        return;
+    }
+
+    const flecha_der = '&nbsp;<i class="fas fa-chevron-right"></i>';
+
+    if ( $('indice_resumido').hasClassName('hidden') ) {
+        $('indice_resumido').removeClassName('hidden');
+        $$('body')[0].addClassName('indice_resumido');
+        $('btn_indice').update( Dict.termcap('MENU') + flecha_der );
+        $('btn_indice').title = Dict.termcap('MENU');
+        update_estado( 'on', id_curso );
+    }else{ // Necesario en caso de que sea el llamado inicial, al cargar la pagina
+        $('btn_indice').update( Dict.termcap('MENU') + flecha_der );
+        $('btn_indice').title = Dict.termcap('MENU');
+    }
+}
+
+// Funcion para ocultar el indice resumido y setear el texto acorde en el boton
+function ocultar_indice({id_curso}){
+    if( Educativa.Aula.SimulandoPopup ){
+        return;
+    }
+    const flecha_izq = '<i class="fas fa-chevron-left"></i>&nbsp;';
+
+    if ( ! $('indice_resumido').hasClassName('hidden') ) {
+        $('indice_resumido').addClassName('hidden');
+        $$('body')[0].removeClassName('indice_resumido');
+        $('btn_indice').update( flecha_izq + Dict.termcap('INDICE') );
+        $('btn_indice').title = Dict.termcap('INDICE');
+        update_estado( 'off', id_curso );
+    }else{ // Necesario en caso de que sea el llamado inicial, al cargar la pagina
+        $('btn_indice').update( flecha_izq + Dict.termcap('INDICE') );
+        $('btn_indice').title = Dict.termcap('INDICE');
+    }
+}

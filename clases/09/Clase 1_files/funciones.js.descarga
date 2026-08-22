@@ -1,0 +1,10 @@
+function winHelp(){
+    Educativa.popupAyuda({ url: url_ayuda_popup});
+};
+if (! window.OpenVC ) OpenVC = function () {
+void windowOpener('videoconferencia_adobeconnect.cgi?id_curso='+id_grupo,
+'VC',
+'toolbar=0,location=0,directories=0,status=0,'+
+'menubar=0,scrollbars=0,resizable=0,width='+screen.width+','+
+'height='+screen.height);
+}; //end OpenVC()

@@ -1,0 +1,184 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-COMPONENT-GROUP Component - Component Groups
+   ==================================== */
+
+:root {
+    /* Spacing */
+    --edu-component-group-gap-sm: 6px;
+    --edu-component-group-gap: 8px;
+    --edu-component-group-gap-md: 10px;
+    --edu-component-group-gap-lg: 12px;
+}
+
+/* ====================================
+   Base Component Group Styles
+   ==================================== */
+
+.edu-component-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--edu-component-group-gap-md) var(--edu-component-group-gap);
+    width: 100%;
+}
+
+.edu-component-group-block {
+    display: flex;
+    margin: 3px 0;
+}
+
+.edu-component-group-margin {
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+/* Reset margins for child components */
+.edu-component-group > .edu-btn,
+.edu-component-group > .edu-icon-btn,
+.edu-component-group > .edu-select,
+.edu-component-group > .edu-check,
+.edu-component-group > .edu-dropdown {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+/* ====================================
+   Spacing Variants
+   ==================================== */
+
+.edu-component-group-tight {
+    gap: var(--edu-component-group-gap-sm);
+}
+
+.edu-component-group-loose {
+    gap: var(--edu-component-group-gap-lg);
+}
+
+/* ====================================
+   Layout Variants
+   ==================================== */
+
+.edu-component-group-vertical {
+    flex-direction: column;
+    align-items: stretch;
+    display: inline-flex;
+    width: auto;
+}
+
+.edu-component-group-wrap {
+    flex-wrap: wrap;
+}
+
+.edu-component-group-fill {
+    display: flex;
+    width: 100%;
+}
+
+.edu-component-group-fill > .edu-btn,
+.edu-component-group-fill > .edu-icon-btn,
+.edu-component-group-fill > .edu-select,
+.edu-component-group-fill > .edu-check,
+.edu-component-group-fill > .edu-dropdown {
+    flex: 1;
+}
+
+/* ====================================
+   Alignment Modifiers
+   ==================================== */
+
+.edu-component-group-start {
+    justify-content: flex-start;
+}
+
+.edu-component-group-center {
+    justify-content: center;
+}
+
+.edu-component-group-end {
+    justify-content: flex-end;
+}
+
+.edu-component-group-justified {
+    justify-content: space-between;
+}
+
+.edu-component-group-justified > .edu-btn,
+.edu-component-group-justified > .edu-icon-btn,
+.edu-component-group-justified > .edu-select,
+.edu-component-group-justified > .edu-check,
+.edu-component-group-justified > .edu-dropdown {
+    flex: 1;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+.edu-component-group-sm {
+    gap: var(--edu-component-group-gap-sm);
+}
+
+.edu-component-group-lg {
+    gap: var(--edu-component-group-gap-lg);
+}
+
+/* ====================================
+   Responsive Behaviors
+   ==================================== */
+
+@media (max-width: 576px) {
+    .edu-component-group-responsive {
+        flex-direction: column;
+        display: flex;
+        width: 100%;
+    }
+
+    .edu-component-group-responsive > .edu-btn,
+    .edu-component-group-responsive > .edu-icon-btn,
+    .edu-component-group-responsive > .edu-select,
+    .edu-component-group-responsive > .edu-check,
+    .edu-component-group-responsive > .edu-dropdown {
+        margin: 2px 0;
+    }
+}
+
+/* ====================================
+   Accessibility Enhancements
+   ==================================== */
+
+.edu-component-group[role="group"] {
+    border: 1px solid transparent;
+}
+
+.edu-component-group[role="group"]:focus-within {
+    outline: 2px solid rgba(0, 123, 255, 0.25);
+    outline-offset: 2px;
+}
+
+/* ====================================
+   Special Toolbar Variant
+   ==================================== */
+
+.edu-component-group-toolbar {
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.edu-component-group-toolbar > .edu-component-group {
+    flex-shrink: 0;
+}
+
+.edu-component-group-toolbar > .edu-btn,
+.edu-component-group-toolbar > .edu-icon-btn,
+.edu-component-group-toolbar > .edu-select,
+.edu-component-group-toolbar > .edu-check,
+.edu-component-group-toolbar > .edu-dropdown {
+    margin: 0;
+}

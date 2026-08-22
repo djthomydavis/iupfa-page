@@ -1,0 +1,861 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/**
+ * @namespace Educativa.Aula clases y funciones del aula
+ */
+Educativa.Aula = {
+    /**
+     * @namespace Educativa.Aula.Control controles del aula  */
+    Control: {
+        MailTo: function (args) {
+
+            if (!args.url_mensajeria)
+                args.url_mensajeria = 'mensajeria.cgi';
+
+            var params_tpl = "#{url_mensajeria}?";
+
+            if (args.id_curso) {
+                if (args.id_curso != 0) {
+                    params_tpl += "wIdDestino=#{to}&";
+                    params_tpl += "id_curso=#{id_curso}&";
+                }
+            } else {
+                if (self.id_grupo && self.id_grupo != 0) {
+                    args.id_curso = id_grupo;
+
+                    params_tpl += "wIdDestino=#{to}&";
+                    params_tpl += "id_curso=#{id_curso}&";
+                }
+            }
+
+            if (args.subject)
+                params_tpl += "wAsunto=#{subject}&";
+
+            if (args.message)
+                params_tpl += "wMensaje=#{message}&";
+
+            if (args.IdEmailEnviadosReenvio)
+                params_tpl += "wIdEmailEnviadosReenvio=#{IdEmailEnviadosReenvio}&";
+
+            if (args.IdEmail)
+                params_tpl += "wIdEmail=#{IdEmail}&";
+
+            if (args.IdEmailEnviadosResponder)
+                params_tpl += "wIdEmailEnviadosResponder=#{IdEmailEnviadosResponder}&";
+
+            if (args.IdEmailEnviadosResponderATodos)
+                params_tpl += "wIdEmailEnviadosResponderATodos=#{IdEmailEnviadosResponderATodos}&";
+
+            if (args.mostrarUrlActual) {
+                args.message += "* URL: " + document.location.href;
+                if (document.referrer)
+                    args.message += "<br>* Origen: " + document.referrer;
+            }
+
+            if (args.mail_to_admin)
+                params_tpl += "mail_to_admin=#{mail_to_admin}&";
+
+            if (args.wSeccion) {
+                params_tpl += "wSeccion=#{wSeccion}&";
+            }
+
+            var tmpl = new Template(params_tpl);
+
+            args.subject = escapar(args.subject);
+            args.to = escapar(args.to);
+            args.message = escapar(args.message);
+
+            // Si se recibe en verdadero el parametro args.redirect_popup, en vez de abrir el envio de mensajeria en una ventana Modal, redirige dentro del popup actual
+            if (args.redirect_popup) {
+                window.resizeTo(900, 650);
+                return window.location.href = tmpl.evaluate(args);
+            }
+
+            window.parent.EduOpen({
+                url: tmpl.evaluate(args),
+                id: 'comunes_mensajeria',
+                exitButtonOnly: true,
+                classname: 'comunes_mensajeria',
+            })
+        },
+
+
+    },
+    verInfoUsuario: function (id_usuario, id_curso) {
+        var url = `perfil.cgi?id_usuario=${id_usuario}&id_curso=${id_curso}`;
+        EduOpen({
+            url,
+            width: 670,
+            height: 500
+        });
+    },
+
+    /**  Retorna true si se invoca desde el backend, false en caso contrario
+       Debe llamarse despues de que se haya cargado el contenido */
+    is_backend: function () {
+        return $$('body').first().hasClassName('backend');
+    },
+
+    // Funcion para validar nombre y apellido de usuarios
+    // Los caracteres validos incluyen:
+    // - Letras ASCII mayusculas y minusculas
+    // - Numeros
+    // - Simbolos permitidos: _ - . ' acento agudo(\xb4) punto medio(\xb7)
+    // - El rango \xc0-\xfc Latin1 que incluye acentos, acentos graves, acentos circumflejos, dieresis, enies, cedilla
+    // - Espacios siimples (no tabs)
+    // - Caracteres ordinales:
+    //      * MASCULINE ORDINAL INDICATOR (\xba) - https://www.fileformat.info/info/unicode/char/00ba/index.htm
+    //      * FEMININE ORDINAL INDICATOR (\xaa) - https://www.fileformat.info/info/unicode/char/00aa/index.htm
+    // - GRAVE ACCENT (\x60) - https://www.fileformat.info/info/unicode/char/0060/index.htm
+    valida_caracteres_nombre(text) {
+        if (text.match(/^[a-zA-Z0-9_ \-\.'\xb4\xc0-\xfc\xba\xaa\xb7\x60]+$/)) {
+
+            return true;
+        }
+
+        return false;
+    }
+
+};
+
+/** Bakcward Compatibility para link antiguos que nunca fueron modificados. */
+function MailTo(destinatario, asunto) {
+    Educativa.Aula.Control.MailTo({ to: destinatario, subject: asunto });
+}
+
+// deshabilitar la escritura en input[type="file"]
+Event.observe(window, 'load', function () {
+    Educativa.Utils.disable_input_file_keypress();
+});
+
+/**
+* @namespace Educativa.Aula.View Vistas del aula.
+*/
+Educativa.Aula.View = {};
+
+// Esta clase solo se utiliza en ForosComunes.js, se podria mover ahi
+// Genera un combo selector de categorias
+//
+Educativa.Aula.View.ControlSelectCategorias = Class.create({
+
+    // container  (HTML) Contenedor donde se renderiza el combo
+    // titulo     (String) Nombre de la primer linea del combo, solo se pasa para foros de seccion
+    // id         (String) Id del combo
+    // name       (String) Name del combo
+    // categorias (Array)  Categorias que se muestran en las ocpiones
+    // selected   (String) Value del option seleccionado
+    // desactivas ( 1|0 ) Flag que indica si puede haber categorias desactivas
+    //
+    initialize: function (args) { // id_categoria_actual
+
+        Object.extend(this, args);
+
+        var combo_categorias = new Element('select', { id: this.id, name: this.name });
+
+        if (args.titulo) {
+            combo_categorias.insert(new Element('option', { value: '0' }).update(args.titulo));
+        }
+
+        this.categorias.each(function (cat) {
+            var label_cat = cat.nombre;
+            var class_tipo = '';
+            if (cat.tipo == 'GT') {
+                label_cat = '** ' + label_cat;
+                class_tipo = 'categoriaTipoGT';
+            } else if (cat.tipo == 'PU') {
+                label_cat = '* ' + label_cat;
+                class_tipo = 'categoriaTipoPU';
+            } else if (cat.tipo == 'PRG') {
+                class_tipo = 'categoriaTipoPRG';
+            }
+
+            var attr = { value: cat.id, className: class_tipo };
+            if (cat.activa != '1') {
+                attr.className += 'item_noactivo';
+            }
+            combo_categorias.insert(new Element('option', attr).update(label_cat));
+
+        }, this);
+
+        if (this.selected) {
+            combo_categorias.value = this.selected;
+        }
+
+        var referencias = new Element('div', { className: 'control_select_categorias_referencias' });
+        var leyenda_desactivas = new Element('p', { className: 'leyenda-desactiva' })
+            .update('LOS_COLOREADOS_INDICAN_CATEGORIAS_DESACTIVADAS'.termcap());
+
+        if (this.desactivas) {
+            referencias.insert(leyenda_desactivas);
+        }
+
+
+        this.container.insert(
+            new Element('div', { className: 'control_select_categorias_foros' })
+                .insert(combo_categorias)
+                .insert(referencias)
+        );
+
+        var msg_pub = 'PUBLICAR_CATEGORIA_TODOS_LOS_GRUPOS'.term();
+        var msg_gt = 'ESTA_CATEGORIA_PERTENECE_A_UN_GRUPO_DE_TRABAJO'.termcap();
+
+        if ($(this.id)) {
+            var select = $(this.id);
+
+            var div_info = new Element('div', { id: 'div_info', className: 'ambito_categoria', style: 'display:none;' });
+            var target = $$('.control_select_categorias_referencias')[0];
+
+            target.insert({ top: div_info });
+
+            Event.observe(select, 'change', function () {
+                div_info.hide();
+                var index = select.selectedIndex;
+                if (select.options[index].className.match(/categoriaTipoPU/i)) {
+                    div_info.update(msg_pub).show();
+                } else if (select.options[index].className.match(/categoriaTipoGT/i)) {
+                    div_info.update(msg_gt).show();
+                }
+            });
+
+            // Solo seteada para temas de seccion
+            if (args.titulo) {
+                if (select.options.length == 2) {
+                    select.selectedIndex = 1;
+                }
+            }
+
+            var index = select.selectedIndex;
+            if (select.options[index].className.match(/categoriaTipoPU/i)) {
+                div_info.update(msg_pub).show();
+            } else if (select.options[index].className.match(/categoriaTipoGT/i)) {
+                div_info.update(msg_gt).show();
+            }
+        }
+
+    }
+
+});
+
+
+/*************************************************
+********* Educativa.Aula.SessionChecker **********
+**************************************************/
+/*
+    @param args
+    @param {String}  options.url_dir      URL del aula
+    @param {Int}     options.max_downtime Tiempo (en minutos) maximo permitido de inactividad
+    @param {Int}     options.alert_time   Tiempo (en minutos) antes de cerrar la sesion por inactividad, en el que se debe alertar
+@class */
+Educativa.Aula.SessionChecker = Class.create({
+    initialize: function (args) {
+        Object.extend(this, args);
+
+        this.alert_mssg = this.alert_time == 1
+            ? 'DEBIDO_A_LA_INACTIVIDAD_LA_SESION_FINALIZARA_EN_1_MINUTO'.term()
+            : 'DEBIDO_A_LA_INACTIVIDAD_LA_SESION_FINALIZARA_EN_X_MINUTOS'.term().interpolate({ minutos: this.alert_time });
+
+        this.max_downtime *= 60;
+        this.alert_time *= 60;
+
+        // Esperamos a que se terminen todos los llamados ajax si los hay, para recuperar la ultima interaccion
+        var self = this;
+        var wait = setInterval(function () {
+            if (!Ajax.activeRequestCount) {
+                clearInterval(wait);
+                self.getInteraccion();
+            }
+        }, 500);
+
+    },
+
+    getInteraccion: function () {
+        var before = new Date().getTime();
+        new Ajax.Request(this.url_dir + 'ajax/session_checker.cgi', {
+            parameters: { wAccion: 'get_interaccion' },
+            onSuccess: this.onGetInteraccionSuccess.bind(this, before)
+        })
+    },
+
+    onGetInteraccionSuccess: function (before, tr) {
+        var after = new Date().getTime();
+        if (tr.responseText.isJSON()) {
+            json = JSON.parse(tr.responseText);
+
+            if (json.interaccion) {
+                this.interaccion = json.interaccion;
+                this.starTimer(Math.ceil((after - before) / 1000));
+            }
+        }
+    },
+
+    starTimer: function (downtime) {
+        var stay = 0;
+        var prompted = 0;
+        var self = this;
+
+        this.timer = setInterval(function () {
+            downtime++;
+
+            // Si ya se pregunto y apreto aceptar, o si todavia no se pregunto
+            if (!stay && !prompted && (self.max_downtime - self.alert_time - downtime) <= 0) {
+                var before = new Date().getTime();
+                stay = confirm(self.alert_mssg);
+                var after = new Date().getTime();
+                downtime += Math.ceil((after - before) / 1000);
+                prompted = 1;
+            }
+
+            // Si se vencio el tiempo de inactividad
+            if ((self.max_downtime - downtime) <= 0) {
+                self.cerrarSesion();
+            }
+
+            // Si se pregunto y apreto aceptar
+            if (prompted && stay) {
+                self.setInteraccion();
+                stay = 0;
+                prompted = 0;
+            }
+        }, 1000);
+    },
+
+    stopTimer: function () {
+        clearInterval(this.timer);
+    },
+
+    cerrarSesion: function () {
+        this.stopTimer();
+        var self = this;
+        new Ajax.Request(this.url_dir + 'ajax/session_checker.cgi', {
+            parameters: { wAccion: 'check_interaccion', interaccion: this.interaccion },
+            onSuccess: function (tr) {
+                if (tr.responseText.isJSON()) {
+                    json = JSON.parse(tr.responseText);
+
+                    if (json.interaccion) {
+                        self.interaccion = json.interaccion;
+                        self.starTimer(Math.ceil(parseFloat(json.downtime)));
+                    } else {
+                        alert('LA_SESION_HA_SIDO_FINALIZADA_POR_INACTIVIDAD'.term());
+                        window.location = self.url_logoff;
+                    }
+                }
+            }
+        })
+    },
+
+    setInteraccion: function () {
+        this.stopTimer();
+        new Ajax.Request(this.url_dir + 'ajax/session_checker.cgi', {
+            parameters: { wAccion: 'set_interaccion' },
+            onSuccess: this.setInteraccionSuccess.bind(this),
+            onFailure: this.setInteraccionFailure.bind(this)
+        });
+    },
+
+    setInteraccionSuccess: function (tr) {
+        if (tr.responseText.isJSON()) {
+            json = JSON.parse(tr.responseText);
+
+            if (json.result) {
+                this.starTimer(0);
+            } else {
+                this.cerrarSesion()
+            }
+        }
+    },
+
+    setInteraccionFailure: function () {
+        this.cerrarSesion();
+    }
+})
+
+
+/**************************************************
+********* Listado Categorias MenuDerecho **********
+***************************************************/
+/*
+    Este JS se encarga de controlar el comportamiento de los selectores de categoria del menu derecho.
+    Para esto dichos selectores deben tener las clases .action_item.categorias
+*/
+document.observe("dom:loaded", function () {
+    (function () {
+        var showListadoCategorias = function (e) {
+            e.cancelBubble = true;
+            if (this.showing) {
+                hideListadoCategorias(this);
+                return false;
+            }
+
+            this.show();
+            this.showing = true;
+
+            var descendentes = this.descendants();
+            var bodyHandler = function (e, b) {
+                if (descendentes.indexOf(e.target) < 0) {
+                    hideListadoCategorias(this, bodyHandler);
+                }
+            }.bind(this)
+
+            document.body.observe('click', bodyHandler);
+        }
+
+        var hideListadoCategorias = function (listado, bodyHandler) {
+            if (bodyHandler) {
+                document.body.stopObserving('click', bodyHandler);
+            }
+            if (listado.showing) {
+                listado.fade({ duration: 0.3 });
+            }
+            listado.showing = false;
+        }
+
+        var listados_categorias = $$('.action_item.categorias');
+        listados_categorias.each(function (listado_categorias) {
+            var titulo = listado_categorias.down('.title');
+            var listado = listado_categorias.down('.content');
+            listado.showing = false;
+
+            if (listado) listado.hide();
+
+            var combo = new Element('div', { className: 'selected linea_unica', tabIndex: '0' });
+
+            $$('.combo_categorias').each(
+                function (c) {
+                    c.select('li').invoke('observe', 'click', function (e) { hideListadoCategorias(listado) })
+                });
+
+            if (titulo && listado && listado.down()) {
+                var categoria_seleccionada = listado.down('.remarcada');
+
+                if (categoria_seleccionada) {
+
+                    if (categoria_seleccionada.down('a')) {
+                        categoria_seleccionada = categoria_seleccionada.down('a').innerHTML;
+                    } else if (categoria_seleccionada.down('span')) {
+                        categoria_seleccionada = categoria_seleccionada.down('span').innerHTML
+                    } else {
+                        categoria_seleccionada = 'SELECCIONAR_'.termcap();
+                    }
+                } else {
+                    categoria_seleccionada = 'SELECCIONAR_'.termcap();
+                }
+
+                titulo.insert({ after: combo.insert(categoria_seleccionada) });
+                combo.observe('click', showListadoCategorias.bindAsEventListener(listado));
+                combo.observe('keypress', showListadoCategorias.bindAsEventListener(listado));
+            }
+        })
+    })();
+
+});
+
+Educativa.Visualizando620 = false;
+Educativa.Aula.Visualizador620Controller = Class.create({
+
+    initialize: function (args) {
+
+        // setear propiedades del objeto
+        Object.extend(this, args);
+
+        // agregar observe al click del boton ZOOM IN
+        this.el.observe('click', this.renderContenido620.bind(this));
+
+    },
+
+    renderContenido620: function () {
+
+        // chequear del flag
+        if (Educativa.Visualizando620 == true) { return; }
+
+        // setear el flag
+        Educativa.Visualizando620 = true;
+
+        // clonar contenido_620
+        this.copy = Element.clone($(this.el).up(), true);
+        this.copy.addClassName('visualizando');
+        this.copy.id = 'contenido_620_visor';
+        this.copy.select('.contenido_620_abrir').first().remove();
+
+        // agregar boton ZOOM OUT
+        this.btn_cerrar = new Element('div').update('Cerrar').addClassName('contenido_620_cerrar action_button no_icono');
+        this.copy.insert({ top: this.btn_cerrar });
+
+        // agregar observe al click del boton ZOOM OUT
+        this.btn_cerrar.observe('click', this.onClickCerrarContenido620.bind(this));
+
+        // incorporar contenido clonado al body
+        $$('body').first().insert(this.copy);
+
+        //hacer scroll to top
+        scroll(0, 0);
+
+        // agregar marcador para el onHistoryBack
+        window.location = window.location + '#ver_documento';
+
+        // incorporar clase al body
+        $$('body').first().addClassName('visor_620');
+
+        // setear atributo width=device en 662
+        $$("meta[name=viewport]").first().setAttribute('content', value = 'width=842, initial-scale=1');
+    },
+
+    onClickCerrarContenido620: function () {
+
+        // quitar clase al body
+        $$('body').first().removeClassName('visor_620');
+
+        // des-setear atributo width=device
+        $$("meta[name=viewport]").first().writeAttribute('content', value = 'width=device-width, initial-scale=1');
+
+        // borrar contenido clonado
+        this.copy.remove();
+        this.copy = null;
+
+        // des-setear el flag
+        Educativa.Visualizando620 = false;
+    }
+});
+
+Educativa.Aula.VisualizadorIframe = Class.create({
+
+    initialize: function (args) {
+
+        // setear propiedades del objeto
+        Object.extend(this, args);
+
+        this.renderIframe();
+    },
+
+    renderIframe: function () {
+
+        // chequear del flag
+        if (Educativa.Visualizando620 == true) { return; }
+
+        // setear el flag
+        Educativa.Visualizando620 = true;
+
+        this.controlesBottom = new Element('div', { className: 'controles' });
+        this.el.insert({ bottom: this.controlesBottom });
+
+        // Si se ingresa desde un dispositivo de apple ( Ipad/Iphone/Ipod ) no se muestra el control de expandir
+        // Ios no soporta el api FullScreen - Ver bug 14412
+        var isIos = window.navigator.userAgent.match(/ipad|iphone|ipod/i);
+
+        this.controlesTop = new Element('div', { className: 'controles' });
+        this.el.insert({ top: this.controlesTop });
+
+        if (!isIos) {
+            // agregar boton ZOOM IN
+            this.btn_zoom_in = new Element('button', { type: 'button', className: 'zoom_in zoom_button' });
+            this.btn_zoom_in.insert(new Element('i', { className: 'fas fa-expand' }));
+            this.btn_zoom_in.insert(' ' + 'EXPANDIR'.termcap());
+            this.controlesTop.insert(this.btn_zoom_in);
+
+            // agregar boton ZOOM OUT
+            this.btn_zoom_out = new Element('button', { type: 'button', className: 'zoom_out zoom_button' });
+            this.btn_zoom_out.insert(new Element('i', { className: 'fas fa-compress' }));
+            this.btn_zoom_out.insert(' ' + 'CONTRAER'.termcap());
+            this.controlesTop.insert(this.btn_zoom_out);
+        }
+
+        if (this.onClose) {
+            // agregar boton CERRAR
+            this.btn_cerrar = new Element('button', { type: 'button', className: 'zoom_in zoom_button' });
+            this.btn_cerrar.insert(new Element('i', { className: 'far fa-times' }));
+            this.btn_cerrar.insert(' ' + 'CERRAR'.termcap());
+            this.controlesTop.insert(this.btn_cerrar);
+        }
+
+        if (this.onClickAnterior) {
+            // agregar boton ANTERIOR
+            this.btn_anterior = new Element('button', { id: 'btn_anterior', type: 'button', className: 'zoom_in action_button no_icono', title: 'ANTERIOR'.termcap() });
+            this.btn_anterior.insert(new Element('i', { className: 'fas fa-chevron-left' }));
+            if (!this.anteriorDisponible) {
+                this.btn_anterior.setStyle({ display: 'none' });
+            }
+            this.controlesBottom.insert(this.btn_anterior);
+        }
+
+        if (this.onClickSiguiente) {
+            // agregar boton SIGUIENTE
+            this.btn_siguiente = new Element('button', { id: 'btn_siguiente', type: 'button', className: 'zoom_in action_button no_icono', title: 'SIGUIENTE'.termcap() });
+            this.btn_siguiente.insert(new Element('i', { className: 'fas fa-chevron-right' }));
+            if (!this.siguienteDisponible) {
+                this.btn_siguiente.setStyle({ display: 'none' });
+            }
+            this.controlesBottom.insert(this.btn_siguiente);
+        }
+
+        if (!isIos) {
+            // agregar observe al click del boton ZOOM OUT
+            this.btn_zoom_in.observe('click', this.onZoomIn.bindAsEventListener(this));
+            this.btn_zoom_out.observe('click', this.onZoomOut.bindAsEventListener(this));
+        }
+        // disparar el evento onClose al hacer click en boton CERRAR
+        if (this.onClose) {
+            this.btn_cerrar.observe('click', this.onClose);
+        }
+
+        // disparar el evento onAnterior al hacer click en boton ANTERIOR
+        if (this.onClickAnterior) {
+            this.btn_anterior.observe('click', this.onClickAnterior);
+        }
+
+        // disparar el evento onSiguiente al hacer click en boton SIGUIENTE
+        if (this.onClickSiguiente) {
+            this.btn_siguiente.observe('click', this.onClickSiguiente);
+        }
+    },
+
+    onZoomIn: function (e) {
+        // evita el alert cuando hay un SCO abierto.
+        Event.stop(e);
+
+        // registramos la posicion original
+        this.topScroll = document.viewport.getScrollOffsets().top;
+
+        //hacer scroll to top
+        scroll(0, 0);
+
+        // agregar marcador para el onHistoryBack
+        window.location = window.location + '#ver_documento';
+
+        this.toggleFullscreen();
+
+        // setear atributo width=device en 662
+        $$("meta[name=viewport]").first().setAttribute('content', value = 'width=device-width, initial-scale=1');
+
+    },
+
+    onZoomOut: function (e) {
+        // evita el alert cuando hay un SCO abierto.
+        Event.stop(e);
+
+        this.toggleFullscreen();
+
+        // des-setear atributo width=device
+        $$("meta[name=viewport]").first().writeAttribute('content', value = 'width=device-width, initial-scale=1');
+
+        // des-setear el flag
+        Educativa.Visualizando620 = false;
+
+        // scroll a la posicion original
+        scroll(0, this.topScroll);
+    },
+
+    showAnterior: function () {
+        this.btn_anterior.show();
+    },
+
+    showSiguiente: function () {
+        this.btn_siguiente.show();
+    },
+
+    toggleFullscreen: function () {
+
+        if (this.el) {
+            toggleFullscreen(this.el);
+
+            if (this.el.hasClassName('visualizando_iframe')) {
+                this.el.removeClassName('visualizando_iframe');
+            } else {
+                this.el.addClassName('visualizando_iframe');
+            }
+        }
+    }
+
+});
+
+Educativa.Aula.SimulandoPopup = false;
+
+function toggleFullscreen(elem) {
+    elem = elem || document.documentElement;
+    if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+    }
+}
+
+Educativa.Aula.Modal = Class.create({
+    initialize: function (args) {
+        Object.extend(this, args);
+
+        this.overlay = new Element('div', { className: 'modal_overlay oculto' });
+        this.container = new Element('div', { className: 'modal_container ' + this.classname });
+        this.close_btn = new Element('div', { className: 'modal_close_btn' })
+            .insert(new Element('i', { className: 'far fa-times-circle icon' }));
+
+        this.container.insert(this.close_btn);
+        this.overlay.insert(this.container);
+
+        document.body.insert(this.overlay);
+
+        this.overlay.observe('click', this.hide.bind(this));
+        this.container.observe('click', this.stop.bindAsEventListener(this))
+        this.close_btn.observe('click', this.hide.bind(this));
+        document.observe('keydown', this.onEscape.bindAsEventListener(this));
+    },
+
+    // Cerrar la ventana al apretar escape
+    onEscape: function (e) {
+        if (e.keyCode == 27) {
+            this.hide();
+        }
+    },
+
+    show: function (args) {
+        this.overlay.removeClassName('oculto');
+        $$('body')[0].addClassName('noscroll');
+    },
+
+    hide: function (args) {
+        this.overlay.addClassName('oculto');
+        $$('body')[0].removeClassName('noscroll');
+
+        // Si se paso un hadler para el cierre de la ventana modal, ejecutarlo
+        if (this.close_hdlr) {
+            this.close_hdlr();
+        }
+    },
+
+    // Impedir que la ventana se cierre al hacer click sobre ella
+    stop: function (ev) {
+        ev.stop();
+    },
+
+});
+
+Educativa.Aula.ProgressBar = Class.create({
+    initialize: function (args) {
+        Object.extend(this, args);
+
+        this.button = $(this.button_id);
+        this.progress_bar = $(this.progress_bar_id);
+
+        this.button.observe('click', this.download.bind(this));
+    },
+
+    download: function () {
+        this.button.removeClassName("destacado");
+        this.button.writeAttribute("disabled", "disabled");
+
+        this.progress_bar.show();
+        this.progress_bar.value = 0;
+
+        var self = this;
+
+        new Ajax.Request(this.url_download, {
+            onCreate: function (t) {
+                t.transport.onprogress = function (event) {
+                    if (event.lengthComputable) {
+                        self.progress_bar.max = event.total;
+                        self.progress_bar.value = event.loaded;
+                        self.progress_bar.textContent = self.progress_bar.value;
+                    }
+                }
+            },
+            onSuccess: function () {
+                window.location = self.url_download;
+                self.button.addClassName("destacado");
+                self.button.writeAttribute("disabled");
+
+                setTimeout(function () { self.progress_bar.fade({ duration: self.bar_delay }); }, 500);
+
+                if (self.reload_delay) {
+                    setTimeout(function () { document.location.reload(); }, self.reload_delay);
+                }
+            }
+        });
+    }
+});
+
+document.observe("dom:loaded", function () {
+    $$('.contenido_620_abrir').each(function (element) {
+        new Educativa.Aula.Visualizador620Controller({ el: element });
+    });
+
+    $$('.contenido_iframe').each(function (element) {
+        new Educativa.Aula.VisualizadorIframe({ el: element });
+    });
+});
+
+// comprueba si un desbordamiento esta ocurriendo
+function isOverflowing(element) {
+    return (element.scrollWidth > element.offsetWidth);
+}
+
+// comprueba si un contenido es responsive
+// esta funcion supone que element tiene seteado display != none
+function isResponsive(element) {
+
+    // achicamos el area de contenido para testear si es responsive
+    element.setStyle({ 'width': '320px' });
+
+    // siempre que hay un contenido_620 existe un .tiny_personalizado y
+    // necesitamos hacer esto porque si no detecta que siempre es responsive
+    element.select('.tiny_personalizado')[0].setStyle({ 'overflow': 'visible' });
+
+    var overflow = isOverflowing(element);
+
+    // seteamos a sus valores iniciales
+    element.setStyle({ 'width': 'auto' });
+    element.select('.tiny_personalizado')[0].setStyle({ 'overflow': 'hidden' });
+
+    return !overflow;
+}
+
+/*
+    JS encargado de testear si un contenido es o no responsive
+*/
+document.observe('dom:loaded', function () {
+
+    if (Educativa.Aula.is_backend()) return;
+
+    var contenido_620 = $$('.contenido_620');
+
+    if (contenido_620.length) {
+
+        contenido_620.each(function (item) {
+
+            if (!isResponsive(item))
+                item.addClassName('no-responsive');
+
+            // por defecto los contenido_620 no estan visibles (ocultos desde css)
+            // entonces modificamos esto para mostrar el contenido
+            item.setStyle({ 'visibility': 'visible' });
+        });
+    }
+});
+
+// Abre videoconferencia AdobeConnect
+if (!window.OpenVC) OpenVC = function () {
+    void windowOpener('videoconferencia_adobeconnect.cgi?id_curso=' + id_grupo,
+        'VC',
+        'toolbar=0,location=0,directories=0,status=0,' +
+        'menubar=0,scrollbars=0,resizable=0,width=' + screen.width + ',' +
+        'height=' + screen.height);
+
+}; //end OpenVC()

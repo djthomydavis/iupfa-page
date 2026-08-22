@@ -40,22 +40,22 @@
 
     <section class="landing-features">
       <article class="feature-card">
-        <div class="feature-icon">📚</div>
+        <div class="feature-icon"><span class="icon icon-book"></span></div>
         <h3>Material por materia</h3>
         <p>Apuntes, guías y recursos organizados por año y asignatura, a un clic de distancia.</p>
       </article>
       <article class="feature-card">
-        <div class="feature-icon">✅</div>
+        <div class="feature-icon"><span class="icon icon-check-circle"></span></div>
         <h3>Control de tu carrera</h3>
         <p>Visualizá qué materias tenés aprobadas, cuáles están a rendir final y cuáles ya podés cursar.</p>
       </article>
       <article class="feature-card">
-        <div class="feature-icon">🗓️</div>
+        <div class="feature-icon"><span class="icon icon-calendar"></span></div>
         <h3>Calendario académico</h3>
         <p>Fechas de exámenes, inscripciones y eventos importantes de la carrera, siempre a mano.</p>
       </article>
       <article class="feature-card">
-        <div class="feature-icon">💬</div>
+        <div class="feature-icon"><span class="icon icon-chat"></span></div>
         <h3>Foros y comunidad</h3>
         <p>Compartí dudas, apuntes y experiencias con otros estudiantes, en general o por materia.</p>
       </article>
@@ -65,7 +65,7 @@
   <section id="authScreen" class="auth-screen hidden">
     <div class="auth-visual">
       <div class="auth-visual-glow"></div>
-      <div class="auth-visual-watermark">🛡️</div>
+      <div class="auth-visual-watermark"><span class="icon icon-shield"></span></div>
 
       <button id="backToLanding" class="back-link">&larr; Volver al inicio</button>
 
@@ -74,9 +74,9 @@
         <h1>Cybersecurity Students IUPFA</h1>
         <p>Tu espacio para organizar la cursada, acceder al material de cada materia y seguir el estado de tu carrera.</p>
         <ul class="auth-highlights">
-          <li><span class="hl-icon">📚</span>Material centralizado por materia</li>
-          <li><span class="hl-icon">✅</span>Seguimiento de aprobadas y finales</li>
-          <li><span class="hl-icon">💬</span>Comunidad activa de estudiantes</li>
+          <li><span class="hl-icon"><span class="icon icon-book"></span></span>Material centralizado por materia</li>
+          <li><span class="hl-icon"><span class="icon icon-check-circle"></span></span>Seguimiento de aprobadas y finales</li>
+          <li><span class="hl-icon"><span class="icon icon-chat"></span></span>Comunidad activa de estudiantes</li>
         </ul>
       </div>
     </div>
@@ -211,64 +211,57 @@
   </section>
 
   <section id="portalScreen" class="portal-shell hidden">
-    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
-        <div>
+        <div class="sidebar-text">
           <strong>CS IUPFA</strong>
           <span>Campus digital</span>
         </div>
       </div>
 
       <nav class="sidebar-nav">
-        <button class="nav-link active" data-view="inicio">Inicio</button>
-        <button class="nav-link" data-view="calendario">Calendario</button>
-        <button class="nav-link" data-view="planificacion">Planificación</button>
-        <button class="nav-link" data-view="foro">Foro General</button>
-        <button class="nav-link" data-view="alumnos">Alumnos</button>
-        <button class="nav-link" data-view="faq">Preguntas Frecuentes</button>
-        <button class="nav-link" data-view="contacto">Contacto</button>
-        <a id="adminShortcut" class="nav-link hidden" href="admin.html">Ir a Admin</a>
+        <button class="nav-link active" data-view="inicio"><span class="nav-icon"><span class="icon icon-home"></span></span><span class="nav-label sidebar-text">Inicio</span></button>
+        <button class="nav-link" data-view="calendario"><span class="nav-icon"><span class="icon icon-calendar"></span></span><span class="nav-label sidebar-text">Calendario</span></button>
+        <button class="nav-link" data-view="planificacion"><span class="nav-icon"><span class="icon icon-folder"></span></span><span class="nav-label sidebar-text">Planificación</span></button>
+        <button class="nav-link" data-view="foro"><span class="nav-icon"><span class="icon icon-chat"></span></span><span class="nav-label sidebar-text">Foro General</span></button>
+        <button class="nav-link" data-view="alumnos"><span class="nav-icon"><span class="icon icon-users"></span></span><span class="nav-label sidebar-text">Alumnos</span></button>
+        <button class="nav-link" data-view="faq"><span class="nav-icon"><span class="icon icon-help-circle"></span></span><span class="nav-label sidebar-text">Preguntas Frecuentes</span></button>
+        <button class="nav-link" data-view="contacto"><span class="nav-icon"><span class="icon icon-phone"></span></span><span class="nav-label sidebar-text">Contacto</span></button>
+        <a id="adminShortcut" class="nav-link hidden" href="admin.html"><span class="nav-icon"><span class="icon icon-tool"></span></span><span class="nav-label sidebar-text">Ir a Admin</span></a>
       </nav>
 
       <div class="sidebar-group">
-        <span class="sidebar-label">Materias por año</span>
+        <span class="sidebar-label"><span class="nav-icon"><span class="icon icon-book"></span></span><span class="nav-label sidebar-text">Materias por año</span></span>
         <div id="yearList" class="year-nav"></div>
       </div>
 
       <div class="sidebar-footer">
-        <label class="theme-toggle">
-          <span>🌙 Modo oscuro</span>
-          <input type="checkbox" id="darkModeToggle" />
-          <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
-        </label>
+        <button type="button" class="sidebar-user-btn" id="sidebarUserBtn">
+          <div id="sidebarUserAvatar" class="avatar small">U</div>
+          <span class="sidebar-text" id="sidebarUserName">Usuario</span>
+        </button>
       </div>
     </aside>
 
-    <div class="main-column">
-      <header class="topbar">
-        <div class="topbar-brand">
-          <button type="button" id="sidebarToggle" class="ghost-btn icon-btn" aria-label="Mostrar/ocultar menú">☰</button>
-          <div class="logo-mark small"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
-          <div>
-            <h1>Cybersecurity Students IUPFA</h1>
-            <span>Gestión académica personal y comunitaria</span>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <div id="profilePillBtn" class="profile-pill clickable" title="Gestionar mi perfil">
-            <div id="userAvatar" class="avatar">U</div>
-            <div>
-              <strong id="userName">Usuario</strong>
-              <span id="userRole">Estudiante</span>
-            </div>
-          </div>
-          <button id="viewModeToggle" class="ghost-btn hidden">Ver como usuario</button>
-          <button id="logoutBtn" class="ghost-btn">Cerrar sesión</button>
-        </div>
-      </header>
+    <div class="sidebar-user-menu hidden" id="sidebarUserMenu">
+      <button type="button" class="sidebar-user-menu-item" id="sidebarUserProfileBtn">
+        <span class="icon icon-user"></span><span>Mi perfil</span>
+      </button>
+      <button type="button" class="sidebar-user-menu-item hidden" id="sidebarViewModeToggle">
+        <span class="icon icon-refresh"></span><span id="sidebarViewModeLabel">Ver como usuario</span>
+      </button>
+      <label class="sidebar-user-menu-item theme-toggle">
+        <span class="icon icon-moon"></span><span>Modo oscuro</span>
+        <input type="checkbox" id="darkModeToggle" />
+        <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+      </label>
+      <button type="button" class="sidebar-user-menu-item danger" id="sidebarLogoutBtn">
+        <span class="icon icon-log-out"></span><span>Cerrar sesión</span>
+      </button>
+    </div>
 
+    <div class="main-column">
       <main class="content">
         <section id="inicioView" class="view-section">
           <div class="hero card">
@@ -284,21 +277,21 @@
           </div>
           <div class="stats-grid">
             <article class="card stat-card">
-              <div class="stat-icon">📖</div>
+              <div class="stat-icon"><span class="icon icon-book-open"></span></div>
               <div>
                 <span>Materias cursables</span>
                 <strong id="statCursables">0</strong>
               </div>
             </article>
             <article class="card stat-card">
-              <div class="stat-icon">📚</div>
+              <div class="stat-icon"><span class="icon icon-book"></span></div>
               <div>
                 <span>Materias cursando</span>
                 <strong id="statCursando">0</strong>
               </div>
             </article>
             <article class="card stat-card">
-              <div class="stat-icon">🎓</div>
+              <div class="stat-icon"><span class="icon icon-graduation-cap"></span></div>
               <div>
                 <span>Materias aprobadas</span>
                 <strong id="statAprobadas">0</strong>
@@ -312,7 +305,7 @@
         </section>
 
         <section id="calendarioView" class="view-section hidden">
-          <button type="button" id="calendarNavToggle" class="ghost-btn units-nav-toggle-btn">🗓️ Calendario académico</button>
+          <button type="button" id="calendarNavToggle" class="ghost-btn units-nav-toggle-btn"><span class="icon icon-calendar"></span> Calendario académico</button>
           <div id="calendarLayout" class="content-layout calendar-layout">
             <section class="card content-main">
               <div class="section-head">
@@ -329,97 +322,108 @@
               <div id="calendarGrid" class="calendar-grid"></div>
             </section>
             <div id="calendarNavBackdrop" class="units-nav-backdrop"></div>
-            <aside class="card content-units-nav">
-              <div class="section-head">
-                <h3>Calendario académico</h3>
-                <div class="stack-row">
-                  <button type="button" id="toggleHolidaysBtn" class="ghost-btn icon-btn" aria-label="Ver feriados" title="Ver todos los feriados">🟠</button>
-                  <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
-                  <button type="button" id="addRecurringClassBtn" class="ghost-btn icon-btn hidden" aria-label="Generar clases recurrentes" title="Generar clases recurrentes del cuatrimestre">🔁</button>
-                  <button type="button" id="importHolidaysBtn" class="ghost-btn icon-btn hidden" aria-label="Importar feriados" title="Importar feriados nacionales de un año">📥</button>
-                  <button type="button" id="calendarNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar calendario académico">✕</button>
+            <div class="content-units-nav calendar-side-panels">
+              <section class="card calendar-panel">
+                <div class="section-head">
+                  <h3>Calendario académico</h3>
+                  <div class="stack-row">
+                    <button type="button" id="toggleHolidaysBtn" class="ghost-btn icon-btn" aria-label="Ver feriados" title="Ver todos los feriados"><span class="icon icon-circle-dot"></span></button>
+                    <button type="button" id="addCalendarEventBtn" class="ghost-btn icon-btn hidden" aria-label="Agregar evento">+</button>
+                    <button type="button" id="importHolidaysBtn" class="ghost-btn icon-btn hidden" aria-label="Importar feriados" title="Importar feriados nacionales de un año"><span class="icon icon-inbox"></span></button>
+                    <button type="button" id="calendarNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar calendario académico">✕</button>
+                  </div>
                 </div>
-              </div>
-              <form id="newCalendarEventForm" class="stack inline-edit-form hidden">
-                <input id="newCalendarEventTitle" type="text" placeholder="Título del evento" required />
-                <div class="two-cols">
-                  <input id="newCalendarEventDate" type="date" required />
-                  <select id="newCalendarEventType">
-                    <option>Académico</option>
-                    <option>Examen</option>
-                    <option>Inscripción</option>
-                    <option>Feriado</option>
-                    <option>Entrega</option>
-                    <option>Cuatrimestre</option>
-                    <option>Clase</option>
+                <form id="newCalendarEventForm" class="stack inline-edit-form hidden">
+                  <input id="newCalendarEventTitle" type="text" placeholder="Título del evento" required />
+                  <div class="two-cols">
+                    <input id="newCalendarEventDate" type="date" required />
+                    <select id="newCalendarEventType">
+                      <option>Académico</option>
+                      <option>Examen</option>
+                      <option>Inscripción</option>
+                      <option>Feriado</option>
+                      <option>Entrega</option>
+                      <option>Cuatrimestre</option>
+                      <option>Clase</option>
+                    </select>
+                  </div>
+                  <select id="newCalendarEventSubject"><option value="">Sin materia</option></select>
+                  <select id="newCalendarEventModality">
+                    <option value="">Sin modalidad</option>
+                    <option value="Presencial">Presencial</option>
+                    <option value="Virtual">Virtual</option>
                   </select>
-                </div>
-                <select id="newCalendarEventSubject"><option value="">Sin materia</option></select>
-                <select id="newCalendarEventModality">
-                  <option value="">Sin modalidad</option>
-                  <option value="Presencial">Presencial</option>
-                  <option value="Virtual">Virtual</option>
-                </select>
-                <label class="checkbox-row small"><input type="checkbox" id="newCalendarEventRoomToggle" class="room-toggle" /> Aula (clase presencial)</label>
-                <input id="newCalendarEventRoom" type="text" placeholder="Aula" class="hidden" />
-                <label class="checkbox-row small"><input type="checkbox" id="newCalendarEventCodeToggle" class="code-toggle" /> Código de clase (link de Zoom, clase virtual)</label>
-                <input id="newCalendarEventCode" type="text" placeholder="Código o link de Zoom" class="hidden" />
-                <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
-                <label class="field-label">Fecha fin<input id="newCalendarEventEndDate" type="date" /></label>
-                <div class="two-cols">
-                  <label class="field-label">Hora inicio<input id="newCalendarEventStartTime" type="time" /></label>
-                  <label class="field-label">Hora fin<input id="newCalendarEventEndTime" type="time" /></label>
-                </div>
-                <div class="stack-row">
-                  <button type="submit" class="small-btn">Guardar evento</button>
-                  <button type="button" id="cancelNewCalendarEvent" class="ghost-btn small-btn">Cancelar</button>
-                </div>
-              </form>
+                  <label class="checkbox-row small"><input type="checkbox" id="newCalendarEventRoomToggle" class="room-toggle" /> Aula (clase presencial)</label>
+                  <input id="newCalendarEventRoom" type="text" placeholder="Aula" class="hidden" />
+                  <label class="checkbox-row small"><input type="checkbox" id="newCalendarEventCodeToggle" class="code-toggle" /> Código de clase (link de Zoom, clase virtual)</label>
+                  <input id="newCalendarEventCode" type="text" placeholder="Código o link de Zoom" class="hidden" />
+                  <p class="form-hint">Opcional: si el evento dura varios días, indicá la fecha de fin. Si tiene un horario puntual, cargá hora de inicio y fin.</p>
+                  <label class="field-label">Fecha fin<input id="newCalendarEventEndDate" type="date" /></label>
+                  <div class="two-cols">
+                    <label class="field-label">Hora inicio<input id="newCalendarEventStartTime" type="time" /></label>
+                    <label class="field-label">Hora fin<input id="newCalendarEventEndTime" type="time" /></label>
+                  </div>
+                  <div class="stack-row">
+                    <button type="submit" class="small-btn">Guardar evento</button>
+                    <button type="button" id="cancelNewCalendarEvent" class="ghost-btn small-btn">Cancelar</button>
+                  </div>
+                </form>
 
-              <form id="recurringClassForm" class="stack inline-edit-form hidden">
-                <p class="form-hint">Genera una clase por cada día elegido dentro del cuatrimestre activo (según el evento "Cuatrimestre" cargado en el calendario), alternando modalidad si querés.</p>
-                <div id="recurringNotice" class="notice"></div>
-                <select id="recurringSubjectSelect" required><option value="">Elegí una materia…</option></select>
-                <select id="recurringWeekday" required>
-                  <option value="1">Todos los lunes</option>
-                  <option value="2">Todos los martes</option>
-                  <option value="3">Todos los miércoles</option>
-                  <option value="4">Todos los jueves</option>
-                  <option value="5">Todos los viernes</option>
-                  <option value="6">Todos los sábados</option>
-                  <option value="0">Todos los domingos</option>
-                </select>
-                <div class="two-cols">
-                  <label class="field-label">Hora inicio<input id="recurringStartTime" type="time" required /></label>
-                  <label class="field-label">Hora fin<input id="recurringEndTime" type="time" required /></label>
-                </div>
-                <label class="checkbox-row small"><input type="checkbox" id="recurringRoomToggle" class="room-toggle" /> Aula (clase presencial)</label>
-                <input id="recurringRoom" type="text" placeholder="Aula" class="hidden" />
-                <label class="checkbox-row small"><input type="checkbox" id="recurringCodeToggle" class="code-toggle" /> Código de clase (link de Zoom, clase virtual)</label>
-                <input id="recurringCode" type="text" placeholder="Código o link de Zoom" class="hidden" />
-                <p class="form-hint">Patrón de modalidad: cuántas clases seguidas son presenciales y cuántas virtuales (se repite en ese orden hasta el final del cuatrimestre). Ej: 1 y 2 = Presencial, Virtual, Virtual, Presencial, Virtual, Virtual…</p>
-                <div class="two-cols">
-                  <label class="field-label">Presenciales seguidas<input id="recurringPresencialCount" type="number" min="0" value="1" /></label>
-                  <label class="field-label">Virtuales seguidas<input id="recurringVirtualCount" type="number" min="0" value="0" /></label>
-                </div>
-                <div class="stack-row">
-                  <button type="submit" class="small-btn">Generar clases del cuatrimestre</button>
-                  <button type="button" id="cancelRecurringClass" class="ghost-btn small-btn">Cancelar</button>
-                </div>
-              </form>
+                <form id="importHolidaysForm" class="stack inline-edit-form hidden">
+                  <p class="form-hint">Trae los feriados nacionales de Argentina de un año desde un servicio público (Nager.Date) y los agrega como eventos "Feriado". Ese servicio no distingue entre inamovible/trasladable/no laborable/turístico como <a href="https://www.argentina.gob.ar/feriados" target="_blank" rel="noopener">argentina.gob.ar/feriados</a> — si necesitás esa distinción exacta, revisá ahí y ajustá el título a mano después de importar.</p>
+                  <div id="importHolidaysNotice" class="notice"></div>
+                  <div class="two-cols">
+                    <input id="importHolidaysYear" type="number" min="2020" max="2100" required />
+                    <button type="submit" class="small-btn">Importar</button>
+                  </div>
+                  <button type="button" id="cancelImportHolidays" class="ghost-btn small-btn">Cancelar</button>
+                </form>
 
-              <form id="importHolidaysForm" class="stack inline-edit-form hidden">
-                <p class="form-hint">Trae los feriados nacionales de Argentina de un año desde un servicio público (Nager.Date) y los agrega como eventos "Feriado". Ese servicio no distingue entre inamovible/trasladable/no laborable/turístico como <a href="https://www.argentina.gob.ar/feriados" target="_blank" rel="noopener">argentina.gob.ar/feriados</a> — si necesitás esa distinción exacta, revisá ahí y ajustá el título a mano después de importar.</p>
-                <div id="importHolidaysNotice" class="notice"></div>
-                <div class="two-cols">
-                  <input id="importHolidaysYear" type="number" min="2020" max="2100" required />
-                  <button type="submit" class="small-btn">Importar</button>
-                </div>
-                <button type="button" id="cancelImportHolidays" class="ghost-btn small-btn">Cancelar</button>
-              </form>
+                <div id="calendarFull" class="stack"></div>
+              </section>
 
-              <div id="calendarFull" class="stack"></div>
-            </aside>
+              <section class="card calendar-panel">
+                <div class="section-head">
+                  <h3><span class="icon icon-graduation-cap"></span> Clases</h3>
+                  <div class="stack-row">
+                    <button type="button" id="addRecurringClassBtn" class="ghost-btn icon-btn hidden" aria-label="Generar clases recurrentes" title="Generar clases recurrentes del cuatrimestre"><span class="icon icon-refresh"></span></button>
+                  </div>
+                </div>
+                <form id="recurringClassForm" class="stack inline-edit-form hidden">
+                  <p class="form-hint">Genera una clase por cada día elegido dentro del cuatrimestre activo (según el evento "Cuatrimestre" cargado en el calendario), alternando modalidad si querés.</p>
+                  <div id="recurringNotice" class="notice"></div>
+                  <select id="recurringSubjectSelect" required><option value="">Elegí una materia…</option></select>
+                  <select id="recurringWeekday" required>
+                    <option value="1">Todos los lunes</option>
+                    <option value="2">Todos los martes</option>
+                    <option value="3">Todos los miércoles</option>
+                    <option value="4">Todos los jueves</option>
+                    <option value="5">Todos los viernes</option>
+                    <option value="6">Todos los sábados</option>
+                    <option value="0">Todos los domingos</option>
+                  </select>
+                  <div class="two-cols">
+                    <label class="field-label">Hora inicio<input id="recurringStartTime" type="time" required /></label>
+                    <label class="field-label">Hora fin<input id="recurringEndTime" type="time" required /></label>
+                  </div>
+                  <label class="checkbox-row small"><input type="checkbox" id="recurringRoomToggle" class="room-toggle" /> Aula (clase presencial)</label>
+                  <input id="recurringRoom" type="text" placeholder="Aula" class="hidden" />
+                  <label class="checkbox-row small"><input type="checkbox" id="recurringCodeToggle" class="code-toggle" /> Código de clase (link de Zoom, clase virtual)</label>
+                  <input id="recurringCode" type="text" placeholder="Código o link de Zoom" class="hidden" />
+                  <p class="form-hint">Patrón de modalidad: cuántas clases seguidas son presenciales y cuántas virtuales (se repite en ese orden hasta el final del cuatrimestre). Ej: 1 y 2 = Presencial, Virtual, Virtual, Presencial, Virtual, Virtual…</p>
+                  <div class="two-cols">
+                    <label class="field-label">Presenciales seguidas<input id="recurringPresencialCount" type="number" min="0" value="1" /></label>
+                    <label class="field-label">Virtuales seguidas<input id="recurringVirtualCount" type="number" min="0" value="0" /></label>
+                  </div>
+                  <div class="stack-row">
+                    <button type="submit" class="small-btn">Generar clases del cuatrimestre</button>
+                    <button type="button" id="cancelRecurringClass" class="ghost-btn small-btn">Cancelar</button>
+                  </div>
+                </form>
+
+                <div id="calendarClasesList" class="stack"></div>
+              </section>
+            </div>
           </div>
         </section>
 
@@ -427,7 +431,7 @@
           <section class="card">
             <div class="section-head">
               <h3>Planificación de carrera</h3>
-              <button type="button" id="roadmapBtn" class="ghost-btn small-btn">🗺 Roadmap Recomendado</button>
+              <button type="button" id="roadmapBtn" class="ghost-btn small-btn"><span class="icon icon-compass"></span> Roadmap Recomendado</button>
             </div>
             <div class="planning-filters">
               <input id="planningSearch" type="text" class="table-search" placeholder="Buscar por código, materia, modalidad o estado..." />
@@ -501,14 +505,14 @@
           </div>
           <div class="stats-grid">
             <section class="card stat-card">
-              <div class="stat-icon">☎️</div>
+              <div class="stat-icon"><span class="icon icon-phone"></span></div>
               <div>
                 <span>Teléfono (línea fija, no WhatsApp)</span>
                 <strong class="contact-value"><a href="tel:1149055060">4905-5060</a></strong>
               </div>
             </section>
             <section class="card stat-card">
-              <div class="stat-icon">✉️</div>
+              <div class="stat-icon"><span class="icon icon-mail"></span></div>
               <div>
                 <span>Correo electrónico</span>
                 <strong class="contact-value"><a href="mailto:telecomunicaciones@iupfa.edu.ar">telecomunicaciones@iupfa.edu.ar</a></strong>
@@ -521,7 +525,7 @@
               <p>Para reclamos formales, completá el formulario oficial de Google del área. Se abre en una pestaña nueva.</p>
             </div>
             <a class="claim-btn" href="https://docs.google.com/forms/d/e/1FAIpQLScMUK1SEV83h3twEnJoNh5xEctq_jrO4fABjYfVLOhTuPKNmg/viewform?usp=dialog" target="_blank" rel="noopener">
-              📝 Abrir formulario de reclamo <span class="claim-btn-arrow">→</span>
+              <span class="icon icon-edit"></span> Abrir formulario de reclamo <span class="claim-btn-arrow">→</span>
             </a>
           </section>
         </section>
@@ -570,16 +574,30 @@
                 <select id="contentTypeSelect">
                   <option value="pdf">PDF</option>
                   <option value="clase">Clase</option>
+                  <option value="video">Video</option>
                 </select>
                 <input id="contentTitleInput" type="text" placeholder="Título del contenido" required />
                 <input id="contentFileInput" type="file" accept="application/pdf" class="content-field-pdf" />
                 <div id="contentBodyWrapper" class="content-field-clase hidden">
+                  <div class="clase-import-block">
+                    <p class="form-hint">Importar desde un "Clase N.html" guardado del campus: elegí el archivo .html y, si tiene imágenes incrustadas, también los archivos de su carpeta "..._files" (los podés seleccionar todos juntos).</p>
+                    <div class="two-cols">
+                      <input type="file" id="claseImportHtmlInput" accept=".html,.htm" />
+                      <input type="file" id="claseImportAssetsInput" multiple accept="image/*" />
+                    </div>
+                    <div id="claseImportNotice" class="notice"></div>
+                    <button type="button" id="claseImportFillBtn" class="ghost-btn small-btn">Completar título y contenido desde el HTML</button>
+                  </div>
                   <textarea id="contentBodyInput"></textarea>
+                </div>
+                <div id="contentVideoWrapper" class="content-field-video hidden">
+                  <p class="form-hint">Pegá el link para compartir de Google Drive (el video tiene que estar compartido como "Cualquiera con el enlace"). Se muestra embebido en la página, sin redirigir a Drive.</p>
+                  <input id="contentVideoUrlInput" type="url" placeholder="https://drive.google.com/file/d/..." />
                 </div>
                 <button type="submit">Agregar contenido</button>
               </form>
             </div>
-            <button type="button" id="unitsNavToggle" class="ghost-btn units-nav-toggle-btn">📚 Unidades</button>
+            <button type="button" id="unitsNavToggle" class="ghost-btn units-nav-toggle-btn"><span class="icon icon-book"></span> Unidades</button>
             <div id="contentLayout" class="content-layout">
               <div id="subjectContent" class="card content-main stack"></div>
               <div id="unitsNavBackdrop" class="units-nav-backdrop"></div>

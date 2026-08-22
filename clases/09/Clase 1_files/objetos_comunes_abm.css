@@ -1,0 +1,474 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*
+*** @objeto: ABM ( alta , baja y modificacion ) ***
+*/
+.solo-contenido { font-size: .7em;}
+
+/* Reset */
+.abm {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-weight: normal;
+}
+
+.abm strong { font-weight: bold; }
+
+.abm {
+    margin: 12px 0 22px;
+    padding: 20px 20px 14px;
+    border: 1px solid #dcdcdc;
+    background-color: #f5f5f5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+}
+.abm fieldset {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+/* Aplica borde a todos los fieldset dentro del form */
+.abm fieldset fieldset {
+    border: 1px solid #bdbdbd;
+    padding: 6px 8px;
+}
+
+/* Titulo del abm */
+.abm h6 {
+    margin: 0 0 26px;
+    padding: 0 0 10px 20%;
+    font-size: 1.25rem;
+    border-bottom: solid 1px #c1c1c1;
+    color: #535353;
+}
+
+/* Filas */
+
+.abm .line {
+    position: relative;
+    padding-bottom: 16px;
+}
+.abm .lineBox {
+    display: block;
+    border: 1px solid #eee;
+    margin: 4px 2%;
+    background: #f5f5f5;
+}
+
+
+/* Labels */
+
+.abm .label,
+.inputLabelText {
+    float: left;
+    width: 18%;
+    min-height: 26px;
+    padding: 2px 2% 0 0;
+    font-size: .875rem;
+    text-align: right;
+    color: #535353;
+}
+.abm .lineBox .label {
+    display:block;
+    float:none;
+    margin: 0;
+    padding: 3px 0;
+    width: 100%;
+    background-color:#eeeeee;
+    text-align:center;
+    font-weight: bold;
+}
+
+/* propiedas para el usuario  */
+.abm .line p.inputLabelText,
+.line p.inputLabelText {
+    margin: 2px 0 0;
+    padding: 0;
+    border-bottom: none;
+    width: auto;
+    max-width: 75%;
+    text-transform: none;
+    word-break: break-word;
+    overflow-wrap: break-word;
+ }
+
+/* campos opcionales y requeridos */
+.requerido .label, .requerido label { font-weight: bold; }
+.requerido .inputRadioGroup  label  { font-weight: normal; }
+
+/* ayuda */
+.help {
+    border-top: none;
+    padding: 5px 0 3px;
+    margin: 0 0 10px 20%;
+    clear: left;
+    font-size: .8em;
+}
+
+/* categoria publica */
+#div_info {
+    padding: 5px 0 10px 0;
+    clear: both;
+    font-size: .8em;
+    color: #646464;
+}
+
+/* general para los controles */
+.control {
+    box-sizing: border-box;
+    width: fit-content;
+    padding: 4px 10px;
+    font-family: 'Roboto', Sans-Serif;
+    font-size: .813rem;
+    color: #000000;
+}
+.inputFile { padding-left: 0; }
+
+/* campos no validos */
+/* ver si se siguen utilizando */
+.invalido { color: #C73333; }
+.invalido .label { font-weight: bold; color: #C73333; }
+/* quitamos el icono dentro del control */
+.invalido.control { border-color: #C73333; }
+/* --------------------------- */
+
+.invalid_reason {
+    margin-top: 3px;
+    margin-left: 20%;
+    font-size: .9rem;
+}
+
+/* tamanios de los inputs de texto */
+.inputTextCorto { width: 18%; }
+
+.inputPassword,
+.inputTextMediano { width: 50%; }
+
+.inputTextarea,
+.inputTextAncho,
+.inputTextLargo {
+    width: 80%;
+    border: 1px solid #bdbdbd;
+}
+
+/* colores de fondo por default */
+.inputPassword,
+.inputTextCorto,
+.inputTextMediano,
+.inputTextAncho,
+.inputTextLargo,
+.inputNumber,
+.selectSimple,
+.selectMultiple,
+.estado_select {
+    border: 1px solid #bdbdbd;
+    background-color: #ffffff;
+}
+
+/* rich text */
+.RichTextWrapper { float: left !important; }
+.RichTextWrapper { width: 80%; }
+
+/* checkbox y radios */
+.abm .labelCheckbox,
+.abm .labelRadio { vertical-align: middle; }
+
+/* labels a izquierda */
+.inputCheckbox, .inputRadio {
+    display: inline;
+    width: 18px;
+    height: 18px;
+    border: none;
+    vertical-align: middle;
+    accent-color: #007bff;
+}
+/* margenes para labels a derecha de checkbox y radios */
+.abm .labelCheckbox .inputCheckbox,
+.abm .labelRadio .inputRadio { margin: 0 6px 1px 0; }
+
+/* checkbox y radios con labels a izquierda */
+.abm .inputCheckbox,
+.abm .inputRadio { /*! margin-top: .3em; */ }
+
+/* select simples y multiples */
+.abm .selectSimple,
+.abm .selectMultiple {
+    width: 80%;
+    border: 1px solid #bdbdbd;
+}
+.ambito_categoria { float: left; width: 80%;}
+.inputOption { margin-left: 3px; }
+
+/* input para fechas */
+.inputDate {
+    width: fit-content;
+    padding-right: 26px;
+    background: #ffffff url(./../img/comunes/calendar.png) center right 2px no-repeat;
+    cursor: pointer;
+}
+.frontend input[class~= "inputDate"] {
+    border: 1px solid #bdbdbd;
+}
+.frontend .inputDate[disabled] { background-color: #ebebe4; }
+
+/* --- Grupos de checkbox y radios --- */
+/* Grupo de checkbox */
+.abm .inputCheckGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin: 0 0 8px;
+    border-color: #d9d9d9;
+    background-color: rgba(255, 255, 255, .18);
+}
+.abm .inputCheckGroup.horizontal {
+    align-items: center;
+    width: inherit;
+}
+.abm .inputCheckGroup.vertical { flex-direction: column; }
+
+/* Grupo de radios */
+.abm .inputRadioGroup {
+    clear: none;
+    width: auto;
+    padding: 10px 8px;
+}
+.abm .inputRadioGroup .labelRadio {
+    display: block;
+    margin: 0 0 8px;
+    padding: 0;
+}
+.abm .inputRadioGroup .labelRadio:last-child { margin: 0; }
+
+.abm .horizontal .labelRadio {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0;
+}
+.abm .inputRadioGroup.horizontal {
+    display: flex;
+    gap: 10px 12px;
+    flex-wrap: wrap;
+}
+.abm .horizontal .inputRadio { margin-right: 0; }
+
+
+/* control de condicion de abierto/cerrado utilizado en Foros */
+.ctrl_condicion {
+    list-style-type: none;
+    font-size: 0.8em;
+}
+.ctrl_condicion .inputRadio {
+    width: auto;
+}
+.ctrl_condicion .inputTextCorto {
+    width: 23%;
+    border-bottom: 1px solid #CCCCCC;
+    padding: 2px 0;
+}
+.ayuda_formato {
+    color: #8D8D8D;
+    font-size: 0.8em;
+    margin-top: 10px;
+    display: block;
+}
+
+/* Boton repositorio (solo se usa en archivos) */
+.inputInputRepositorio {
+    clear: none;
+    border: none;
+    float: left;
+    width: auto;
+}
+.inputInputRepositorio .nombre {
+    display: inline-block;
+}
+.inputInputRepositorio .nombre a {
+    display: block;
+    margin: 2px 0 0 0;
+    padding: 2px 10px;
+    background-color: white;
+    text-decoration: none;
+    color: #6A6A6A;
+}
+
+.inputInputRepositorio .nombre a:hover { text-decoration: underline; color: #000; }
+.inputInputRepositorio .nnombre a { display: block; overflow: hidden; width: 99%; }
+
+.repositorioButton, .RL {
+            display: inline-block;
+            border-radius: 3px;
+            padding: 7px 10px 8px;
+            border: none;
+            font-size: .9rem;
+            color: white;
+            background-color: #2766be;
+            text-decoration: none;
+            cursor: pointer;
+            transition-duration: .4s;
+            text-transform: capitalize;
+            min-height: 28px;
+            z-index: 90;
+}
+
+.repositorioButton:hover, .RL:hover {
+    background-color: rgba(52,131,250,.8);
+}
+
+/* submit */
+.abm .submit {
+    border: none;
+    position: relative;
+    margin: 12px 0 4px;
+    text-align: right;
+}
+.formulario-eliminar .inputButton,
+.abm .submit .control {
+    margin-top: 5px;
+    border: solid 1px;
+    border-color: #fff #BBB #BBB #fff;
+    padding: 4px 14px;
+    text-transform: capitalize;
+    font-size: .85rem;
+    background-color: #e0e0e0;
+    color: #464646;
+    cursor: pointer;
+}
+.abm .submit .control:hover {
+    border-color: #dadada;
+    color: #000;
+    background-color: #ffffff;
+}
+
+/* HACK:; separacion de parrafos de contenido tiny que se encuentren dentro de forms .abm */
+.abm .tiny_personalizado p {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+/* cantidad de eventos: FIXME - tiene que ir en calendario.css */
+.inputNumber { width: 9%; text-align: center }
+
+/* tooltips */
+.tooltip {
+    position: absolute;
+    right: -23%;
+    font-size: .7em;           /* le aplico el font-size porque esta dentro del body
+                                  no del formulario, ya que se cambia con javascript */
+    top: 0;
+    background-color: #FFFBCB;
+    border: 1px solid #96965E;
+    padding: .2em;
+    width: 17.5em;
+}
+.tooltip-button {
+    position: absolute;
+    top: 2px;
+    width: 16px;
+    height: 16px;
+    margin: 0 !important;
+    padding: 0 !important;
+    vertical-align: top;
+    background: url(../img/comunes/button-help.gif) 50% 50% no-repeat ;
+}
+.tooltip-fixed  { padding-top: 0; }
+.tooltip-button-over, .tooltip-fixed  { top: 1px; }
+.tooltip-fixed-tt { background-color: transparent; border: none; z-index: 98 !important; }
+
+p.aclaracion_field {
+    clear: both;
+    float: right;
+    font-size: 0.8em;
+    width: 80%;
+}
+p.aclaracion_submit {
+    display: block;
+    padding-left: 20%;
+    text-align: right;
+    font-size: 80%;
+    color: #8b8b8b;
+}
+
+/* Captcha */
+.wrapperCaptcha { float: left; width: 80% }
+.captchaAyuda { display: block; color: #646464; font-size: .8em; }
+img.captcha { vertical-align: middle }
+
+/* control selectMultiple (usado en mensajeria para seleccionar varios destinatarios */
+.selectMultipleControl {
+    float:left;
+    width: 80%;
+    vertical-align: top;
+}
+.selectMultipleWrapperButton {
+    float: left;
+    width: 18%;
+    padding: 3px 2% 0 0;
+    text-align: right;
+}
+.selectMultipleControl textarea.control { width: 100% }
+
+.selectMultipleButton, .selectMultipleControl .Aceptar {
+    padding: 3px 10px 4px;
+    border: solid 1px;
+    border-color: #ffffff #bbbbbb #bbbbbb #ffffff;
+    padding: 3px 18px 4px;
+    font-size: .875rem;
+    color: #464646;
+    background-color: #e0e0e0;
+    cursor: pointer;
+}
+.selectMultipleButton:hover, .selectMultipleControl .Aceptar:hover{ border-color: #DADADA; color: #000; background-color: #fff; }
+
+/* lista de usuarios con check */
+.users_check        { float: left; width: 80%; }
+.users_check ul     { list-style: none; margin: 0; padding: 0; }
+.users_check li     { margin-bottom: 5px; }
+
+
+/* ---------------
+   ABM Responsive
+   -------------- */
+@media screen and (max-width:650px) {
+    .abm h6 { padding: 8px 0 8px 0; }
+
+    .abm .label, .inputLabelText {
+        display: block;
+        width: auto;
+        float: none;
+        text-align: left;
+    }
+    .abm .selectSimple,
+    .abm .selectMultiple,
+    .inputTextarea,
+    .inputTextAncho,
+    .inputTextLargo,
+    .ambito_categoria,
+    .RichTextWrapper {
+        float: none;
+        width: 100%;
+    }
+    .help { margin-left: 0; }
+
+    .invalid_reason { margin-left: 0; }
+
+    p.aclaracion_field { width: 100% }
+
+
+    /* Redefinimos formularios.css por el responsive en ABM (front) */
+    .abm .formulario .row { flex-direction: column; }
+
+    .abm .formulario .row label {
+        width: auto;
+        text-align: left;
+    }
+    .abm .container_file_simple { width: 100%; }
+}
+

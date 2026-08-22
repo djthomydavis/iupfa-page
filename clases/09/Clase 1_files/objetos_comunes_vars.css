@@ -1,0 +1,106 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*
+    Variables comunes en todo el producto
+    Se pueden redefinir a nivel skin
+*/
+:root {
+
+    --theme-light-base: #ffffff;
+    --theme-dark-base: #000000;
+
+    --theme-success: #198654;
+    --theme-success-hover: #157347;
+    --theme-success-contrast: #ffffff;
+    --theme-warning: #ffc107;
+    --theme-warning-hover: #e0a800;
+    --theme-warning-contrast: #000000;
+    --theme-danger: #be2731;
+    --theme-danger-hover: #ae0d18;
+    --theme-danger-contrast: #ffffff;
+    --theme-info: #1c9adc;
+    --theme-info-hover: #1789c6;
+    --theme-info-contrast: #ffffff;
+    --theme-disabled: #757575;
+    --theme-disabled-hover: #646464;
+    --theme-disabled-contrast: #ffffff;
+
+    /* ----------
+       Tipografia
+       ---------- */
+    --theme-lineheight: 28px;
+
+    /* ----------------
+       Component Sizing
+       ---------------- */
+    --theme-component-height-sm: 30px;
+    --theme-component-height: 36px;
+    --theme-component-height-lg: 44px;
+
+    --theme-component-border-radius: 4px;
+    --theme-component-border-radius-lg: 8px;
+
+    /* --------------------
+       Shared Design Tokens
+       -------------------- */
+    /* Transitions */
+    --theme-transition-duration: .2s;
+    --theme-transition-timing: ease-in-out;
+
+    /* Focus states */
+    --theme-focus-shadow-mix: 40%;
+    --theme-focus-shadow-width: 2px;
+
+    /* Background mixing percentages */
+    --theme-label-bg-mix: 10%;   /* Labels and prominent elements */
+    --theme-bg-mix-subtle: 8%;   /* Containers and backgrounds */
+    --theme-bg-mix-soft: 4%;     /* Containers and backgrounds */
+    --theme-hover-mix: 6%;       /* Hover state tinting */
+
+    /* List hover color */
+    --theme-list-bg-color_hover: #f8fafc;
+
+    /* --------
+       Programa
+       -------- */
+    --theme-item-obligatorio-color: #dd3906;
+    --theme-item-obligatorio-color_hover: #c44135;
+
+    --theme-item-opcional-color: #5f9bdb;
+    --theme-item-opcional-color_hover: #528bc8;
+
+    --theme-item-aprobado-color: #14a568;
+    --theme-unidad-correlativa-color: #757575;
+    --theme-retomar-color: #0247a8;
+    --theme-error-color: #c40000;
+
+    /* -----------------
+       Colores en tablas
+       ----------------- */
+    --theme-desactivas: #ffe9c0;
+    --theme-correlativo: #e4fdfd;
+    --theme-verde: #e0ffe0;
+    --theme-amarillo: #FFFF99;
+
+    --theme-bgcolor-titulo: #666666;
+    --theme-txcolor-titulo: white;
+
+    --theme-bgcolor-columnas: #757575;
+    --theme-txcolor-columnas: #ffffff;
+    --theme-txcolor-columnas_hover: #ffcc00;
+
+    --theme-bgcolor-pie: #d9d9d9;
+    --theme-txcolor-pie: #666666;
+
+    --theme-bgcolor-linea: rgba(230, 230, 230, .94);
+    --theme-bgcolor-impar: rgba(128, 128, 128, .05);
+
+    /* -- Helpers -- */
+    --theme-filter-link: brightness(60%);
+    --theme-filter-link_hover: brightness(30%);
+}

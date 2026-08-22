@@ -1,0 +1,182 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   edu-system-message Component - Alert System
+   ==================================== */
+
+:root {
+    --edu-system-message-primary: var(--theme-primary);
+    --edu-system-message-primary-contrast: var(--theme-primary-contrast);
+    --edu-system-message-secondary: var(--theme-secondary);
+    --edu-system-message-secondary-contrast: var(--theme-secondary-contrast);
+    --edu-system-message-success: var(--theme-success);
+    --edu-system-message-success-contrast: var(--theme-success-contrast);
+    --edu-system-message-warning: var(--theme-warning);
+    --edu-system-message-warning-contrast: var(--theme-warning-contrast);
+    --edu-system-message-danger: var(--theme-danger);
+    --edu-system-message-danger-contrast: var(--theme-danger-contrast);
+    --edu-system-message-info: var(--theme-info);
+    --edu-system-message-info-contrast: var(--theme-info-contrast);
+}
+
+/* ====================================
+   Base Alert
+   ==================================== */
+
+.edu-system-message {
+    position: relative;
+    margin: 10px 0;
+    padding: 14px 16px;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border: 1px solid;
+    border-left: 4px solid;
+    color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
+}
+
+.edu-system-message a:not(.edu-btn) {
+    color: #2766be;
+    text-decoration: underline;
+    word-break: break-word;
+}
+
+.edu-system-message a:hover {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* ====================================
+   Alert Icons
+   ==================================== */
+
+.edu-system-message-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+/* ====================================
+   Alert Content
+   ==================================== */
+
+.edu-system-message-content {
+    flex: 1;
+    min-width: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.edu-system-message-title {
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+
+.edu-system-message-message {
+    margin: 0;
+}
+
+.edu-system-message-message:only-child {
+    margin-top: 0;
+}
+
+/* ====================================
+   Alert Size Modifier
+   ==================================== */
+
+.edu-system-message-sm {
+    margin: 5px 0;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    line-height: 1.2rem;
+}
+
+/* ====================================
+   Color Variants - Primary
+   ==================================== */
+
+.edu-system-message-primary {
+    border-color: var(--edu-system-message-primary);
+    background-color: color-mix(in srgb, var(--edu-system-message-primary) 10%, white);
+}
+
+.edu-system-message-primary .edu-system-message-icon {
+    color: var(--edu-system-message-primary);
+}
+
+/* ====================================
+   Color Variants - Secondary
+   ==================================== */
+
+.edu-system-message-secondary {
+    border-color: var(--edu-system-message-secondary);
+    background-color: color-mix(in srgb, var(--edu-system-message-secondary) 10%, white);
+}
+
+.edu-system-message-secondary .edu-system-message-icon {
+    color: var(--edu-system-message-secondary);
+}
+
+/* ====================================
+   Color Variants - Success
+   ==================================== */
+
+.edu-system-message-success {
+    border-color: var(--edu-system-message-success);
+    background-color: color-mix(in srgb, var(--edu-system-message-success) 10%, white);
+}
+
+.edu-system-message-success .edu-system-message-icon {
+    color: var(--edu-system-message-success);
+}
+
+/* ====================================
+   Color Variants - Warning
+   ==================================== */
+
+.edu-system-message-warning {
+    border-color: var(--edu-system-message-warning);
+    background-color: color-mix(in srgb, var(--edu-system-message-warning) 10%, white);
+}
+
+.edu-system-message-warning .edu-system-message-icon {
+    color: var(--edu-system-message-warning);
+}
+
+/* ====================================
+   Color Variants - Danger
+   ==================================== */
+
+.edu-system-message-danger {
+    border-color: var(--edu-system-message-danger);
+    background-color: color-mix(in srgb, var(--edu-system-message-danger) 10%, white);
+}
+
+.edu-system-message-danger .edu-system-message-icon {
+    color: var(--edu-system-message-danger);
+}
+
+/* ====================================
+   Color Variants - Info
+   ==================================== */
+
+.edu-system-message-info {
+    border-color: var(--edu-system-message-info);
+    background-color: color-mix(in srgb, var(--edu-system-message-info) 10%, white);
+}
+
+.edu-system-message-info .edu-system-message-icon {
+    color: var(--edu-system-message-info);
+}

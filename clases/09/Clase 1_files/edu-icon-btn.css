@@ -1,0 +1,214 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-ICON-BTN Component - Icon Buttons
+   ==================================== */
+
+:root {
+    --edu-icon-btn-primary: var(--theme-primary);
+    --edu-icon-btn-primary-hover: var(--theme-primary-hover);
+    --edu-icon-btn-primary-contrast: var(--theme-primary-contrast);
+
+    --edu-icon-btn-secondary: var(--theme-secondary);
+    --edu-icon-btn-secondary-hover: var(--theme-secondary-hover);
+    --edu-icon-btn-secondary-contrast: var(--theme-secondary-contrast);
+
+    --edu-icon-btn-success: var(--theme-success);
+    --edu-icon-btn-success-hover: var(--theme-success-hover);
+    --edu-icon-btn-success-contrast: var(--theme-success-contrast);
+
+    --edu-icon-btn-warning: var(--theme-warning);
+    --edu-icon-btn-warning-hover: var(--theme-warning-hover);
+    --edu-icon-btn-warning-contrast: var(--theme-warning-contrast);
+
+    --edu-icon-btn-danger: var(--theme-danger);
+    --edu-icon-btn-danger-hover: var(--theme-danger-hover);
+    --edu-icon-btn-danger-contrast: var(--theme-danger-contrast);
+
+    --edu-icon-btn-info: var(--theme-info);
+    --edu-icon-btn-info-hover: var(--theme-info-hover);
+    --edu-icon-btn-info-contrast: var(--theme-info-contrast);
+
+    --edu-icon-btn-font-size-sm: 14px;
+    --edu-icon-btn-font-size: 16px;
+    --edu-icon-btn-font-size-lg: 18px;
+
+    /* Size tokens - map to global theme */
+    --edu-icon-btn-size-sm: var(--theme-component-height-sm);
+    --edu-icon-btn-size: var(--theme-component-height);
+    --edu-icon-btn-size-lg: var(--theme-component-height-lg);
+
+    /* Border radius - map to global theme */
+    --edu-icon-btn-border-radius: var(--theme-component-border-radius);
+    --edu-icon-btn-border-radius-lg: var(--theme-component-border-radius-lg);
+
+}
+
+/* ====================================
+   Base Icon Button Styles
+   ==================================== */
+
+.edu-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+
+    width: var(--edu-icon-btn-size);
+    height: var(--edu-icon-btn-size);
+    padding: 0;
+    margin: 4px 2px;
+    border: none;
+    border-radius: var(--edu-icon-btn-border-radius);
+
+    font-size: var(--edu-icon-btn-font-size);
+    text-decoration: none;
+
+    cursor: pointer;
+    user-select: none;
+
+    background-color: transparent;
+    color: rgba(0, 0, 0, 0.54);
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                opacity var(--theme-transition-duration) var(--theme-transition-timing),
+                transform 0.1s ease-in-out,
+                box-shadow var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* Icon sizing */
+.edu-icon-btn i {
+    font-size: 1em;
+}
+
+/* Base states */
+.edu-icon-btn:hover:not(:disabled) {
+    background-color: rgba(0, 0, 0, 0.04);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn:disabled {
+    opacity: 0.26;
+    cursor: not-allowed;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+.edu-icon-btn-sm {
+    width: var(--edu-icon-btn-size-sm);
+    height: var(--edu-icon-btn-size-sm);
+    font-size: var(--edu-icon-btn-font-size-sm);
+}
+
+.edu-icon-btn-lg {
+    width: var(--edu-icon-btn-size-lg);
+    height: var(--edu-icon-btn-size-lg);
+    font-size: var(--edu-icon-btn-font-size-lg);
+}
+
+/* ====================================
+   Shape Variants
+   ==================================== */
+
+.edu-icon-btn-circle {
+    border-radius: 50%;
+}
+
+.edu-icon-btn-rounded {
+    border-radius: var(--edu-icon-btn-border-radius-lg);
+}
+
+/* ====================================
+   Color Variants
+   ==================================== */
+
+/* Primary */
+.edu-icon-btn-primary {
+    color: var(--edu-icon-btn-primary);
+}
+
+.edu-icon-btn-primary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-primary) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-primary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Secondary */
+.edu-icon-btn-secondary {
+    color: var(--edu-icon-btn-secondary);
+}
+
+.edu-icon-btn-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-secondary) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-secondary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Success */
+.edu-icon-btn-success {
+    color: var(--edu-icon-btn-success);
+}
+
+.edu-icon-btn-success:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-success) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-success:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-success) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Warning */
+.edu-icon-btn-warning {
+    color: var(--edu-icon-btn-warning);
+}
+
+.edu-icon-btn-warning:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-warning) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-warning:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-warning) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Danger */
+.edu-icon-btn-danger {
+    color: var(--edu-icon-btn-danger);
+}
+
+.edu-icon-btn-danger:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-danger) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-danger:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-danger) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Info */
+.edu-icon-btn-info {
+    color: var(--edu-icon-btn-info);
+}
+
+.edu-icon-btn-info:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-icon-btn-info) var(--theme-hover-mix), transparent);
+    transform: scale(1.05);
+}
+
+.edu-icon-btn-info:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-icon-btn-info) var(--theme-focus-shadow-mix), transparent);
+}
+

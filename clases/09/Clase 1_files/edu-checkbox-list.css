@@ -1,0 +1,139 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-FILTER Component - Collapsible Filter
+   ==================================== */
+
+:root {
+    /* Sizing */
+    --edu-checkbox-list-height: 34px;
+    --edu-checkbox-list-min-width: 150px;
+    --edu-checkbox-list-content-max-height: 200px;
+    --edu-checkbox-list-content-padding: 8px;
+
+    /* Typography */
+    --edu-checkbox-list-font-size: 14px;
+    --edu-checkbox-list-label-font-weight: 500;
+
+    /* Colors */
+    --edu-checkbox-list-primary: var(--theme-primary, #2766be);
+    --edu-checkbox-list-light: var(--theme-light-base, #ffffff);
+    --edu-checkbox-list-dark: var(--theme-dark-base, #333333);
+
+    /* Border */
+    --edu-checkbox-list-border-radius: var(--theme-component-border-radius, 4px);
+}
+
+/* ====================================
+   Base Styles - Generic Filter Component
+   ==================================== */
+
+/* Container */
+.edu-checkbox-list-component {
+    display: inline-flex;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    height: var(--edu-checkbox-list-height);
+    border: 1px solid var(--edu-checkbox-list-primary);
+    border-radius: var(--edu-checkbox-list-border-radius);
+    background-color: var(--edu-checkbox-list-light);
+    overflow: visible;
+}
+
+/* Label */
+.edu-checkbox-list-component .title.edu-checkbox-list-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 32px;
+    font-size: var(--edu-checkbox-list-font-size);
+    font-weight: var(--edu-checkbox-list-label-font-weight);
+    white-space: nowrap;
+    user-select: none;
+    background-color: color-mix(in srgb, var(--edu-checkbox-list-primary) 10%, var(--edu-checkbox-list-light));
+    color: var(--edu-checkbox-list-dark);
+    border-right: 1px solid var(--edu-checkbox-list-primary);
+    border-radius: var(--edu-checkbox-list-border-radius) 0 0 var(--edu-checkbox-list-border-radius);
+    flex-shrink: 0;
+}
+
+/* Dropdown button (created by JavaScript) */
+.edu-checkbox-list-component .selected {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 32px 0 12px;
+    height: 32px;
+    min-width: var(--edu-checkbox-list-min-width);
+    font-size: var(--edu-checkbox-list-font-size);
+    cursor: pointer;
+    position: relative;
+    flex: 1;
+    border-radius: 0 var(--edu-checkbox-list-border-radius) var(--edu-checkbox-list-border-radius) 0;
+}
+
+/* Arrow indicator for dropdown */
+.edu-checkbox-list-component .selected::after {
+    content: '\25BC';
+    position: absolute;
+    right: 12px;
+    font-size: 0.75em;
+    color: var(--edu-checkbox-list-primary);
+}
+
+/* Content dropdown */
+.edu-checkbox-list-component .content.edu-checkbox-list-content {
+    position: absolute;
+    top: 100%;
+    left: auto;
+    right: 0;
+    min-width: 200px;
+    padding: var(--edu-checkbox-list-content-padding);
+    max-height: var(--edu-checkbox-list-content-max-height);
+    overflow-y: auto;
+    background-color: var(--edu-checkbox-list-light);
+    border: 1px solid var(--edu-checkbox-list-primary);
+    border-radius: var(--edu-checkbox-list-border-radius);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 99;
+}
+
+/* ====================================
+   Checkbox Styles
+   ==================================== */
+
+.edu-checkbox-list-component .checkbox-list-parent .name {
+    font-weight: bold;
+    user-select: none;
+}
+
+.edu-checkbox-list-component .checkbox-list-child .name {
+    font-weight: normal;
+    user-select: none;
+}
+
+.checkbox-list-parent .name {
+    border-left: 3px solid var(--theme-primary)
+}
+
+.checkbox-list-child .name {
+    border-left: 5px
+}
+
+/* ====================================
+   JavaScript Hooks
+   ==================================== */
+
+/*
+ * The JavaScript in EduCheckboxList.js looks for:
+ * - .edu-checkbox-list-component (component container)
+ * - .title (for label/trigger)
+ * - .content (for collapsible content)
+ *
+ * This component is self-contained and doesn't depend on Base.js
+ */

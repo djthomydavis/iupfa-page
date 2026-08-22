@@ -1,0 +1,95 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*
+ * EducativaDraftIndicator - Chip flotante de borrador en progreso
+ *
+ */
+
+/* --------------
+   #Variables
+   -------------- */
+:root {
+    --edu_draft_indicator_bg: #064265;
+    --edu_draft_indicator_color: #ffffff;
+    --edu_draft_indicator_shadow: 0 3px 8px rgba(0, 0, 0, .22);
+    --edu_draft_indicator_hover_shadow: 0 5px 14px rgba(0, 0, 0, .3);
+}
+
+/* --------------
+   #Container
+   -------------- */
+.edu_draft_indicator {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 998;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 24px;
+    font-family: 'Roboto', sans-serif;
+    font-size: .875rem;
+    font-weight: 700;
+    color: var(--edu_draft_indicator_color);
+    background-color: var(--edu_draft_indicator_bg);
+    box-shadow: var(--edu_draft_indicator_shadow);
+    opacity: 0;
+    transform: translateY(14px) scale(.9);
+    transition: opacity .2s, transform .2s, box-shadow .2s;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* --------------
+   #States
+   -------------- */
+.edu_draft_indicator_visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.edu_draft_indicator:hover {
+    box-shadow: var(--edu_draft_indicator_hover_shadow);
+    transform: translateY(-2px) scale(1);
+}
+
+.edu_draft_indicator:active {
+    transform: translateY(0) scale(.98);
+}
+
+.edu_draft_indicator:focus-visible {
+    outline: 2px solid #4a90d9;
+    outline-offset: 2px;
+}
+
+/* --------------
+   #Icon
+   -------------- */
+.edu_draft_indicator i {
+    font-size: 1rem;
+}
+
+/* --------------
+   #Text
+   -------------- */
+.edu_draft_indicator_text {
+    white-space: nowrap;
+}
+
+/* --------------
+   #Responsive
+   -------------- */
+@media (max-width: 480px) {
+    .edu_draft_indicator {
+        right: 12px;
+        bottom: 80px;
+        padding: 10px 14px;
+    }
+}

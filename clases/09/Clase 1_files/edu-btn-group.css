@@ -1,0 +1,329 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-BTN-GROUP Component - Button Groups
+   ==================================== */
+
+:root {
+    --edu-btn-group-gap: 8px;
+    --edu-btn-group-gap-sm: 6px;
+    --edu-btn-group-gap-lg: 12px;
+    --edu-btn-group-gap-condensed: 0;
+}
+
+/* ====================================
+   Base Button Group Styles
+   ==================================== */
+
+.edu-btn-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--edu-btn-group-gap);
+    vertical-align: middle;
+}
+
+.edu-btn-group-block {
+    display: flex;
+    margin: 3px 0;
+}
+
+.edu-btn-group-margin {
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.edu-btn-group > .edu-btn,
+.edu-btn-group > .edu-icon-btn {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+/* ====================================
+   Spacing Variants
+   ==================================== */
+
+.edu-btn-group-condensed {
+    gap: var(--edu-btn-group-gap-condensed);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.edu-btn-group-condensed:not(.edu-btn-group-vertical) > .edu-btn,
+.edu-btn-group-condensed:not(.edu-btn-group-vertical) > .edu-icon-btn {
+    border-radius: 0;
+    border-left-width: 0;
+}
+.edu-btn-group-condensed.edu-btn-group-vertical > .edu-btn,
+.edu-btn-group-condensed.edu-btn-group-vertical > .edu-icon-btn {
+    border-radius: 0;
+    border-top-width: 0;
+}
+
+.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+}
+
+.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.edu-btn-group-condensed > .edu-btn:only-child,
+.edu-btn-group-condensed > .edu-icon-btn:only-child {
+    border-radius: 3px;
+}
+
+.edu-btn-group-tight {
+    gap: var(--edu-btn-group-gap-sm);
+}
+
+.edu-btn-group-loose {
+    gap: var(--edu-btn-group-gap-lg);
+}
+
+/* ====================================
+   Layout Variants
+   ==================================== */
+
+.edu-btn-group-vertical {
+    flex-direction: column;
+    align-items: stretch;
+    display: inline-flex;
+    width: auto;
+}
+
+.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 0;
+}
+
+.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+    border-top-right-radius: 0;
+}
+
+.edu-btn-group-wrap {
+    flex-wrap: wrap;
+}
+
+.edu-btn-group-fill {
+    display: flex;
+    width: 100%;
+}
+
+.edu-btn-group-fill > .edu-btn,
+.edu-btn-group-fill > .edu-icon-btn {
+    flex: 1;
+}
+
+/* ====================================
+   Alignment Modifiers
+   ==================================== */
+
+.edu-btn-group-start {
+    justify-content: flex-start;
+}
+
+.edu-btn-group-center {
+    justify-content: center;
+}
+
+.edu-btn-group-end {
+    justify-content: flex-end;
+}
+
+.edu-btn-group-justified {
+    justify-content: space-between;
+}
+
+.edu-btn-group-justified > .edu-btn,
+.edu-btn-group-justified > .edu-icon-btn {
+    flex: 1;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+.edu-btn-group-sm {
+    gap: var(--edu-btn-group-gap-sm);
+}
+
+.edu-btn-group-sm.edu-btn-group-condensed {
+    border-radius: 2px;
+}
+
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 2px;
+    border-bottom-left-radius: 2px;
+}
+
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-btn:only-child,
+.edu-btn-group-sm.edu-btn-group-condensed > .edu-icon-btn:only-child {
+    border-radius: 2px;
+}
+
+.edu-btn-group-sm.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-sm.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 0;
+}
+
+.edu-btn-group-sm.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-sm.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+    border-top-right-radius: 0;
+}
+
+.edu-btn-group-lg {
+    gap: var(--edu-btn-group-gap-lg);
+}
+
+.edu-btn-group-lg.edu-btn-group-condensed {
+    border-radius: 4px;
+}
+
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-btn:only-child,
+.edu-btn-group-lg.edu-btn-group-condensed > .edu-icon-btn:only-child {
+    border-radius: 4px;
+}
+
+.edu-btn-group-lg.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:first-child,
+.edu-btn-group-lg.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:first-child {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 0;
+}
+
+.edu-btn-group-lg.edu-btn-group-vertical.edu-btn-group-condensed > .edu-btn:last-child,
+.edu-btn-group-lg.edu-btn-group-vertical.edu-btn-group-condensed > .edu-icon-btn:last-child {
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-top-right-radius: 0;
+}
+
+/* ====================================
+   Responsive Behaviors
+   ==================================== */
+
+@media (max-width: 620px) {
+    .edu-btn-group-responsive {
+        flex-direction: column;
+        display: flex;
+        width: 100%;
+    }
+
+    .edu-btn-group-responsive > .edu-btn,
+    .edu-btn-group-responsive > .edu-icon-btn {
+        border-radius: 3px !important;
+        margin: 2px 0;
+    }
+
+    .edu-btn-group-responsive > .edu-btn:first-child,
+    .edu-btn-group-responsive > .edu-icon-btn:first-child,
+    .edu-btn-group-responsive > .edu-btn:last-child,
+    .edu-btn-group-responsive > .edu-icon-btn:last-child {
+        border-radius: 3px !important;
+    }
+
+    .edu-btn-group-condensed {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .edu-btn-group-condensed:not(.edu-btn-group-vertical) > .edu-btn,
+    .edu-btn-group-condensed:not(.edu-btn-group-vertical) > .edu-icon-btn {
+        width: 100%;
+        border-radius: 0;
+        border-left-width: var(--edu-btn-border-width);
+        border-top: 0;
+    }
+
+    .edu-btn-group-condensed > .edu-btn:first-child,
+    .edu-btn-group-condensed > .edu-icon-btn:first-child {
+        border-top-left-radius: 3px;
+        border-top-right-radius: 3px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .edu-btn-group-condensed > .edu-btn:last-child,
+    .edu-btn-group-condensed > .edu-icon-btn:last-child {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+        border-bottom-left-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+
+    .edu-btn-group-condensed > .edu-btn:only-child,
+    .edu-btn-group-condensed > .edu-icon-btn:only-child {
+        border-radius: 3px;
+    }
+}
+
+/* ====================================
+   Accessibility Enhancements
+   ==================================== */
+
+.edu-btn-group[role="group"] {
+    border: 1px solid transparent;
+}
+
+.edu-btn-group[role="group"]:focus-within {
+    outline: 2px solid rgba(0, 123, 255, 0.25);
+    outline-offset: 2px;
+}
+
+/* ====================================
+   Special Toolbar Variant
+   ==================================== */
+
+.edu-btn-group-toolbar {
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.edu-btn-group-toolbar > .edu-btn-group {
+    flex-shrink: 0;
+}
+
+.edu-btn-group-toolbar > .edu-btn,
+.edu-btn-group-toolbar > .edu-icon-btn {
+    border-radius: 3px;
+    margin: 0;
+}

@@ -1,0 +1,176 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+
+#actions .offset > *:last-child  { margin-right: 0; }
+#actions .offset > * { margin-bottom: 10px; }
+
+.action_item        { display: inline-block; vertical-align: middle; margin-right: 10px; color: #666; }
+.action_button      { display: inline-block; vertical-align: middle; }
+
+.action_item .title         { display: inline-block; vertical-align: middle; padding-right: 6px; font-size: .85em; font-weight: bold; }
+.action_item .title:after   { content: ':' }
+.action_item .content       { display: inline-block; vertical-align: middle; }
+
+.action_select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px;
+    margin-right: 10px;
+    border: solid 1px #cccccc;
+    border-radius: 2px;
+    font-size: .875rem;
+    color: #666666;
+    background-color: #ffffff;
+    cursor: pointer;
+}
+.action_select .remarcada { font-weight: bold; }
+
+.action_item.fselect .selected {
+    display: inline-block;
+    max-width: 150px;
+    padding: 7px 20px 7px 8px;
+    vertical-align: middle;
+}
+
+/* auditoria */
+.content.auditoria  { border: dotted 1px #666; padding: 5px; font-size: .85em; }
+
+/*************************
+*  LISTADO DE CATEGORIAS *
+*************************/
+.action_item.categorias { position: relative; }
+
+.combo_categorias { padding: 0; margin: 0; list-style: none; max-height: 180px; overflow: auto; }
+
+.fselect .combo_categorias li > * { display: inline-block ; padding: 0; }
+
+.combo_categorias .remarcada    { font-weight: bold; }
+
+.combo_categorias .normal a,
+.combo_categorias .remarcada a,
+.combo_categorias .remarcada span {
+    display: block;
+    padding: 6px;
+    text-decoration: none;
+    color: #666;
+}
+.combo_categorias .etiqueta     { background-image: none; padding-left: 5px; }
+.combo_categorias .etiqueta a   { display: inline-block; }
+
+.combo_categorias .normal:hover     { background-color: #0078d7; }
+.combo_categorias .normal:hover a   { color: #ffffff; }
+
+#actions .buscar:hover,
+.action_select:hover,
+.action_item.categorias .actual:hover { border-color: #999999; }
+
+/* webmail - categorias */
+.action_item.categorias .administrar_etiqueta        { display: inline-block; vertical-align: middle; color: #2766be; text-decoration: none; font-size: .85em; }
+.action_item.categorias .administrar_etiqueta:hover  { text-decoration: underline; }
+
+/* ---------------
+   BOTONES SIMPLES
+   --------------- */
+.action_button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 8px;
+    padding: 8px 14px;
+    font-size: .875rem;
+    text-decoration:none;
+    border: none;
+    border-radius: 4px;
+    color: #ffffff;
+    background-color: var(--theme-secondary);
+    background-position: 7px center;
+    background-repeat: no-repeat;
+    transition: background-color .4s;
+    cursor: pointer;
+}
+.action_button:hover {
+    outline: none;
+    background-color: var(--theme-secondary-hover);
+}
+.action_button:last-child { margin-right: 0; }
+
+.action_input.buscador {
+    padding: 7px 14px 7px 30px;
+}
+
+/* Con bullet */
+.bullet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 16px;
+    min-width: 8px;
+    padding: 0px 4px;
+    font-size: 0.75rem;
+    border-radius: 45px;
+    color: #ffffff;
+}
+.bullet.obligatorio { background-color: var(--theme-item-obligatorio-color); }
+
+.bullet.no-obligatorio { background-color: var(--theme-item-opcional-color); }
+
+/*sin iconos*/
+.action_button.no_icono { padding-left: 12px; }
+
+.action_button.destacado { background-color: var(--theme-primary); }
+
+.action_button.destacado:hover { background-color: var(--theme-primary-hover); }
+
+.action_button.azul { background-color: var(--theme-secondary); }
+
+.action_button.azul:hover { background-color: var(--theme-secondary-hover); }
+
+.action_button.no-show { display: none !important; }
+
+.action_button svg { font-size: .938rem; }
+
+/* Agregar */
+.action_button.agregar,
+.action_button.redactar,
+.action_button.enviar_mensaje_grupal,
+.action_button.enviar_mensaje_sms { background-color: var(--theme-primary); }
+
+.action_button.agregar:hover,
+.action_button.redactar:hover,
+.action_button.enviar_mensaje_grupal:hover,
+.action_button.enviar_mensaje_sms:hover { background-color: var(--theme-primary-hover); }
+
+/* Editar */
+.action_button.corregir,
+.action_button.realizar { background-color: var(--theme-primary); }
+
+.action_button.corregir:hover,
+.action_button.realizar:hover { background-color: var(--theme-primary-hover); }
+
+/*eliminar*/
+.action_button.eliminar:hover { background-color: #be2727 !important; }
+
+/*drive*/
+#action-button-share_btn.action_button.no_icono > svg { display: none; }
+#action-button-share_btn.action_button.shared > svg { display: inline-block; }
+
+/*aunque no es uno de los botones, se pone aca porque esta en el menu derecho*/
+#actions .action_item .buscar_back  { display: block; border: solid 1px #dedede; border-radius: 3px; padding: 0 5px 0 30px; background: url(../img/comunes/icon_search.jpg) no-repeat 8px center #ffffff; }
+#actions .action_item .buscar       { width: 100%; border: none; padding: 3px 0 4px; font-size: .85em; color: #666; }
+#actions .action_item .buscar:focus { outline: none;}
+
+/* Secciones sin menu */
+#section.sin_menu_secciones_aula .action_button:not(.zoom_out):not(.zoom_in) { display: inline-block; vertical-align: middle; margin: 0; }
+
+/* Combo filtro para PRG */
+#actions .offset .filtro_tipo {
+    display: inline-flex;
+    margin-bottom: 0;
+    padding: 0;
+    vertical-align: top;
+}

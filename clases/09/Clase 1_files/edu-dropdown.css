@@ -1,0 +1,393 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-DROPDOWN Component - Custom Dropdown with Links
+   ==================================== */
+
+:root {
+    /* Theme colors */
+    --edu-dropdown-light: var(--theme-light-base);
+    --edu-dropdown-dark: var(--theme-dark-base);
+
+    --edu-dropdown-primary: var(--theme-primary);
+    --edu-dropdown-primary-contrast: var(--theme-primary-contrast);
+    --edu-dropdown-secondary: var(--theme-secondary);
+    --edu-dropdown-secondary-contrast: var(--theme-secondary-contrast);
+
+    /* Background mixing */
+    --edu-dropdown-item-hover-mix: 5%;
+
+    /* Typography */
+    --edu-dropdown-font-size-sm: 14px;
+    --edu-dropdown-font-size: 16px;
+    --edu-dropdown-font-size-lg: 18px;
+
+    /* Sizing */
+    /* Height tokens - map to global theme */
+    --edu-dropdown-height-sm: var(--theme-component-height-sm);
+    --edu-dropdown-height: var(--theme-component-height);
+    --edu-dropdown-height-lg: var(--theme-component-height-lg);
+
+    --edu-dropdown-padding-x-sm: 10px;
+    --edu-dropdown-padding-x: 12px;
+    --edu-dropdown-padding-x-lg: 16px;
+
+    --edu-dropdown-padding-right-sm: 28px;
+    --edu-dropdown-padding-right: 32px;
+    --edu-dropdown-padding-right-lg: 36px;
+
+    --edu-dropdown-min-width: 120px;
+
+    /* Visual design */
+    --edu-dropdown-border-width: 1px;
+
+    /* Border radius - map to global theme */
+    --edu-dropdown-border-radius: var(--theme-component-border-radius);
+
+    --edu-dropdown-arrow-size: 0.75em;
+
+    /* Dropdown menu */
+    --edu-dropdown-menu-max-height: 300px;
+    --edu-dropdown-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ====================================
+   Base Styles
+   ==================================== */
+
+.edu-dropdown {
+    display: inline-flex;
+    position: relative;
+}
+
+.edu-dropdown-wrapper {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    min-width: var(--edu-dropdown-min-width);
+    flex: 1;
+}
+
+.edu-dropdown-toggle {
+    display: inline-flex;
+    align-items: center;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 0 var(--edu-dropdown-padding-right) 0 var(--edu-dropdown-padding-x);
+    height: var(--edu-dropdown-height);
+    border: var(--edu-dropdown-border-width) solid transparent;
+    border-radius: var(--edu-dropdown-border-radius);
+    box-sizing: border-box;
+    font-size: var(--edu-dropdown-font-size);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                border-color var(--theme-transition-duration) var(--theme-transition-timing),
+                box-shadow var(--theme-transition-duration) var(--theme-transition-timing);
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    gap: 6px;
+}
+
+.edu-dropdown-wrapper::after {
+    content: '\25BC';
+    position: absolute;
+    right: var(--edu-dropdown-padding-x);
+    pointer-events: none;
+    font-size: var(--edu-dropdown-arrow-size);
+    transition: transform var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* Rotate arrow when open */
+.edu-dropdown.edu-dropdown-open .edu-dropdown-wrapper::after {
+    transform: rotate(180deg);
+}
+
+/* ====================================
+   Label Styles
+   ==================================== */
+
+.edu-dropdown-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--edu-dropdown-padding-x);
+    height: var(--edu-dropdown-height);
+    font-size: var(--edu-dropdown-font-size-sm);
+    white-space: nowrap;
+    user-select: none;
+    border: var(--edu-dropdown-border-width) solid transparent;
+    border-radius: var(--edu-dropdown-border-radius) 0 0 var(--edu-dropdown-border-radius);
+    border-right: none;
+    box-sizing: border-box;
+    gap: 6px;
+}
+
+/* With label: toggle gets right radius and no left border */
+.edu-dropdown:has(.edu-dropdown-label) .edu-dropdown-toggle {
+    border-radius: 0 var(--edu-dropdown-border-radius) var(--edu-dropdown-border-radius) 0;
+    border-left: none;
+}
+
+/* ====================================
+   Dropdown Menu
+   ==================================== */
+
+.edu-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 2px;
+    background-color: var(--edu-dropdown-light);
+    border: var(--edu-dropdown-border-width) solid transparent;
+    border-radius: var(--edu-dropdown-border-radius);
+    box-shadow: var(--edu-dropdown-menu-shadow);
+    max-height: var(--edu-dropdown-menu-max-height);
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    list-style: none;
+    margin: 2px 0 0 0;
+    padding: 0;
+    min-width: 100%;
+    max-width: 400px;
+    width: max-content;
+}
+
+.edu-dropdown.edu-dropdown-open .edu-dropdown-menu {
+    display: block;
+}
+
+.edu-dropdown-item {
+    margin: 0;
+    padding: 0;
+}
+
+.edu-dropdown-link {
+    display: flex;
+    align-items: center;
+    padding: 0 var(--edu-dropdown-padding-x);
+    height: var(--edu-dropdown-height);
+    font-size: var(--edu-dropdown-font-size);
+    color: var(--edu-dropdown-dark);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    gap: 6px;
+    max-width: 100%;
+}
+
+.edu-dropdown-link:hover {
+    text-decoration: none;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+/* Small */
+.edu-dropdown-sm .edu-dropdown-label {
+    padding: 0 var(--edu-dropdown-padding-x-sm);
+    height: var(--edu-dropdown-height-sm);
+    font-size: 12px;
+}
+
+.edu-dropdown-sm .edu-dropdown-toggle {
+    padding: 0 var(--edu-dropdown-padding-right-sm) 0 var(--edu-dropdown-padding-x-sm);
+    height: var(--edu-dropdown-height-sm);
+    font-size: var(--edu-dropdown-font-size-sm);
+}
+
+.edu-dropdown-sm .edu-dropdown-wrapper::after {
+    right: var(--edu-dropdown-padding-x-sm);
+}
+
+.edu-dropdown-sm .edu-dropdown-link {
+    padding: 0 var(--edu-dropdown-padding-x-sm);
+    height: var(--edu-dropdown-height-sm);
+    line-height: var(--edu-dropdown-height-sm);
+    font-size: var(--edu-dropdown-font-size-sm);
+}
+
+/* Large */
+.edu-dropdown-lg .edu-dropdown-label {
+    padding: 0 var(--edu-dropdown-padding-x-lg);
+    height: var(--edu-dropdown-height-lg);
+    font-size: var(--edu-dropdown-font-size);
+}
+
+.edu-dropdown-lg .edu-dropdown-toggle {
+    padding: 0 var(--edu-dropdown-padding-right-lg) 0 var(--edu-dropdown-padding-x-lg);
+    height: var(--edu-dropdown-height-lg);
+    font-size: var(--edu-dropdown-font-size-lg);
+}
+
+.edu-dropdown-lg .edu-dropdown-wrapper::after {
+    right: var(--edu-dropdown-padding-x-lg);
+}
+
+.edu-dropdown-lg .edu-dropdown-link {
+    padding: 0 var(--edu-dropdown-padding-x-lg);
+    height: var(--edu-dropdown-height-lg);
+    line-height: var(--edu-dropdown-height-lg);
+    font-size: var(--edu-dropdown-font-size-lg);
+}
+
+/* ====================================
+   Color Variants
+   ==================================== */
+
+/* Primary - Solid variant */
+.edu-dropdown-primary .edu-dropdown-toggle {
+    background-color: var(--edu-dropdown-primary);
+    color: var(--edu-dropdown-primary-contrast);
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-primary .edu-dropdown-wrapper::after {
+    color: var(--edu-dropdown-primary-contrast);
+}
+
+.edu-dropdown-primary .edu-dropdown-toggle:hover {
+    background-color: var(--theme-primary-hover);
+    border-color: var(--theme-primary-hover);
+}
+
+.edu-dropdown-primary .edu-dropdown-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-dropdown-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-dropdown-primary .edu-dropdown-label {
+    background-color: color-mix(in srgb, var(--edu-dropdown-primary) var(--theme-label-bg-mix), var(--edu-dropdown-light));
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-primary .edu-dropdown-menu {
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-primary .edu-dropdown-link:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-primary) var(--edu-dropdown-item-hover-mix), var(--edu-dropdown-light));
+}
+
+/* Secondary - Solid variant */
+.edu-dropdown-secondary .edu-dropdown-toggle {
+    background-color: var(--edu-dropdown-secondary);
+    color: var(--edu-dropdown-secondary-contrast);
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-secondary .edu-dropdown-wrapper::after {
+    color: var(--edu-dropdown-secondary-contrast);
+}
+
+.edu-dropdown-secondary .edu-dropdown-toggle:hover {
+    background-color: var(--theme-secondary-hover);
+    border-color: var(--theme-secondary-hover);
+}
+
+.edu-dropdown-secondary .edu-dropdown-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-dropdown-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-dropdown-secondary .edu-dropdown-label {
+    background-color: color-mix(in srgb, var(--edu-dropdown-secondary) var(--theme-label-bg-mix), var(--edu-dropdown-light));
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-secondary .edu-dropdown-menu {
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-secondary .edu-dropdown-link:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-secondary) var(--edu-dropdown-item-hover-mix), var(--edu-dropdown-light));
+}
+
+/* ====================================
+   Color Variants - Outline Dropdowns
+   ==================================== */
+
+/* Outline Primary */
+.edu-dropdown-outline-primary .edu-dropdown-toggle {
+    background-color: var(--edu-dropdown-light);
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-wrapper::after {
+    color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-toggle:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-primary) var(--theme-hover-mix), var(--edu-dropdown-light));
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-dropdown-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-label {
+    background-color: color-mix(in srgb, var(--edu-dropdown-primary) var(--theme-label-bg-mix), var(--edu-dropdown-light));
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-menu {
+    border-color: var(--edu-dropdown-primary);
+}
+
+.edu-dropdown-outline-primary .edu-dropdown-link:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-primary) var(--edu-dropdown-item-hover-mix), var(--edu-dropdown-light));
+}
+
+/* Outline Secondary */
+.edu-dropdown-outline-secondary .edu-dropdown-toggle {
+    background-color: var(--edu-dropdown-light);
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-wrapper::after {
+    color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-toggle:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-secondary) var(--theme-hover-mix), var(--edu-dropdown-light));
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-dropdown-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-label {
+    background-color: color-mix(in srgb, var(--edu-dropdown-secondary) var(--theme-label-bg-mix), var(--edu-dropdown-light));
+    color: var(--edu-dropdown-dark);
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-menu {
+    border-color: var(--edu-dropdown-secondary);
+}
+
+.edu-dropdown-outline-secondary .edu-dropdown-link:hover {
+    background-color: color-mix(in srgb, var(--edu-dropdown-secondary) var(--edu-dropdown-item-hover-mix), var(--edu-dropdown-light));
+}

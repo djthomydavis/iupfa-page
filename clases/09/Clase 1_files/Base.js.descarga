@@ -1,0 +1,3224 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/** @namespace Framework e-ducativa */
+var Educativa = new Object;
+
+/**
+ *  Sirve para implementar el patron Observable. Es una clase abstracta, debe ser heredada.
+ *  @class
+ *  */
+Educativa.Observable = Class.create(
+/** @lends Educativa.Observable# */
+{
+    observe : function(event, action){
+        if ( Object.isUndefined( this._listeners ) )
+            this._listeners = {};
+        (this._listeners[event] = this._listeners[event] || []).push( action );
+        return this;
+    },
+    fire : function( event, memo)
+    {
+        if ( Object.isUndefined( this._listeners )
+          || Object.isUndefined(this._listeners[event]) ) return;
+
+        var listeners = this._listeners[event];
+
+        for( var i=0; i < listeners.length; i++ )
+            listeners[i]( this, memo );
+
+        return this;
+    }
+});
+
+Educativa.Control = Class.create(Educativa.Observable,
+/** @lends Educativa.Control#  */
+{
+    /**
+    Clase base para los controles del formulario
+    @deprecated en lo posible <span style="color:red;font-weight:bold;">NO UTILIZAR</span> en nuevos desarrollos.
+    @constructs
+    @extends Educativa.Observable
+    */
+    initialize : function(id){
+       this.element = this.element || $(id);
+
+       // indexo los controles para la funcion E() del prototype
+       if (this.element) Educativa.Control.Objects[ id || this.element.identify() ] = this;
+    }
+});
+
+Educativa.Control.Objects = {};
+
+/**
+ * La clase Elemento forma parte del DOM y es aumentada mediante prototype (y Educativa).
+ * Aqui se documentan solo las funciones que agrega Educativa.
+ * @name Element
+ * @class */
+Element.addMethods( {
+    /** Alias de {@link Element#control}
+        @memberOf Element# */
+    E : function(element) {
+        return Educativa.Control.Objects[element.id]
+    },
+    /** Devuelve la instancia de {@link Educativa.Control} asociada al objeto.
+        @memberOf Element# */
+    control : function(element){
+        return Educativa.Control.Objects[element.id]
+    }
+} );
+
+Educativa.Control.OverlayedDialog = Class.create(
+/** @lends Educativa.Control.OverlayedDialog# */
+{
+    options : {
+        title : '',
+        content: '',
+        width : false,
+        height: false,
+        min : 0,
+        max : 100
+    },
+    /** @constructs */
+    initialize : function(options)
+    {
+        Object.extend( this.options, options );
+
+        var dg = this.element = new Element('div', { className : 'overlayed-dialog' });
+
+        $('main').insert({before: dg});
+
+        dg.hide();
+
+        dg.update(
+            '<div class="overlayed-dialog-title"></div>' +
+            '<div class="overlayed-dialog-content"></div>'
+        );
+
+        this._title   = this.element.down();
+        this._content = this.element.down().next();
+
+        this.refresh();
+
+    },
+    refresh : function(){
+        this.setContent(this.options.content);
+        this.setTitle(this.options.title);
+        this.element.setStyle({width:'', height : ''});
+
+        this.setWidth(this.options.width ? this.options.width : this.element.getWidth() );
+        this.setHeight(this.options.height ? this.options.height : this.element.getHeight() );
+    },
+    show : function()
+    {
+        this.lb = new lightbox( this.element.identify() );
+        this.lb.activate()
+        // $('contenedor').scrollTo();
+    },
+    hide : function()
+    {
+        this.lb.deactivate()
+        this.element.hide();
+  },
+    setTitle : function(title)
+    {
+        this._title.update(this.options.title = title);
+    },
+    setContent: function(content)
+    {
+        this._content.update(this.options.content = content);
+    },
+    setWidth : function(w)
+    {
+        this.element.setStyle({width:w+'px',
+            left:((document.viewport.getDimensions().width-w)/2)+'px'});
+    },
+    setHeight : function(h)
+    {
+        this.element.setStyle({height:h+'px',
+            top:((document.viewport.getDimensions().height-h)/2)+'px'});
+    }
+});
+
+
+/** @namespace  Funciones utiles */
+Educativa.Utils = {
+  disable_input_file_keypress : function(){
+    $$('input[type="file"]').invoke('observe','keydown',function(e){
+        if ( e.keyCode != 9 ) Event.stop(e)
+    });
+  },
+
+  /** Quita los tags html de un string */
+  quitar_html_tags : function(str){
+    var letters = str.split('');
+    var estado = ''; //posibles estados: ''|tag|string
+    var quote = '';
+    var new_str = '';
+    for ( var j=0; j < letters.length; ++j){
+        var c = letters[j];
+        switch( estado ){
+            case '':
+                if( c == '<') estado = 'tag';
+                else new_str += c;
+                break;
+            case 'tag':
+               if( c.match(/[\'\"]/) ){ /* ' // para que no me rompa el ue */
+                    estado = 'string';
+                    quote = c;
+                }
+                if( c == '>' ) estado = '';
+                break;
+            case 'string':
+                if( c == quote) estado = 'tag';
+                break;
+            default:
+                alert("epa epa!");
+                break;
+        }
+
+    }
+    return new_str;
+  },
+
+  /** is_empty_str
+  Chequea si es un string vacio
+
+  Param: String str : el string a ser evaluado
+
+  Returns: Boolean. True == es string vacio
+
+  */
+  is_empty_str: function (str){
+
+    var result = true;
+
+    if(str){
+      // si se pasa un numero, lo trata como string
+      result = (str.toString().trim().length == 0);
+
+    }
+
+    return result;
+  },
+
+  /** html_is_empty
+  Chequea si un string de HTML se considera vacio
+
+  Los tags se consideran invisibles (<tag></tag> == "")
+
+  Param: String str : el string a ser evaluado
+
+  Param: String tagsPermitidos OPCIONAL: Se indican los Tags que se quiere considerar como contenido
+
+  Returns: Boolean. True == HTML Vacio
+
+  Por default los Tags: iframe|object|img|embed|video se consideran como contenido valido.
+  */
+  html_is_empty: function (str,tagsPermitidos){
+
+    //tags que son considerados como contenido
+    tagsPermitidos = tagsPermitidos || 'iframe|object|img|embed|video|audio';
+    const pattern = new RegExp ('<(?:'+ tagsPermitidos + ')[^>]*>');
+    if( pattern.test(str) ) return false;
+
+    str = str.replace(/&nbsp;/g,'');
+    const letters = str.substring(0,1000).split('');
+    let estado = ''; //posibles estados: ''|tag|string
+    let quote = '';
+
+    for ( let j=0; j < letters.length; ++j){
+        let c = letters[j];
+        switch( estado ){
+            case '':
+                if( c == '<') estado = 'tag';
+                else if( ! c.match(/\s/) ){
+                    return false;
+                };
+                break;
+            case 'tag':
+                if( c.match(/['"]/) ){
+                    estado = 'string';
+                    quote = c;
+                }
+                if( c == '>' ) estado = '';
+                break;
+            case 'string':
+                if( c == quote) estado = 'tag';
+                break;
+            default:
+                alert("epa epa!");
+                break;
+        }
+    }
+    return true;
+  },
+
+  /**
+   * Reemplaza los caracteres (&, <, >, ", ') por sus entidades correspondientes
+   *
+   * @method     escapeHtml
+   *
+   * @param      {String}       string     Texto a escapar
+   *
+   * @return     {String}       Texto escapado
+   */
+  escapeHTML: function (string) {
+    return string
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  },
+
+  disable_links : function(element){
+    $(element).select("a").each(function(item){
+        item.observe('click', function(e){
+            e.stop();
+            alert( Educativa.Dict.LINKS_DESACTIVADOS_EN_LA_PREVISUALIZACION.capitalize());
+            return true;
+        });
+        item.writeAttribute({title: item.readAttribute('href')});
+        item.removeAttribute("href");
+        item.setStyle({ textDecoration: 'underline' });
+    });
+  },
+
+  uri_split : function(uri){
+    var a = uri.match( /(?:([^:/?#]+):)?(?:\/\/([^\/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?/ );
+    return { scheme : a[1], authority : a[2], path : a[3], query : a[4], fragment : a[5] };
+  },
+
+  is_uri : function(value){
+    if( ! value ) return false;
+    //if( value.match(/[^a-z0-9\:\/\?\#\[\]\@\!\$\&\'\(\)\*\+\,\;\=\.\-\_\~\%]/i ) ) return false; //ver bug 5727
+    if( value.match(/%[^0-9a-f]/i ) ) return false;
+    if( value.match(/%[0-9a-f](:?[^0-9a-f]|$)/i ) ) return false;
+
+    // from RFC 3986
+    var uri = Educativa.Utils.uri_split( value );
+
+    if( ! uri.authority ) return false;
+    if( uri.authority.match(/\s/) ) return false;
+
+    // scheme and path are required, though the path can be empty
+    if ( !(uri.scheme != null && uri.scheme.length && uri.path != null) ) return false;
+
+    // if authority is present, the path must be empty or begin with a /
+    var slash_re = new RegExp( "^/" );
+    if(uri.authority != null  && uri.authority.length )
+    {
+        if( !( uri.path.length == 0 || uri.path.match(slash_re ) ) ) return false;
+        // el authority de las urls debe comenzar con una letra o numero
+        if( uri.scheme == 'http' && !uri.authority.match(/^[a-zA-Z0-9]/) ) return false;
+    }
+    else
+    {   // if authority is not present, the path must not start with //
+        if ( uri.path.match(slash_re) ) return false;
+    }
+
+    // scheme must begin with a letter, then consist of letters, digits, +, ., or -
+    if (! uri.scheme.toLowerCase().match('^[a-z][a-z0-9\+\-\.]*$') ) return false;
+
+    return true;
+  },
+
+  is_web_uri : function(value){
+    if ( !value.match( '^https?://' ) ){
+      return;
+    }
+    return Educativa.Utils.is_uri( value );
+  },
+
+  cleanCommentOnPasteFromWord : function (str) {
+    var results = '';
+    str = str.replace(/endif\]--> &lt;!--/ig, '[endif]--> <!--')
+             .replace(/--&gt; <!--\[if/ig, '--> <!--[if' )
+             .replace(/(accept-charset)\s*=\s*[\"\'].*?[\"\']/gi, "");
+
+   try {
+        HTMLParser( str , {
+          start: function( tag, attrs, unary )
+          {
+            results += "<" + tag;
+            for ( var i = 0; i < attrs.length; i++ )
+              results += " " + attrs[i].name + '="' + attrs[i].escaped + '"';
+            results += (unary ? "/" : "") + ">";
+          },
+          end: function( tag )
+          {
+            results += "</" + tag + ">";
+          },
+          chars: function( text )
+          {
+            results += text;
+          },
+          comment: function( text ) {}
+        });
+    }catch(e){
+        alert(Educativa.Dict.translate('CONTENIDO_INVALIDO_PREVISUALIZACION'));
+    }
+
+    return results;
+  },
+
+  dateFormat: function( fecha ) {
+      return Educativa.Utils.dateFormatDate(fecha)+' '+Educativa.Utils.dateFormatTime(fecha);
+  },
+
+  dateFormatDate: function( fecha ) {
+      var mes = (fecha.getMonth()+1);
+      var dia = fecha.getDate();
+      return (dia<10?'0'+dia:dia)+'/'+(mes<10?'0'+mes:mes)+'/'+fecha.getFullYear();
+  },
+
+  dateFormatTime: function( fecha ) {
+      var hora = fecha.getHours();
+      var minuto = fecha.getMinutes();
+      return (hora<10?'0'+hora:hora)+':'+(minuto<10?'0'+minuto:minuto);
+  },
+
+  /** Retorna el nombre del dia de la semana de una fecha.
+      El invocador es responsable de cargar las traducciones de los terminos al javascript */
+  dateFormatDayName: function( fecha ) {
+      var dias = {
+        0 : 'DOMINGO',
+        1 : 'LUNES',
+        2 : 'MARTES',
+        3 : 'MIERCOLES',
+        4 : 'JUEVES',
+        5 : 'VIERNES',
+        6 : 'SABADO'
+      };
+
+      return dias[fecha.getDay()].term();
+  },
+
+  /** Retorna el nombre del mes de una fecha, si se pasa el string 'short' en modo, usa nombres cortos para los meses.
+      El invocador es responsable de cargar las traducciones de los terminos al javascript */
+  dateFormatMonthName: function( fecha, modo ) {
+      var meses = {
+        0 : 'ENERO',
+        1 : 'FEBRERO',
+        2 : 'MARZO',
+        3 : 'ABRIL',
+        4 : 'MAYO',
+        5 : 'JUNIO',
+        6 : 'JULIO',
+        7 : 'AGOSTO',
+        8 : 'SEPTIEMBRE',
+        9 : 'OCTUBRE',
+        10 : 'NOVIEMBRE',
+        11 : 'DICIEMBRE'
+      };
+
+      var mes = meses[fecha.getMonth()];
+
+      if ( modo == 'short' ) mes += '_SHORT';
+
+      return mes.termcap();
+  },
+
+  /** @param date Toma una fecha en formato '2010 10 31 14 05' (esto seria 2010/10/31 14:05) */
+  parseDate: function(date){
+    var arr = date.split(/ /);
+    return new Date( arr[0], arr[1]-1, arr[2], arr[3], arr[4]);
+  },
+
+  /** Retorna una "DeepCopy" del objeto que deseamos, es decir, retorna una copia completa del objeto
+      incluyendo sus propiedades  (Utilizado en el modulo de inscripcion) */
+  deepCopy:function(obj){
+    if (Object.prototype.toString.call(obj) === '[object Array]') {
+        var out = [], i = 0, len = obj.length;
+        for ( ; i < len; i++ ) {
+            out[i] = arguments.callee(obj[i]);
+        }
+        return out;
+    }
+    if (typeof obj === 'object') {
+        var out = {}, i;
+        for ( i in obj ) {
+            out[i] = arguments.callee(obj[i]);
+        }
+        return out;
+    }
+    return obj;
+  },
+
+  /** Genera un id correspondiente al mail que se esta enviando
+    @param lenght  la longitud del id
+    @return {string}  el id de lenght caracteres , undef en caso de error
+  */
+  generar_id: function(cant){
+      var list = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      return $R(1,cant).map(function(){
+          return list.charAt( Math.floor(Math.random() * (list.length + 1)) );
+      }).join('');
+  },
+
+  /**
+   *  Determina si un elemento esta visible en un contenedor scrolleable
+   *  @param element el elemento a verificar. Debe ser hijo de scrollParent
+   *  @param scrollParent debe ser un contenedor scroleable (overflow auto).
+   *  @return {Bool} Indica se encuentra o no visible
+   */
+  isInScrollView: function(element, scrollParent) {
+      return (element.offsetTop + element.getHeight() > scrollParent.scrollTop+ scrollParent.getHeight())
+             || (element.offsetTop < scrollParent.scrollTop);
+  },
+
+  /** reemplaza \n por &lt;br/&gt; */
+  ln2br: function( s ) {
+    while (s.indexOf("\n") > -1)
+        s = s.replace("\n","<br />");
+    return s;
+  },
+
+  is_date: function(fecha) {
+    const valid_format = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+
+    if ( fecha != '' ) {
+        if ( ! valid_format.test( fecha ) ) {
+            return false;
+        } else {
+            const dmy = fecha.split("/");
+            const date = new Date( dmy[2], dmy[1]-1, dmy[0] );
+
+            if ( date.getDate() != dmy[0] || date.getMonth()+1 != dmy[1] || date.getFullYear() != dmy[2] ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    return false;
+  },
+
+  /**
+   *  Determina si una direccion de email es valida
+   *  @param email la direccion a verificar.
+   *  @return {Bool} Indica si es valida o no
+   */
+  is_email : function(email){
+    var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{1,}))$/;
+    var s = re.test(email);
+    return s;
+  },
+
+  /**
+   *  Determina si una clave es valida
+   *  @param {Object} args
+   *      {String} clave: clave a verificar
+   *      {String} user: id de usuario
+   *      {Int}    passwd_len: largo minimo de la clave
+   *      {Bool}   confirmacion: indica si es necesario reingresar correctamente la clave
+   *      {String} clave_confirmacion: clave reigresada
+   *
+   *  @return {String} Devuelve el error si es que existe, si no devuelve el string vacio
+   */
+  validar_clave: function(args) {
+
+        let error_validacion = args.error_validacion ?? 'REQUISITOS_CLAVE';
+      if (! args.clave) {
+          return Dict.termcap('CAMPO_OBLIGATORIO').interpolate({ nombre_campo: 'clave'});
+        }
+
+        if (args.confirmacion && args.clave !== args.clave_confirmacion) {
+            return Dict.termcap('LA_CLAVE_Y_SU_VERIFICACION_NO_COINCIDEN');
+        }
+
+        if (args.clave.length < args.passwd_len) {
+            return Dict.termcap('LA_CLAVE_DEBE_CONTENER_AL_MENOS_N_CARACTERES').interpolate({ cant: args.passwd_len });
+        }
+        if (! args.passwd_valid_chars.test( args.clave )) {
+            return Dict.term(error_validacion).interpolate({ cant: args.passwd_len });
+        }
+
+    return '';
+  },
+
+  valida_id_usuario: function(id){
+      return id.length >= 3 && id.length <= 30 && /^[a-z0-9_@\-][a-z0-9_@.\-]*$/.test(id);
+  },
+
+  defaultDiacriticsRemovalMap: [
+      {'base':'A', 'letters':/[\u0041\u24B6\uFF21\u00C0\u00C1\u00C2\u1EA6\u1EA4\u1EAA\u1EA8\u00C3\u0100\u0102\u1EB0\u1EAE\u1EB4\u1EB2\u0226\u01E0\u00C4\u01DE\u1EA2\u00C5\u01FA\u01CD\u0200\u0202\u1EA0\u1EAC\u1EB6\u1E00\u0104\u023A\u2C6F]/g},
+      {'base':'E', 'letters':/[\u0045\u24BA\uFF25\u00C8\u00C9\u00CA\u1EC0\u1EBE\u1EC4\u1EC2\u1EBC\u0112\u1E14\u1E16\u0114\u0116\u00CB\u1EBA\u011A\u0204\u0206\u1EB8\u1EC6\u0228\u1E1C\u0118\u1E18\u1E1A\u0190\u018E]/g},
+      {'base':'I', 'letters':/[\u0049\u24BE\uFF29\u00CC\u00CD\u00CE\u0128\u012A\u012C\u0130\u00CF\u1E2E\u1EC8\u01CF\u0208\u020A\u1ECA\u012E\u1E2C\u0197]/g},
+      {'base':'O', 'letters':/[\u004F\u24C4\uFF2F\u00D2\u00D3\u00D4\u1ED2\u1ED0\u1ED6\u1ED4\u00D5\u1E4C\u022C\u1E4E\u014C\u1E50\u1E52\u014E\u022E\u0230\u00D6\u022A\u1ECE\u0150\u01D1\u020C\u020E\u01A0\u1EDC\u1EDA\u1EE0\u1EDE\u1EE2\u1ECC\u1ED8\u01EA\u01EC\u00D8\u01FE\u0186\u019F\uA74A\uA74C]/g},
+      {'base':'U', 'letters':/[\u0055\u24CA\uFF35\u00D9\u00DA\u00DB\u0168\u1E78\u016A\u1E7A\u016C\u00DC\u01DB\u01D7\u01D5\u01D9\u1EE6\u016E\u0170\u01D3\u0214\u0216\u01AF\u1EEA\u1EE8\u1EEE\u1EEC\u1EF0\u1EE4\u1E72\u0172\u1E76\u1E74\u0244]/g},
+      {'base':'a', 'letters':/[\u0061\u24D0\uFF41\u1E9A\u00E0\u00E1\u00E2\u1EA7\u1EA5\u1EAB\u1EA9\u00E3\u0101\u0103\u1EB1\u1EAF\u1EB5\u1EB3\u0227\u01E1\u00E4\u01DF\u1EA3\u00E5\u01FB\u01CE\u0201\u0203\u1EA1\u1EAD\u1EB7\u1E01\u0105\u2C65\u0250]/g},
+      {'base':'e', 'letters':/[\u0065\u24D4\uFF45\u00E8\u00E9\u00EA\u1EC1\u1EBF\u1EC5\u1EC3\u1EBD\u0113\u1E15\u1E17\u0115\u0117\u00EB\u1EBB\u011B\u0205\u0207\u1EB9\u1EC7\u0229\u1E1D\u0119\u1E19\u1E1B\u0247\u025B\u01DD]/g},
+      {'base':'i', 'letters':/[\u0069\u24D8\uFF49\u00EC\u00ED\u00EE\u0129\u012B\u012D\u00EF\u1E2F\u1EC9\u01D0\u0209\u020B\u1ECB\u012F\u1E2D\u0268\u0131]/g},
+      {'base':'o', 'letters':/[\u006F\u24DE\uFF4F\u00F2\u00F3\u00F4\u1ED3\u1ED1\u1ED7\u1ED5\u00F5\u1E4D\u022D\u1E4F\u014D\u1E51\u1E53\u014F\u022F\u0231\u00F6\u022B\u1ECF\u0151\u01D2\u020D\u020F\u01A1\u1EDD\u1EDB\u1EE1\u1EDF\u1EE3\u1ECD\u1ED9\u01EB\u01ED\u00F8\u01FF\u0254\uA74B\uA74D\u0275]/g},
+      {'base':'u','letters':/[\u0075\u24E4\uFF55\u00F9\u00FA\u00FB\u0169\u1E79\u016B\u1E7B\u016D\u00FC\u01DC\u01D8\u01D6\u01DA\u1EE7\u016F\u0171\u01D4\u0215\u0217\u01B0\u1EEB\u1EE9\u1EEF\u1EED\u1EF1\u1EE5\u1E73\u0173\u1E77\u1E75\u0289]/g},
+  ],
+
+  removeDiacritics: function (str, changes) {
+      changes = Educativa.Utils.defaultDiacriticsRemovalMap;
+      for(var i=0; i<changes.length; i++) {
+          str = str.replace(changes[i].letters, changes[i].base);
+      }
+      return str;
+  }
+
+};
+
+/** @class  */
+Educativa.Debug =
+/** @lends Educativa.Debug */
+{
+  clear : function(o){
+        if ($('DivDebug')) $('DivDebug').innerHTML='';
+    },
+  show : function(o){
+    var d;
+    if (!$('DivDebug')){
+        d = document.createElement('pre');
+        d.id = 'DivDebug';
+        d.style.position = 'fixed'
+        d.style.left     = '10px';
+        d.style.bottom   = '0';
+        d.style.width    = '92%';
+        d.style.height   = '200px';
+        d.style.overflow = 'auto';
+
+        d.style.fontSize = '11px';
+
+        d.style.color    ='#FFFFFF';
+        d.style.zIndex   ='1000';
+        d.style.backgroundColor='pink';
+        d.style.borderWidth='2px';
+        d.style.borderColor ='black';
+        d.style.borderStyle ='solid';
+        /** @ignore */
+        d.ondblclick = function(){ Element.hide(this); }
+
+        document.body.style.paddingBottom = '200px';
+        document.body.appendChild(d);
+    } else {
+        d = $('DivDebug');
+    }
+    d.show();
+    var str="";
+
+    if ( typeof o == 'string')
+        str = o;
+    else for(i in o)
+            str += "\t" + i + " => " + o[i] + "\n";
+
+    d.innerHTML +=  "\n" + str;
+  }
+};
+
+
+/** @namespace */
+Educativa.Session = {} ;
+
+/**
+ * Manejo de los terminos de diccionario previo
+ * En su lugar, usar Dict de Comunes.js
+ */
+
+Educativa.Dict = {
+    /** Evitar este metodo. Utilizar {@link String#term} o {@link String#termcap}  */
+    translate: function(t){
+        return Educativa.Dict[t] ? Educativa.Dict[t] : '*' + t + '*';
+    },
+    add: function(term, traduccion){
+        if( Object.isString(term) )
+            Educativa.Dict[term] = traduccion;
+        else
+            Object.extend( Educativa.Dict, term );
+    }
+};
+
+/* Extiende la clase String para menejar terminos de Diccionario */
+Object.extend( String.prototype, {
+    /** Traduce el termino segun el diccionario
+        @example "TERMINO_DEL_DICC".term();
+        @memberOf String#     */
+    term : function() {return Educativa.Dict.translate(this);},
+    /** Traduce el termino segun el diccionario y lo capitaliza
+        @example "TERMINO_DEL_DICC".termcap();
+        @memberOf String#     */
+    termcap:  function() { return this.term().capitalize() ;}
+} );
+
+
+Educativa.Glosario = {};
+
+/* Educativa.Alert */
+(function(){
+    var alertas = [];
+    /** @class
+     * @param options
+     * @param [options.type="success"] Tipo de alerta
+     * @param options.text Texto de el mensaje
+     * */
+    Educativa.Alert = Class.create(
+    {
+        options :
+        {
+            type : 'success',
+            text : ''
+        },
+        initialize : function(options)
+        {
+            myself = this;
+            myself.detallesVisibles = false;
+            // si options es un string
+            if ( typeof( options ) != 'object' ) options = { text : options };
+
+            Object.extend( this.options, options );
+
+            var content = new Element('div',{className: 'content'}).update( this.options.text );
+            this.element = new Element('div', { className: 'edu-system-message edu-system-message-'+ this.options.type , style: "display:none" })
+                               .insert( content );
+
+            if( this.options.log ) {
+
+                var showHideButton = new Element('div', {className: 'AlertShowHideButton'} );
+
+                var log_mssg = new Element('ul');
+                var exists_detail = 0;
+                this.options.log.each(function(e){
+                    if( e.type == 'detail' ){
+                        exists_detail = 1;
+                        log_mssg.insert( new Element('li',{className: 'AlertLogDetail'}).update(e.text)) ;
+                    }else{
+                        log_mssg.insert( new Element('li',{className: 'AlertLogLi'}).update(e.text)) ;
+                    }
+                });
+
+                if ( exists_detail == 1 ) {
+                    showHideButton.update('[Mostrar Detalles]');
+                }
+
+                log_mssg.hide();
+
+                var contentLog = new Element('div',{className:'AlertLogContent'})
+                                     .insert( showHideButton )
+                                     .insert( log_mssg );
+
+                this.element.insert( contentLog );
+                showHideButton.observe('click',function(){
+                    if( myself.detallesVisibles ){
+                        log_mssg.hide();
+                        showHideButton.update('[Mostrar Detalles]');
+                        myself.detallesVisibles = false;
+                    }else{
+                        log_mssg.show();
+                        showHideButton.update('[Ocultar Detalles]');
+                        myself.detallesVisibles = true;
+                    }
+                });
+            }
+
+            $('ajax_indicator').insert({ after : this.element });
+
+            if (Effect) Effect.Pulsate(this.element.identify(),
+                { pulses: 3, duration: .6 });
+
+            this.element.show();
+            alertas.push( this );
+        },
+        hide : function()
+        {
+            this.element.hide();
+        }
+
+    });
+
+    Object.extend( Educativa.Alert, {
+        hideAll : function()
+        {
+            alertas.invoke('hide');
+        }
+    });
+})();
+
+
+
+Educativa.Popup = Class.create(
+/** @lends Educativa.Popup# */
+{
+    closed: function(){
+        return this.window.closed;
+    },
+    /**
+     * Sirve para abrir una nueva pagina en un popup
+     * @constructs */
+    initialize : function(options) {
+        this.options = {
+          url       : 'about:blank',
+          width     : 600,
+          height    : 500,
+          name      : '_blank',
+          location  : false,
+          menubar   : false,
+          toolbar   : false,
+          status    : true,
+          scrollbars: true,
+          resizable : true,
+          left      : 0,
+          top       : 0,
+          depend    : false,
+          normal    : false,
+          center    : true
+        };
+
+        Object.extend(this.options, options || {});
+
+        if ( Educativa.id_grupo ) this.options.name += Educativa.id_grupo;
+
+        if ( this.options.depend )
+            Event.observe( window, 'unload', this.close.bind(this) )
+
+
+        if (this.options.normal){
+            this.options.menubar  = true;
+            this.options.status   = true;
+            this.options.toolbar  = true;
+            this.options.location = true;
+        }
+
+        this.options.width
+            = this.options.width < screen.availWidth
+            ? this.options.width
+            : screen.availWidth;
+
+        this.options.height
+            = this.options.height < screen.availHeight
+            ? this.options.height
+            : screen.availHeight;
+
+        if ( this.options.center ){
+            this.options.top  = (screen.availHeight - this.options.height + 1) / 2;
+            this.options.left = (screen.availWidth  - this.options.width  + 1) / 2;
+        }
+
+
+        var openoptions =
+            'width='       + this.options.width
+          + ',height='     + this.options.height
+          + ',location='   + (this.options.location   ? 'yes' : 'no')
+          + ',menubar='    + (this.options.menubar    ? 'yes' : 'no')
+          + ',toolbar='    + (this.options.toolbar    ? 'yes' : 'no')
+          + ',scrollbars=' + (this.options.scrollbars ? 'yes' : 'no')
+          + ',resizable='  + (this.options.resizable  ? 'yes' : 'no')
+          + ',status='     + this.options.status ;
+
+        if ( this.options.top != "" ) openoptions += ",top=" + this.options.top;
+        if ( this.options.left!= "" ) openoptions += ",left="+ this.options.left;
+
+
+        Educativa.Popup.Objects[this.options.name] = this;
+
+        this.window = window.open(this.options.url, this.options.name,openoptions );
+
+        return this.window;
+
+    },
+    reload : function( n ){
+        ele = Educativa.Popup.get( n );
+        setTimeout( function(){
+            if ( this.window.closed && this.options.onClose )
+                this.options.onClose();
+            else if ( this.options.onReload )
+                this.options.onReload();
+        }.bind(ele), 1)
+    },
+    close : function(){
+
+        if ( ! this.closed() )
+            this.window.close();
+    },
+    focus : function(){
+        this.window.focus();
+        return this;
+    },
+    write : function (content) {
+        var doc = this.window.document;
+        doc.write(content);
+        doc.close();
+    }
+});
+
+Educativa.Popup.Objects = {};
+
+Educativa.Popup.get = function(name){
+    var r ;
+    try {
+        if ( ! Educativa.Popup.Objects[name].closed() )
+            r = Educativa.Popup.Objects[name];
+    } catch(e){}
+    return r;
+}
+
+Educativa.Popup.open = function(opt){
+    var name = opt.name;
+    if ( Educativa.id_grupo ) name += Educativa.id_grupo;
+    var w = Educativa.Popup.Objects[ name ];
+    return  w && !w.closed()
+        ? w.focus()
+        : new Educativa.Popup( opt );
+}
+
+
+Educativa.Tooltips = [];
+Educativa.Tooltip = Class.create(
+/** @lends Educativa.Tooltip# */
+{
+    /**
+    Esta clase se utiliza para crear los tooltips de la plataforma
+    @constructs */
+    initialize : function(options){
+        this.options = {
+            trigger   : null,
+            html      : '',
+            canFixed  : false
+        };
+
+        Object.extend( this.options, options );
+
+        this.trigger = $(this.options.trigger);
+        this.html    = this.options.html;
+
+        var tt = this.element = new Element('div');
+        tt.className = 'tooltip';
+        tt.update(this.options.html);
+
+        $(document.body).appendChild( tt );
+
+        this.trigger.observe('mouseover', this.show.bindAsEventListener(this) );
+        this.trigger.observe('mouseout', this.hide.bindAsEventListener(this) );
+        this.trigger.observe('click', this.click.bindAsEventListener(this) );
+
+        Educativa.Tooltips.push( this );
+
+    },
+
+    show : function(e){
+        var tt = this.element, bt = this.trigger;
+        tt.makePositioned();
+        Position.clone( bt, tt, {
+            setWidth: 0,
+            setHeight: 0,
+            offsetTop: - 3 - tt.getHeight()
+        });
+        bt.addClassName('tooltip-button-over');
+        if ( this.trigger.hasClassName('tooltip-fixed') ) return;
+        tt.show();
+    },
+    hide : function(e){
+        if ( this.trigger.hasClassName('tooltip-fixed') ) return ;
+        this.trigger.removeClassName('tooltip-button-over');
+        this.element.hide();
+    },
+    click : function(e){
+        return;
+    }
+
+});
+
+
+Educativa.Tooltip.Menu = Class.create(
+/** @lends Educativa.Tooltip.Menu# */
+{
+    /**
+    Sirve para crear ventanas popups inline. Es una de las clases mas usada, mas alla de que su nombre sugiere.<br/>
+    Para que el mismo se vea se deben incluir los estilos correspondientes.
+    @param options
+    @param [options.trigger] Objeto o id que al ser clickeado disparara el popup
+    @param [options.html=''] Codigo HTML u objetos que contendra el popup
+    @param [options.over] Elemento sobre el cual se mostrara el popup. En caso de no especificarse se mostrara
+                          sobre el trigger
+    @param [options.offsetLeft=0] Corrimiento hacia la izquierda
+    @param [options.offsetTop=0] Corrimiento hacia arriba
+    @param [options.title=''] Titulo del popup
+    @param [options.is_tooltip='false'] De ser true se mostrara solo mientras el cursor este sobre el mismo
+    @param [options.center='false'] En caso de ser true el popup se mostrara centrado. No es compatible con la
+                                    opcion <b>over</b>.
+    @param [options.id=''] Id del div principal
+    @param [options.className='tooltip'] Class name del div principal.
+    @param [options.close_button='x'] Agrega valor ('x') al link de cerrar. (es por cambio de clase c icono)
+
+    @borrows #event:hide as this.event:TooltipMenu:hide
+    @borrows #event:render as this.event:TooltipMenu:render
+
+    @constructs */
+    initialize : function(options){
+        this.options = {
+            trigger   : null,
+            html      : '',
+            over      : null,
+            offsetLeft: 0,
+            offsetTop : 0 ,
+            className : 'tooltip',
+            innerClass: '',
+            title     : '',
+            is_tooltip: false,
+            center    : false,
+            id        : false,
+            relative_to: null,
+            close_button : null
+        };
+
+        Object.extend( this.options, options );
+        var options = this.options;
+        var menu = this;
+        if( ! this.options.over ) this.options.over = this.options.trigger;
+        this.trigger = $(this.options.trigger);
+
+        //dialog
+        var tt = this.element = new Element('div');
+        this.dialog_element = tt;
+        tt.className = options.className;
+        if( options.innerClass ){
+          tt.addClassName(options.innerClass);
+        }
+        if( options.id )
+            tt.id = options.id;
+        tt.hide();
+        if( this.options.relative_to ){
+            $(this.options.relative_to).insert( tt );
+            this.dialog_element.observe('click', function(ev){
+                var target = ev.target || ev.srcElement;
+                if (target.tagName === 'LABEL' || target.tagName === 'INPUT') {
+                    return;
+                }
+                ev.stop();
+            });
+        }else{
+            $(document.body).insert( tt );
+        }
+
+        //container
+        this.container = new Element('div',{ className: options.className + '_container'  });
+        this.container.update(this.options.html);
+        this.element.insert(this.container);
+
+        // boton para cerrar la ventana
+        this.title_bar = new Element('div', {className: options.className + '_title_bar'});
+        this.b_close = new Element('a', {className: options.className + '_close_button'});
+        this.b_close.update(this.options.close_button);
+
+        this.title_bar
+            .insert(this.title_container = new Element('span').update( options.title ) )
+            .insert(this.b_close);
+        tt.insert( this.title_bar );
+
+        var trigger_event = options.is_tooltip ? 'mouseover' : 'click';
+
+        if( this.trigger ){
+            this.trigger.observe( trigger_event, this.raise_dialog.bindAsEventListener(this) );
+
+            if( options.is_tooltip ){
+                this.trigger.observe('mouseout', this.hide.bindAsEventListener(this) );
+                tt.observe('mouseover', this.show.bindAsEventListener(this) );
+            }
+        }
+
+        this.b_close.observe('click', this.hide.bindAsEventListener(this) );
+
+        if (options.draggable) {
+            this.title_bar.setStyle( {'cursor': 'move'} );
+            new Draggable(tt, { handle: this.title_bar,revert: false });
+        }
+
+        //esta linea hace que cuando se salga de la caja la oculte
+        //tt.observe('mouseout', this.hide.bindAsEventListener(this) );
+    },
+
+    /** Muestra el popup, correctamente ubicado */
+    raise_dialog: function(){
+
+        if (this.options.center) {
+            var left = (document.viewport.getWidth() - this.element.getWidth())/2;
+            var top = (document.viewport.getHeight() - this.element.getHeight())/2;
+            if (top < 0) top = 0;
+            this.element.setStyle({left: left+'px', top: top+'px'});
+        } else {
+            this.element.clonePosition( this.options.over, {
+                setWidth:0,
+                setHeight: 0,
+                offsetLeft: this.options.offsetLeft,
+                offsetTop: this.options.offsetTop
+            });
+        }
+
+        var t = this;
+        Effect.Appear( this.element, {
+            duration :0.4,
+            afterFinish: function(){
+                t.container.fire('TooltipMenu:render');
+            }
+        });
+
+        this.getDialogElement().dataset.isOpen = true;
+    },
+    /** Muestra el popup.
+     * @see #raise_dialog
+     * @private */
+    show : function(){
+        this.element.show();
+        this.element.dataset.isOpen = true;
+    },
+    /**
+     * Oculta el popup */
+    hide : function(ev){
+        if( ! Object.isUndefined(ev) ){ ev.stop(); }
+        this.container.fire('TooltipMenu:hide');
+        this.element.hide();
+        this.element.dataset.isOpen = false;
+    },
+    /**
+     * @method toggle
+     * @void
+     *
+     * @description Oculta o muestra todo el tooltip menu que contiene todo el html de esta clase
+     *
+     * @note Usa solo el metodo hide y show (NO raise_dialog)
+     */
+    toggle: function () {
+        this[this.isOpen() ? 'hide' : 'show']();
+    },
+    /**
+     * @method isOpen
+     *
+     * @description Devuelve si el tooltip esta abierto o no
+     *
+     * @return {Boolean}
+     */
+    isOpen: function () {
+        return (this.getDialogElement().dataset.isOpen === 'true');
+    },
+    /** Actualiza el contenido del popup */
+    update: function(content){
+        this.container.update(content);
+        //this.element.appendChild( this.b_close );
+    },
+    /** Setea la propiedad over del Pop */
+    setOver: function(over){
+        this.options.over = over;
+    },
+    setOffSetLeft: function(offset){
+        this.options.offsetLeft= offset;
+    },
+    setTitle: function(title){
+        this.title_container.update(title);
+    },
+    /**
+     * @method getDialogElement
+     *
+     * @description Obtiene el elemento que contiene todo el html tanto de el title, contenido y demas
+     *
+     * @returns {HTMLDivElement}
+     */
+    getDialogElement: function(){
+        return this.dialog_element;
+    }
+
+});
+
+
+/** Glosariza los elementos de la pagina que posean la clase 'TerminoGlosarizado'.
+    Se llama automaticamente en el onload */
+Educativa.agregar_glosario = function() {
+
+    if (! $('main') ) return;
+    var div = $('DivTerminoGlosarizado');
+    if (!div){
+        new Insertion.Before($('main'), '<div class="desc_term_glosarizado" id="DivTerminoGlosarizado" style="display:none" ></div>');
+        div = $('DivTerminoGlosarizado');
+        div.makePositioned();
+    }
+
+    var tmpl = new Template(
+        '<img class="cerrar_ventana" src="' + Educativa.Session.url_img + 'comunes/close_window.png" '
+        + ' onclick="$(\'DivTerminoGlosarizado\').hide();" title="' + Educativa.Dict.translate('CERRAR').capitalize() + '"><h6>#{id}</h6>'
+        + '<div>#{desc}</div><span class="edu-btn edu-btn-primary" onclick="EduOpen({url: \'glosario.cgi?id_curso=' + Educativa.id_grupo + '\', width: 350, height: 450}); return false;">'
+        +  Educativa.Dict.CLICK_SOBRE_EL_TERMINO_PARA_VISUALIZAR_EL_GLOSARIO_COMPLETO
+        + '</span>'
+    );
+
+    $$('.TerminoGlosarizado').each(function(o){
+
+        o.observe('click', function(e){
+            o.makePositioned();
+            var offset = Position.realOffset(o);
+            Position.clone( o, div, {
+                setWidth  : 0,
+                setHeight : 0,
+                offsetLeft: 20,
+                offsetTop : 20
+            } );
+
+            var termName = o.getAttribute('data-name');
+            div.innerHTML = Educativa.Glosario[termName]
+                ? tmpl.evaluate(Educativa.Glosario[termName])
+                : '';
+            div.show();
+        });
+    });
+
+};
+Event.observe(window, 'load', Educativa.agregar_glosario );
+Ajax.Responders.register({  onComplete: Educativa.agregar_glosario });
+
+//Al cerrar un popup ejecuta la funcion reload,
+// por si el mismo tiene definido acciones mediante options.onClose()
+//Es dificil determinar si esta en uso
+try{
+if ( window.opener && window.name && window.opener.Educativa ){
+    Event.observe( window, 'unload', function(){
+        try{
+            window.opener.Educativa.Popup.get( window.name ).reload(window.name);
+        } catch(e){}
+    });
+}
+} catch(e){}
+
+
+/* Evita errores en caso de que no este activado el firebug,
+y se hayan dejado mesajes de debug */
+if( Object.isUndefined( window.console ) ){
+    window.console = {
+        /** @ignore */
+        log : function(){},
+        /** @ignore */
+        info : function(){}
+    };
+}
+
+if (! window.OpenWin ) OpenWin = function () {
+    switch ( id_usuario ){
+        case "":
+            EduAlert( {text: Educativa.Dict.translate('PARA_UTILIZAR_EL_CHAT_PRIMERO_DEBES_INGRESAR_A_LA_INTRANET')} );
+            break;
+        case "_anonimo":
+            EduAlert( {text: Educativa.Dict.translate('ESTA_FUNCION_NO_ESTA_DISPONIBLE_PARA_USUARIOS_ANONIMOS')} );
+            break;
+        default:
+            // Abrir ventana de Chat
+            var height = screen.width * 0.8;
+            var width = screen.availHeight * 0.8;
+            EduOpen({url: 'location.cgi?wseccion=21'+'&id_curso='+id_grupo, height, width});
+    }
+}
+
+//Abrir popup de seccion Chat
+//El usuario debe estar en un aula
+// donde se vea la seccion chat en el menu
+popupWins = new Array();
+
+if(! window.windowOpener) windowOpener = function ( url, name, args)
+{
+    if ( typeof( popupWins[name] ) != "object" ){
+        popupWins[name] = window.open(url,name,args);
+    } else {
+        if (!popupWins[name].closed){
+            popupWins[name].focus();
+        } else {
+            popupWins[name] = window.open(url, name,args);
+        }
+    }
+    popupWins[name].focus();
+};
+
+
+if (! window.OpenWin ) {
+    // Funcion para abrir la ventana de chat
+    OpenWin = function () {
+        if ( Educativa.username === "_anonimo" ) {
+            alert(Educativa.Dict.translate('ESTA_FUNCION_NO_ESTA_DISPONIBLE_PARA_USUARIOS_ANONIMOS'));
+            return;
+        }
+
+        var windowWidth = screen.width * 0.8;
+        var windowHeight = screen.availHeight * 0.8;
+        var windowX = (screen.width * 0.2 /2);
+        var windowY = (screen.availHeight * 0.2 /2);
+        windowOpener('location.cgi?wseccion=21'+'&id_curso='+id_grupo,
+                    'Chat'+Educativa.username+id_grupo,'menubar=0,toolbar=0,location=0,directories=0,status=0,'+
+                    'menubar=0,scrollbars=0,resizable=1,width='+windowWidth+','+'height='+windowHeight+
+                    ',top='+windowY+',screenY='+windowY+',left='+windowX+',screenX='+windowX);
+    }
+};
+
+// Agrega el color #CCC a los option desactivados, bug del IE
+if ( Prototype.Browser.IE )
+    Event.observe(window, 'load', function(){
+        $$('select option').each(function(e){
+            if(e.disabled) e.setStyle({color : "#CCC"});
+        });
+    });
+
+/** Abrir los popups de ayuda en aula */
+Educativa.popupAyuda = function (args){
+
+    var url = Educativa.url_ayuda;
+
+    if( args.url )
+        url = args.url;
+
+    new Educativa.Popup({
+        url : url,
+        width : 1280,
+        height : 800,
+        resizable: false,
+        status : false
+    });
+
+    return;
+}
+
+/** Se utiliza para crear popups que permiten seleccionar elementos de una lista.<br/>
+    <b>clase abstracta, debe ser heredara para funcionar</b>
+   @param options Objeto con las siguietes propiedades:
+   @param options.trigger   id del elemento que dispara la ventana
+   @param options.container id del elemento en donde se insertan los elementos seleccionados
+   @param options.ajax_url  url de donde se toman los elementos
+   @param [options.page_limit=10]
+   @param [options.className='list_select_dialog']
+   @param [options.void_list_message="No existen items dispobibles"]
+   @param [options.draggable=0] Permite arrastrar la ventana
+   @param [options.offsetTop=0]
+   @param [options.offsetLeft=0]
+   @param [options.title=''] Titulo del popup
+   @class
+*/
+Educativa.ListSelectDialog = Class.create(
+/** @lends Educativa.ListSelectDialog# */
+{
+
+    initialize : function(args) {
+        //parametros que recive
+        var options = {
+            trigger     : null,
+            ajax_url    : null,
+            page_limit  : 10,
+            page_index  : 0,
+            className   : 'list_select_dialog',
+            void_list_message : "No existen items disponibles",
+            draggable   : 0,
+            offsetTop   : 0,
+            offsetLeft  : 0,
+            title       : '',
+            lista       : null //array con los items disponibles
+        };
+
+        Object.extend(options,args); // para pisar los default
+        Object.extend(this,options);
+
+
+        this.menu = new Educativa.Tooltip.Menu({
+            trigger   : $(this.trigger),
+            html      : new Element('div',{ className: this.className+"_spinner" }),
+            className : this.className,
+            over      : $(this.trigger),
+            offsetLeft: this.offsetLeft,
+            offsetTop : this.offsetTop,
+            draggable : this.draggable,
+            title     : this.title
+        });
+
+        this.menu.container.observe(
+            'TooltipMenu:render',
+            this.render.bindAsEventListener(this )
+        );
+
+        var obj = this;
+        if( this.lista == null ){
+            new Ajax.Request(this.ajax_url, {
+                method: 'get',
+                onSuccess: function(transport) {
+                    obj.lista = transport.responseText.evalJSON();
+                    obj.load_items();
+                }
+            });
+        }else{
+            this.load_items();
+        }
+
+    },
+    load_items: function() {
+        var obj = this;
+        var i = 0;
+        $A(this.lista).findAll(function(c){ return c.asociado == 1 }).each(function(c){
+            obj.asociar_item({ item :c, index: i++ });
+        });
+    },
+
+    render: function(ev,argd_container) {
+        var obj = this;
+
+        if( obj.lista == null ){
+
+            new Ajax.Request(this.ajax_url, {
+                method: 'get',
+                onSuccess: function(transport) {
+                    obj.lista = transport.responseText.evalJSON();
+                    obj.draw_items_list();
+                }
+            });
+
+        }else{
+            this.draw_items_list();
+        }
+    },
+
+    draw_items_list: function( ){
+        var obj = this;
+        var cant_c = $A(this.lista).findAll(function(e){ return e.asociado == 0 }).size();
+        if( cant_c == 0 ){
+            this.menu.update( new Element('div').update( this.void_list_message ));
+            return;
+        }
+        if( this['empty_body_message'] && cant_c == this.lista.length ) this.empty_body_message();
+        //chequeaos basicos
+        if( this.page_index >= cant_c ){ this.page_index -= this.page_limit ; }
+        if( this.page_index < 0       ){ this.page_index = 0; }
+
+        var div = new Element('div');
+        var list = new Element('ul');
+
+        var items = $A(this.lista).
+            findAll(function(e){ return e.asociado == 0 }).
+            sort( function(a,b){ return a.nombre.localeCompare(b.nombre); } );
+
+        for( var i = this.page_index; items[i] &&  i < (this.page_index+this.page_limit) ; ++i){
+            var e = items[i];
+            var li = new Element('li',
+                    { id: "curso_"+e.id , className: e.estado ? this.className+'_item_'+(i%2?'impar':'par'): 'grupo_inactivos_control' }
+            );
+
+            list.insert(
+                li.insert( new Element('span').update(e.nombre+ ' ') )
+            );
+
+            li.observe('click', obj.asociar_item.bind(obj, { item: e} ) );
+
+            if( this['item_decorator'] ) this.item_decorator( li, e);
+        }
+
+        div.insert(list);
+
+        // paginador
+        var pie = new Element('div',{ className: this.className + '_footer' });
+
+        if( this.page_index > 0 ){
+            var atras    = new Element('span',{ className: this.className + '_back'  }).update(' << ');
+            atras.observe('click', this.retroceder_pagina.bindAsEventListener(this) );
+            pie.insert(atras);
+        }
+
+        pie.insert(new Element('span').update(
+            Educativa.Dict.PAGINA_DE.interpolate({
+                nro:'<span style="font-weight: bold" >'+
+                     ((this.page_index/this.page_limit)+1).floor()
+                    +'</span>' ,
+                total: (cant_c/this.page_limit).ceil()
+                }).capitalize()
+        ));
+
+        if( cant_c > (this.page_index+this.page_limit) ){
+            var adelante = new Element('span',{ className: this.className + '_next'  }).update(' >> ');
+            adelante.observe('click', this.avanzar_pagina.bindAsEventListener(this) );
+            pie.insert(adelante);
+        }
+        div.insert(pie);
+
+        this.menu.update( div);
+
+    },
+
+    avanzar_pagina: function( ){
+        this.page_index += this.page_limit;
+        this.draw_items_list();
+    },
+
+    retroceder_pagina: function( ){
+        this.page_index -= this.page_limit;
+        this.draw_items_list();
+    },
+
+    toFormInput: function(formId, inputName){ // puede reescribirse
+        var frm = $(formId);
+        $$('.'+inputName+'_class').each(function(e){
+            e.remove();
+        });
+        $A(this.lista).findAll(function(c){ return c.asociado == 1 }).each( function (c) {
+            frm.insert(new Element('input',{
+                className: inputName+'_class',
+                name  : inputName,
+                value : Object.toJSON({ id: c.id, activo: (c.activa_chk.checked ?1 :0) }),
+                type  : 'hidden'
+            }));
+        });
+        return true;
+
+    },
+
+    hide: function(){
+        this.menu.hide();
+    },
+
+    asociar_item: function(arg){}, //pure virtual
+
+    desasociar_item: function(arg){}, //pure virtual
+
+    empty_body_message: function(){} //pure virual (puede no ser implementada)
+});
+
+
+/** Crea un conrtol con dos combos relacionados. Aparentemente solo utilizado en Encuestas
+   @param args
+   @param args.options  [
+        {
+            label : 'parent 1',
+            value : 1
+            childs : [
+                { label : 'child 1', value : 1 },
+                { label : 'child 2', value : 2 },
+                ...
+            ]
+        },
+        ...
+    ]
+    @param args.target Elemento que contendra al control
+    @param args.name Id base de los elementos del control.
+ * @class
+ */
+Educativa.LinkedCombos = Class.create(
+/** @lends Educativa.LinkedCombos# */
+{
+    /** @private */
+    initialize : function (args) {
+        this.name = args.name;
+        this.options = args.options;
+        this.target = args.target;
+        Object.extend(this, args);
+
+        this.render();
+        this.onChangeParent();
+    },
+    render : function () {
+        $(this.target).update('');
+
+        this.parentCombo = new Element('select', {id : this.name + '_parent'});
+
+        var pcombo = this.parentCombo;
+        var options = this.options;
+
+        var i = 0;
+        $A(options).each(function(opt) {
+            pcombo.insert( new Element('option', {value : opt.value}).update(opt.label) );
+        });
+
+        Event.observe(pcombo,'change',this.onChangeParent.bindAsEventListener(this));
+
+        $(this.target).insert(new Element('p').update(
+            new Element('label', {'for' : this.name + '_parent'}).update(this.label_parent)
+            ).insert(pcombo)
+        );
+        $(this.target).insert(new Element('p', {id : this.name + '_child_cont'}).update(
+            new Element('label', {'for' : this.name + '_child'}).update(this.label_child)
+            )
+        );
+        $(this.target).insert(new Element('input', {type: 'hidden', name: this.name, id: this.name}));
+
+        this.onChangeParent();
+    },
+    onChangeParent : function() {
+        if (this.childCombo) {
+            Element.remove(this.childCombo);
+        }
+        this.childCombo = new Element('select', {id : this.name + '_child'});
+        var ccombo = this.childCombo;
+        var pcombo = this.parentCombo;
+
+        var options = this.options;
+
+        $A(options).each(function(opt) {
+            if (opt.value == pcombo.getValue()) {
+                $A(opt.childs).each(function(chld) {
+                    ccombo.insert( new Element('option', {value : chld.value}).update(chld.label) );
+                });
+
+            }
+        });
+
+        this.setValue(pcombo.getValue(),ccombo.getValue());
+
+        Event.observe(ccombo,'change',this.onChangeChild.bindAsEventListener(this));
+        $(this.name + '_child_cont').insert(ccombo);
+    },
+    onChangeChild : function() {
+        var ccombo = this.childCombo;
+        var pcombo = this.parentCombo;
+
+        this.setValue(pcombo.getValue(),ccombo.getValue());
+    },
+    setValue : function (p, c) {
+        $(this.name).setValue(p + ',' + c);
+    },
+    getSelected : function () {
+        var ccombo = this.childCombo;
+        var pcombo = this.parentCombo;
+        return [pcombo.getValue(),ccombo.getValue()];
+    }
+});
+
+/** Crea objetos HTML.
+ *  Se creo a partir de un bug de IE, el cual no toma los checked si no estan agregados al form en el DOM.
+ *  Debe utilizarse para crear los inputs de tipo check y radio
+ *  @function
+ */
+function ie_bug_element(e,h){
+    var parameters = '';
+    $H(h).each(function(pair) {
+        if( pair.value == null ) return;
+        if( pair.key == 'disabled'){
+            if(pair.value) {
+                parameters += ' disabled="disabled" ';
+            }
+            return;
+        }
+        parameters += ' '+pair.key +'="'+ pair.value+'" ';
+
+    });
+    return '<'+e+parameters+' />';
+}
+
+
+(function(){
+
+var inputs_creados = [];
+/**
+    Permite eliminar el contenido de un input file.
+    Modo de uso, ejemplo:
+    @example
+&lt;input id="wImagenPost" class=CajaABM TYPE=FILE NAME="wImagenPost" SIZE=35
+       onchange="Educativa.InputClear.agregarInput('wImagenPost')"
+       style="width: auto;"
+&gt;
+    @class
+*/
+Educativa.InputClear = Class.create(
+/** @lends Educativa.InputClear# */
+{
+    initialize : function(input_id) {
+        var input_file = $(input_id);
+
+        this.elementId = input_id;
+
+        this.element = input_file;
+
+        this.element.addClassName('inputFile');
+
+        this.padre = input_file.parentNode || input_file.parentElement;
+        this.existeEliminar = 0;
+    },
+
+    crear: function(){
+
+        if( this.existeEliminar == 0 ){
+            this.wrapper = this.element.wrap( 'div', {className : 'inputClearWrapper'});
+
+            this.wrapper.appendChild( (new Element('a', {
+                href : 'javascript:;',
+                className : 'inputClearButton',
+                title : Educativa.Dict.translate('QUITAR_ARCHIVO')
+            })).observe('click', function(){ this.eliminar(); }.bind(this)) );
+
+            this.wrapper.appendChild( new Element('div', { style : 'clear:both' } ) );
+
+            this.existeEliminar = 1;
+        }
+
+    },
+
+    eliminar: function(){
+        var c = this.element.E();
+
+        this.element = new Element('input', {
+            type: 'file',
+            className: this.element.className,
+            name: this.element.name,
+            size: this.element.size,
+            id: this.elementId
+        });
+
+        if ( c ) {
+            c.element = this.element;
+        }
+
+        this.element.observe( 'change', this.crear.bind(this) );
+
+
+        this.wrapper.replace( this.element );
+
+        Educativa.Utils.disable_input_file_keypress();
+
+        this.existeEliminar = 0;
+    }
+
+});
+
+Educativa.InputClear.agregarInput = function(input_id) {
+    if( ! inputs_creados[input_id] ){
+        inputs_creados[input_id] = new Educativa.InputClear(input_id);
+    }
+    inputs_creados[input_id].crear();
+};
+
+Educativa.InputClear.clear = function( input_id ) {
+    if( inputs_creados[input_id] ){
+        inputs_creados[input_id].eliminar();
+    }
+};
+
+})();
+
+
+/**
+  Sirve para armar controles desplegables.
+  Debe llamarse en el onLoad, o cuando esten creados los objetos
+  @param header_id id u objeto que se desplegara al se clickeado
+  @param body_id   ud u objeto que sera desplegado
+  @param desplegado   estado por defecto del desplegable
+  @class
+ */
+Educativa.Desplegable = Class.create({
+
+    initialize : function( header_id, body_id, desplegado ) {
+
+        this.header = $(header_id);
+        this.body   = $(body_id);
+        this.desplegado = desplegado;
+
+        if( this.desplegado ){
+            this.header.addClassName('formSection-desplegado');
+            this.header.removeClassName('formSection-replegado');
+            this.body.show();
+        }else{
+            this.header.removeClassName('formSection-desplegado');
+            this.header.addClassName('formSection-replegado');
+            this.body.hide();
+        }
+
+        this.header.observe('click',this.onClick.bindAsEventListener(this));
+    },
+
+    onClick: function(){
+        if( this.desplegado ){
+            this.desplegado = false;
+            this.header.removeClassName('formSection-desplegado');
+            this.header.addClassName('formSection-replegado');
+            this.body.hide();
+        }else{
+            this.desplegado = true;
+            this.header.addClassName('formSection-desplegado');
+            this.header.removeClassName('formSection-replegado');
+            this.body.show();
+        }
+    }
+});
+
+/** Genera un spinner hecho con font-awesome parametrizable sobre el elemento deseado, bloqueando al mismo.
+
+    @param options
+    @param options.over                         Elemento sobre el cual se creara el spinner
+    @param [options.className='']               Clase adicional del elemento.
+    @param [options.take_zindex_over = false]   Si es true, toma el z-index del this.over y le suma 1 (si existe
+                                                el del estilo en linea, sino el computado del css para el element)
+ * @class */
+Educativa.OverlayedSpinner = Class.create(
+/** @lends Educativa.OverlayedSpinner# */
+{
+    over: null,
+    spinner: null,
+    take_zindex_over: false,
+    className: '',
+
+    initialize: function(args){
+        Object.extend( this, args);
+
+        let spinner_zindex = 94;
+
+        var d = this.over.getDimensions();
+        if (this.take_zindex_over) {
+            // Toma el valor entero de la propiedad z-index del elemento over mas uno
+            // Esto evita que aparezca oculto el spinner si el this.over tiene mayor zindex
+            if (this.over.style['z-index'] && this.over.style['z-index'] > spinner_zindex) {
+                // Si hay un estilo en linea para la prop zindex definido para
+                // el elemento this.over, se toma este
+                spinner_zindex = parseInt( this.over.style['z-index'] ) + 1;
+            } else {
+                // Tomamos los estilos computados de los css
+                spinner_zindex = parseInt( window.getComputedStyle(this.over).zIndex ) + 1;
+            }
+        }
+
+        this.spinner = new Element('div', { className: 'cont_spinner_fa '+ this.className });
+        this.spinner.setStyle({
+            position: 'absolute', width: d.width, height: d.height, zIndex: spinner_zindex
+        });
+        this.spinner.clonePosition(this.over);
+
+        var awesome = new Element('i',{ className: 'fal fa-spinner-third fa-spin fast-spin' } );
+        this.spinner.insert(awesome);
+
+        $(document.body).insert( this.spinner );
+        this.showing = true;
+        this.spinner.observe('click',function(ev){ ev.cancelBubble = true; });
+    },
+
+    remove: function(){
+        this.spinner.remove();
+        this.showing = false;
+    }
+});
+
+
+/** Modulo para generar formularios.<br/>
+    Es el modulo que debe utilizarse a la hora de crear formularios web. El mismo puede utilizarse direcctamente
+    ser heredado por otra clase que extienda sus funcionalidades.
+
+    @param {Object} option Objeto con las opciones para inicializar la clase.
+    @param {Element} option.container Elemento que contendra al formulario.
+    @param {String} [option.method='']
+    @param {String} [option.action='']
+    @param {String} [option.id='event_form']
+    @param {String} [option.className ='EventForm']
+    @param {String} [option.submit_button_text='Agregar']
+    @param {String} [option.cancel_button_text='Cancelar']
+    @param {Bool} [option.cancel_button=true]
+    @param {Bool} [option.submit_button=true]
+    @param {Bool} [option.submit_on_key_return=false]
+    @param {function} [option.on_submit_hd=null]
+    @param {function} [option.on_cancel_hd=null]
+    @param {FormField[]} fields Array con la especificacion de los campos que contendra el formulario.
+    @param {Bool} [option.disable_csrf_token = true] Permite desactivar el renderizado del token CSRF.
+
+    @example
+    //Inicializamos la clase
+    this.form = new Educativa.FormSimple({
+         container: $(this.container),
+         id : 'SecuenciaForm-',
+         className: 'SecuenciaForm',
+         submit_button: false,
+         cancel_button: false
+       },
+       form_fields
+    );
+
+    // Este es un ejemlo de form_fields:
+
+    // Campos del formulario
+    var form_fields = [
+       {
+           name: 'categoria',
+           label: 'CATEGORIA'.term().capitalize(),
+           type: 'combo',
+           value: this.secuencia.categoria || '',
+           obligatorio: 1,
+           items: this.categorias,
+           tooltip: 'TOOLTIP_AULA_CATEGORIA_SECUENCIA'.term(),
+           classes: 'selectSimple',
+           readonly: !this.editable()
+       },{
+           name: 'nombre',
+           label: 'NOMBRE'.term().capitalize(),
+           type: 'text',
+           value: this.secuencia.nombre || '',
+           obligatorio: 1,
+           maxlength: 50,
+           tooltip: 'TOOLTIP_AULA_NOMBRE_SECUENCIA'.term(),
+           classes: 'inputTextMediano',
+           readonly: !this.editable()
+       },{ // Campo costumizable
+           name: 'pildoras',
+           label: '',
+           type: 'custom',
+           value: this.secuencia.pildoras,
+           render: this.pildoras_control_render,//function handler
+           reset: this.pildoras_control_reset, //function handler
+           submit_value: this.pildoras_control_value, //function handler
+       }
+    ];
+
+    // cada FORMFIELD TIENE los siguientes atributos que hacen a su ESTRUCTURA:
+
+    name          :   Id del campo
+    label         :   Label de campo, en caso de que pase '' el label no se mostrara.
+    type          :   Tipo de campo que sera creado.<br/>Actualmente soporta los siguientes tipos:
+                              'text', 'hidden', 'check', 'datetime', 'richtext', 'numeric', 'custom', 'new_password',
+                              'combo', 'label', 'radiogroup', 'buttonbar', 'file', 'file_change'
+    value         :   Valor que tendra inicialmente el control.
+    [line_id]     :   Indica el id de la linea del elemento (opcional).
+    [line_classes]:   Listado de clases css que se agregaran a la linea del elemento (opcional).
+    [force_id]    :   Pisa el parametro id, y se utiliza como id del campo, sin importar el id de la clase.
+    [force_name]  :   Pisa el parametro name, y se utiliza como name del campo, sin importar el id de la clase.
+    [tooltip]     :   Tooltip del control.
+    [classes]     :   Listado de clases css que se agregaran al elemento.
+    [class_radiogroup_container]: String tipo de clase que se le agrega para el ancho del contenedor de radio buttons para el type 'file_change'
+                                    Tipos de clase: small, medium, large
+    [class_wrapper_file]: String tipo de clase que se le agrega para el ancho del contenedor de wrapper (con clase uploader) para el type 'file'
+                            Tipos de clase: small, medium, large
+    [readonly]    :   (bool) Indica si el elemento podra ser editado, o sera de solo lectura.
+    [obligatorio] :   (bool) Indica si el elemento es obligatorio.
+    [maxlength]   :   Se utiliza para especificar el maximo permitido para los input de texto.
+    [items]       :   Se utiliza junto al tipo 'combo', es un array ({value: , name: }) con los elementos del combo.
+    [render]      :   Se utiliza para el tipo 'custom'. Funcion encargada de dibujar el control.
+                            Toma como parametro el elemento line donde debe dibujarse, y el objeto con la definicion.
+    [reset]       :   Se utiliza para el tipo 'custom'. Funcion encargada de resetear el control.
+    [submit_value]:   Se utiliza para el tipo 'custom'. Funcion encargada de devolver el valor del control.
+    [validar]     :   En caso de que se pase una funcion, que toma como primer parametro, el formulario, y como
+                             segundo, el objeto a validar, se invoca la misma para validar el elemento en la funcion
+                             {@link Educativa.FormSimple#validate}. Deve devolver true o false.
+
+    @class
+*/
+Educativa.FormSimple =  Class.create(
+/** @lends Educativa.FormSimple# */
+{
+    id: 'event_form',
+    className : 'EventForm',
+    submit_button_text: 'Agregar',
+    cancel_button_text: 'Cancelar',
+    cancel_button: true,
+    submit_button: true,
+    submit_on_key_return: false,
+    on_submit_hd: null,
+    on_cancel_hd: null,
+    disable_csrf_token: false,
+
+    /** @ignore */
+    initialize : function( options, elements) {
+
+        Object.extend( this, options);
+
+        this.elements = $A(elements);
+
+        this.toHTML();
+    },
+
+    renderSubmitBar: function(){
+        this.form.insert(
+            this.btns_fr = new Element('div', { className: this.className+'-Buttons' })
+        );
+        if( this.cancel_button ){
+            this.btns_fr.insert(
+                this.cancel_b = new Element('input',{type: 'button', className:'cancel-btn', value: this.cancel_button_text})             );
+        }
+        if( this.submit_button ){
+            this.btns_fr.insert(
+                this.submit_b = new Element('input',{type: 'button', className:'accept-btn', value: this.submit_button_text})
+            );
+        }
+        if( this.on_cancel_hd ){ this.cancel_b.observe('click', this.on_cancel_hd.bind(this) ); }
+        if( this.on_submit_hd ){ this.submit_b.observe('click', this.submit.bind(this) ); }
+    },
+
+    /** @private */
+    render_error_area: function(){},
+
+    /** @private */
+    _add_hidden_element: function( obj, data_elem ){
+        this.form.insert( obj.element = new Element('input', {
+            id    : data_elem.id,
+            name  : data_elem.name,
+            value : obj.value,
+            type  : 'hidden'
+        }));
+    },
+
+    /** @private */
+    toHTML: function(){
+        var form_args = { id: this.id, className: this.className };
+        if( this.name ) form_args.name = this.name;
+
+        if(this.title){ this.container.insert( new Element('h2').insert(this.title)); }
+
+        if (this.from_template) {
+            this.form = document.getElementById(this.id);
+        } else {
+            this.form = new Element('form', form_args);
+        }
+
+        if( this.method ) this.setMethod( this.method );
+        if( this.action ) this.setAction( this.action );
+
+        this.container.insert( this.form );
+        this.elements.each( this.add_element.bind(this) );
+
+        if (!this.disable_csrf_token) {
+          // Agregar token CSRF
+          this._add_csrf_token();
+        }
+
+        this.render_error_area();
+        this.renderSubmitBar();
+    },
+
+    _add_csrf_token: function(){
+        // Objeto referido a token CSRF.
+        // A diferencia de los demas inputs, este siempre se agrega de manera automatica, a menos que se desactive.
+        const obj = {
+            name: 'csrf_token',
+            type: 'hidden',
+            value: document.getCSRFToken(),
+            element: null,
+        };
+
+        obj.element = document.createElement('input');
+        obj.element.type = 'hidden';
+        obj.element.name = 'csrf_token';
+        obj.element.value = document.getCSRFToken();
+
+        // Agregar el token CSRF a lista de inputs para mantenerlo trackeado
+        this.elements.push(obj);
+
+        // Agregar elemento al form
+        this.form.appendChild(obj.element);
+    },
+
+    _add_linecontent: function( obj ){
+        var line_options = { className: this.className + '-line' + (obj.line_classes ? ' '+obj.line_classes : '') };
+
+          if (obj.line_id) line_options.id = obj.line_id;
+
+          this.form.insert( obj.line = new Element('div', line_options));
+    },
+
+    _add_control_label: function( obj, data_elem ){
+        var clase_label = this.className+'-Label-'+obj.type + ' ' + this.className + (obj.obligatorio ? "-requerido" : "-opcional");
+        obj.label_obj = new Element('label', { className: clase_label, for: data_elem.id } ).update( obj.label )
+
+        if( obj.tooltip ){
+            var tt = new Element('a', { className: this.className + '-tooltip-button' } );
+            obj.label_obj.insert( tt );
+            new Educativa.Tooltip({
+                trigger  : tt,
+                html     : obj.tooltip,
+                canFixed : true
+            }).hide();
+        }
+        obj.line.insert( obj.label_obj );
+    },
+
+    _add_text_element: function( obj, data_elem ) {
+        var cls = data_elem.classes + ( obj.type == 'numeric' ? '-Numeric' : '-Text');
+
+        obj.line.insert( obj.element = new Element('input', {
+            id        : data_elem.id,
+            name      : data_elem.name,
+            disabled  : obj.readonly,
+            className : cls,
+            value     : obj.value,
+            maxlength : obj.maxlength,
+            type      : 'text'
+        }));
+        obj.element.observe( 'keydown', this.onInputKeyDown.bindAsEventListener(this, obj));
+    },
+
+    _add_check_element: function( obj, data_elem ){
+        obj.line.insert( ie_bug_element( 'input', {
+                type     : 'checkbox',
+                id       : data_elem.id,
+                name     : data_elem.name,
+                'class'  : data_elem.classes+'-check',
+                value    : obj.value || obj.name,
+                disabled : obj.readonly
+            })
+        );
+        obj.element = $(data_elem.id);
+        obj.element.checked = obj.checked ? 'checked' : '';
+    },
+
+    _add_radiogroup_element : function ( obj, data_elem ) {
+
+        var container = new Element('ul', { id : data_elem.id + '-' + data_elem.name, 'class' : 'radiogroup' });
+        obj.options.each( function(e) {
+            var opt_line = new Element('li', { 'class' : 'radiogroup-line' });
+            var radio_params = {
+                type     : 'radio',
+                id       : data_elem.id + '-' + e.value,
+                name     : data_elem.name,
+                'class'  : data_elem.classes + '-radio',
+                value    : obj.name + '-' + e.value,
+                disabled : obj.readonly
+            };
+
+            if( e.value == obj.default_checked ) Object.extend( radio_params, { checked : 'checked' } );
+
+            var radio = ie_bug_element( 'input', radio_params );
+            opt_line.insert( radio );
+            var label = new Element('label').update( e.label );
+            opt_line.insert( label );
+
+            container.insert( opt_line );
+        });
+
+        obj.line.insert( container );
+        obj.element = $(data_elem.id);
+    },
+
+    _add_richtext_element : function ( obj, data_elem ){
+        obj.line.insert( obj.element = new Element('textarea', {
+            id       : data_elem.id,
+            name     : data_elem.name,
+            disabled : obj.readonly,
+            className: data_elem.classes + '-richtext',
+            style    : data_elem.styles
+          })
+        );
+        try { obj.element.setValue( obj.value ) }catch(e){}; //IE7 hack.
+    },
+
+    _add_password_element: function ( obj, data_elem ){
+        obj.line.insert( obj.element = new Element('input', {
+              type         : 'password',
+              autocomplete : 'off',
+              id           : data_elem.id,
+              name         : data_elem.name,
+              disabled     : obj.readonly,
+              className    : data_elem.classes+'-Text',
+              value        : obj.value
+        }));
+    },
+
+    _add_combo_element : function ( obj, data_elem ){
+        var combo_attr = {
+            id        : data_elem.id,
+            name      : data_elem.name,
+            disabled  : obj.readonly,
+            className : data_elem.classes+'-Combo'
+        };
+        if( ! Object.isUndefined(obj.multiple) ){
+          combo_attr.multiple = 'multiple';
+        }
+        if( ! Object.isUndefined(obj.size) ){
+          combo_attr.size = obj.size;
+        }
+        obj.element = new Element( 'select', combo_attr );
+
+        obj.items.each( function(h) {
+            var option_args = { value : h.value };
+
+            if( ! Object.isUndefined(h['class']) ){
+              option_args.className =  h['class'];
+            }
+            if( ! Object.isUndefined(h['selected']) ){
+              option_args.selected =  'selected';
+            }
+            obj.element.insert(new Element('option', option_args ).update(h.name) );
+
+        }, this );
+
+        obj.element.setValue( obj.value );
+        obj.line.insert( obj.element );
+    },
+
+    _add_label_element : function ( obj, data_elem ){
+        obj.line.insert( obj.element = new Element(
+            'label', {
+                id        : data_elem.id,
+                className : data_elem.classes+'-Label'
+            }).update(obj.value)
+        );
+    },
+
+    _add_file_element: function ( obj, data_elem ){
+
+        var upload_instancia = this.id + generar_random(20), upload_opt = {};
+
+        obj.input_intancia = new Element( 'input', {
+            type: 'hidden',
+            name: data_elem.name + '_id_instancia',
+            id: data_elem.id + '_id_instancia',
+            value: upload_instancia
+        });
+
+        obj.input_uploads = new Element( 'input', {
+            type: 'hidden',
+            name: data_elem.name + '_uploads_cant',
+            id: data_elem.id + '_uploads_cant',
+            value: 0
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.id = `${data_elem.id}_wrap`;
+        wrapper.classList.add('uploader');
+
+        if(obj.class_wrapper_file) {
+            let clases = {
+                small: 'small',
+                medium: 'medium',
+                large: 'large',
+            };
+
+            wrapper.classList.add(clases[obj.class_wrapper_file]);
+        }
+
+        obj.wrapper = wrapper;
+
+        if (obj.uploads_limit)     upload_opt.uploads_limit     = obj.uploads_limit;
+        if (obj.file_size_limit)   upload_opt.file_size_limit   = obj.file_size_limit;
+        if (obj.total_size_limit)  upload_opt.total_size_limit  = obj.total_size_limit;
+        if (obj.regla_extensiones) upload_opt.regla_extensiones = obj.regla_extensiones;
+        if (obj.url_dir)           upload_opt.url_dir           = obj.url_dir;
+        if (obj.cache_id)upload_opt.cache_id = obj.cache_id;
+
+        upload_opt.id_instancia    = upload_instancia;
+        upload_opt.container       = wrapper;
+        upload_opt.onUploadsChange = function ( uploads ) {
+          obj.input_uploads.value = uploads.length;
+          if (obj.onUploadsChange) obj.onUploadsChange( uploads, obj.line, obj )
+        };
+
+        obj.uploader = new Educativa.HTML5Upload(upload_opt);
+
+        obj.uploader.getContainerElement().appendChild(obj.input_intancia);
+        obj.uploader.getContainerElement().appendChild(obj.input_uploads);
+
+        obj.line.insert( obj.uploader.getContainerElement() );
+    },
+
+    _get_file_change_ctrls : function( obj ){
+
+        var file_ctrls = {
+            radiogroup : new Element('ul', { className: 'file_change_radiogroup' }),
+            mantener :  {
+                elem :  new Element( 'li' ),
+                label:  new Element( 'label', { 'for': obj.name+'mantener' }).update('MANTENER'.termcap())
+            },
+            eliminar:  {
+                elem:   null,
+                label:  null,
+            },
+            cambiar:  {
+                elem:   new Element( 'li' ),
+                label:  new Element( 'label', { 'for': obj.name+'cambiar' }).update('CAMBIAR'.termcap())
+            }
+        };
+
+        if( obj.file_name ){
+
+            file_ctrls.eliminar.elem  = new Element( 'li' );
+            file_ctrls.eliminar.label = new Element( 'label', {
+              'id': 'lbl_'+obj.name+'eliminar',
+              'name': 'lbl_'+obj.name+'eliminar',
+              'for': obj.name+'eliminar'
+            }).update('ELIMINAR'.termcap());
+        }
+
+        file_ctrls.radiogroup.insert( file_ctrls.mantener.elem );
+        file_ctrls.radiogroup.insert( file_ctrls.cambiar.elem );
+        file_ctrls.radiogroup.insert( file_ctrls.eliminar.elem );
+
+        return file_ctrls;
+    },
+
+    _add_file_change_element: function ( obj, data_elem ){
+
+        var file_ctrls = this._get_file_change_ctrls( obj );
+
+        obj.mantener_opt   = new Element( 'input', {
+          type     : 'radio',
+          name     : data_elem.name,
+          className: data_elem.classes + '-radio',
+          id       : data_elem.id + '-mantener',
+          value    : obj.name + '-mantener',
+          checked  : 'checked'
+        });
+
+        file_ctrls.mantener.elem.insert( obj.mantener_opt ).insert( file_ctrls.mantener.label );
+
+        if( obj.file_name ){
+            file_ctrls.mantener.elem.insert( new Element('img', { className: 'file_ico',  src: obj.file_ico } ) );
+            file_ctrls.mantener.elem.insert(
+              new Element('a', { href: obj.file_link, target: '_blank' }).insert(
+                new Element('span', {className: 'file_name'}).update( obj.file_name )
+              )
+            );
+
+            obj.eliminar_opt = new Element( 'input', {
+              type     : 'radio',
+              name     : data_elem.name,
+              className: data_elem.classes + '-radio',
+              id       : data_elem.id + '-eliminar',
+              value    : obj.name + '-eliminar'
+            });
+
+            file_ctrls.eliminar.elem.insert( obj.eliminar_opt ).insert( file_ctrls.eliminar.label );
+        }else{
+            file_ctrls.mantener.elem.insert( new Element('span', {className:'no_file'}).update( obj.no_file_text ) );
+        }
+
+        var id_upload_instancia = this.id + generar_random(20), upload_opt = {};
+
+        obj.cambiar_opt   = new Element( 'input', {
+          type     : 'radio',
+          name     : data_elem.name,
+          className: data_elem.classes + '-radio',
+          id       : data_elem.id + '-cambiar',
+          value    : obj.name + '-cambiar'
+        });
+
+        obj.input_intancia = new Element( 'input', {
+            type: 'hidden',
+            name: data_elem.name + '_id_instancia',
+            id: data_elem.id + '_id_instancia',
+            value: id_upload_instancia
+        });
+
+        obj.input_uploads = new Element( 'input', {
+            type: 'hidden',
+            name: data_elem.name + '_uploads_cant',
+            id: data_elem.id + '_uploads_cant',
+            value: 0
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.id = `${data_elem.id}_wrap`;
+        wrapper.classList.add('uploader');
+        wrapper.style.display = 'none';
+
+        obj.wrapper = wrapper;
+
+        file_ctrls.cambiar.elem
+            .insert( obj.cambiar_opt )
+            .insert( file_ctrls.cambiar.label )
+            .insert( obj.wrapper );
+
+        wrapper.appendChild(obj.input_intancia);
+        wrapper.appendChild(obj.input_uploads);
+
+        if (obj.uploads_limit)     upload_opt.uploads_limit      = obj.uploads_limit;
+        if (obj.file_size_limit)   upload_opt.file_size_limit    = obj.file_size_limit;
+        if (obj.total_size_limit)  upload_opt.total_size_limit   = obj.total_size_limit;
+        if (obj.regla_extensiones) upload_opt.regla_extensiones  = obj.regla_extensiones;
+        if (obj.url_dir)           upload_opt.url_dir            = obj.url_dir;
+        if (obj.cache_id)upload_opt.cache_id = obj.cache_id;
+
+        upload_opt.id_instancia    = id_upload_instancia;
+        upload_opt.container       = obj.wrapper;
+        upload_opt.onUploadsChange = function ( uploads ) {
+            obj.input_uploads.value = uploads.length;
+            if (obj.onUploadsChange) obj.onUploadsChange( uploads, obj.line, obj )
+        };
+
+        obj.uploader = new Educativa.HTML5Upload(upload_opt);
+
+        let clases = {
+            small: 'small',
+            medium: 'medium',
+            large: 'large',
+        };
+
+        let className = 'file_change_radiogroup_container';
+        if (clases[obj.class_radiogroup_container]) {
+            className += ' '+ clases[obj.class_radiogroup_container]
+        }
+
+        var radiogroup_container =
+            new Element('div', { className }).insert( file_ctrls.radiogroup );
+
+        obj.line.insert( radiogroup_container );
+
+        obj.mantener_opt.observe( 'click', function () {
+            if (obj.mantener_opt.checked) {
+                obj.uploader.hide();
+                obj.uploader.deleteFolder();
+                obj.input_uploads.value = 0
+            }
+        }.bindAsEventListener(this) );
+
+        if ( obj.eliminar_opt ) {
+            obj.eliminar_opt.observe( 'click', function () {
+                if (obj.eliminar_opt.checked) {
+                    obj.uploader.hide();
+                    obj.uploader.deleteFolder();
+                    obj.input_uploads.value = 0
+                }
+            }.bindAsEventListener(this) );
+        }
+
+        obj.cambiar_opt.observe(  'click', function () {
+          if (obj.cambiar_opt.checked) obj.uploader.show();
+        }.bindAsEventListener(this) );
+    },
+
+    _add_text_line: function ( obj ){
+        obj.line.insert( obj.element = new Element(
+            'div', { className : 'no_label '+obj.classes }).insert( new Element('div', { className: 'aclaracion'}).update(obj.value))
+        );
+    },
+
+    /** Agrega campos al formulario. Utilizada mas que nada de forma interna */
+    add_element: function( obj ) {
+
+        var data_elem = {
+          name : obj.force_name || this.id+obj.name,
+          id   : obj.force_id   || this.id+obj.name
+        };
+
+        if(  obj.type == 'hidden' ){
+            this._add_hidden_element( obj, data_elem );
+
+        }else{
+            this._add_linecontent( obj );
+
+            if( obj.label ) this._add_control_label( obj, data_elem );
+
+            obj.readonly = obj.readonly ? true : false;
+            data_elem.classes = ( obj['classes'] ? obj['classes']+' ' : '' ) +  this.className;
+            data_elem.styles = obj.style ? obj.style : '';
+
+            if( obj.type == 'text' || obj.type == 'numeric' ){
+                this._add_text_element( obj, data_elem );
+
+            }else if( obj.type == 'check' ){
+                this._add_check_element( obj, data_elem );
+
+            } else if( obj.type == 'radiogroup' ) {
+                this._add_radiogroup_element( obj, data_elem );
+
+            } else if( obj.type == 'datetime' ){
+
+                var input = this.calendar_input( obj );
+                obj.line.insert( input );
+                new Educativa.Calendar({ inputField: obj.name, showsTime: 1, ifFormat: '%d/%m/%Y %H:%M', daFormat: '%d/%m/%Y %H:%M' });
+
+            }else if( obj.type == 'richtext' ){
+                this._add_richtext_element( obj, data_elem );
+
+            }else if( obj.type == 'buttonbar' ) {
+                this._add_buttonbar_element( obj, data_elem );
+            }else if( obj.type == 'custom' ){
+                obj.render.bind(this, obj.line, obj)();
+            }else if( obj.type == 'new_password' ){
+                this._add_password_element( obj, data_elem ) ;
+
+            }else if( obj.type == 'combo' ){
+                this._add_combo_element( obj, data_elem ) ;
+
+            }else if( obj.type == 'label' ){
+                this._add_label_element( obj, data_elem );
+
+            }else if( obj.type == 'file_change' ){
+                this._add_file_change_element( obj, data_elem );
+
+            }else if( obj.type == 'file' ){
+                this._add_file_element( obj, data_elem );
+
+            }else if( obj.type == 'text_line' ){
+                this._add_text_line( obj );
+
+            }else {
+                alert('Error: bad type "'+obj.type+'"')
+            }
+
+            if( ! obj.disable ){
+                /** @ignore */
+                obj.disable = function(){ obj.element.disable(); };
+            }
+
+            return obj;
+        }
+    },
+
+    /** @private */
+    // Genera un input de fecha usando Calendar.js
+    // @param {obj} Objeto con los parametros para crear el control
+    // @param {String}  obj.name
+    // @param {String}  obj.value
+    // @param {Function} obj.onUpdate ???
+    //
+    calendar_input: function( obj ) {
+        var obj_class = obj.className ? ' '+obj.className : '';
+        var input = new Element( 'input', {
+            id        : obj.name,
+            name      : obj.name,
+            type      : 'text',
+            value     : obj.value,
+            className : obj.className || 'small inputdate',
+            maxlength : 10,
+            autocomplete : 'off'
+        });
+
+        /** @ignore */
+        obj.disable = function(){ obj.element.disable(); };
+
+        return input;
+    },
+
+
+    /** Resetea el formulario */
+    reset: function(){
+        var id = this.id;
+
+        this.elements.each( function(e){
+            if      ( e.type == "check"    ) { e.element.checked = e.checked ? 'checked' : ''; }
+            else if ( e.type == "datetime" ) { e.element.value = Educativa.Utils.dateFormat(e.value); }
+            else if ( e.type == "slider"   ) { }
+            else if ( e.type == 'richtext' ) {
+              if(typeof tinymce !== 'undefined'){
+                var element_id = id + e.name;
+                tinymce.EditorManager.get( element_id ).setContent('');
+              }else{
+                e.element.value = e.value;
+              }
+            }
+            else if ( e.type == "custom"   ) { e.reset ? e.reset(e) : ''; }
+            else if ( e.type == "file_change" || e.type == "file" ) {
+                e.uploader.reset();
+                e.input_uploads.value = 0
+            } else if( e.element['value'] ) { e.element.value = e.value; }
+            else                            { e.element.inneHTML = e.value; }
+        });
+    },
+
+    /** Devuelve los valores del formulario
+        @return Devuelve un Hash con los pares { name: value } de cada uno de los campos. */
+    getValues: function(){
+        var values = {};
+        this.getElements().each( function(e){
+            values[e.name] = this.getValue(e);
+        }, this );
+        return values;
+    },
+
+    getValue: function( element_or_name ){
+        var e = Object.isString(element_or_name) ? this.getElement( element_or_name) : element_or_name;
+        if(      e.type == "check"  ){ return e.element['checked'] ? 1 : 0;  }
+        else if (e.type == "custom" ){ return e.submit_value(e); }
+        else if( e.element['value'] ){ return e.element.value || '';    }
+        else                         { return e.element.inneHTML || ''; }
+    },
+
+    /** solo implementada para text de momento */
+    setValue: function( element_or_name, value ){
+        var e = Object.isString(element_or_name) ? this.getElement( element_or_name) : element_or_name;
+        if(      e.type == "text"  ){
+            e.element.value = value;
+        }else{
+            console.log('Error: not implemented');
+        }
+    },
+
+    /** Hace focus al primer elemento del formulario */
+    focus: function(){
+        this.elements.first().element.focus();
+    },
+
+    /** Devuelve el objeto que representa el campo "name"  del formulario */
+    getElement: function( name ){
+        return this.elements.find(function(e){ return e.name == name });
+    },
+
+    /** Devuelve el array con los campos del formulario */
+    getElements: function(){
+        return this.elements;
+    },
+
+    /** Setea el texto del boton de submit, en caso de que tenga uno */
+    setSubmitButtonText: function(text){
+        this.submit_b.value = text;
+    },
+
+    /** Setea el method del form: (POST|GET) */
+    setMethod: function( method){
+        this.form.method = method;
+
+        if ( method.toLowerCase() == 'post' ) {
+          this.form.setAttribute('enctype','multipart/form-data');
+        }
+    },
+
+    /** Setea el action del form */
+    setAction: function( action){
+        this.form.action=action;
+    },
+
+    /** Devuelve el elemento form interno de la clase. Lo mejor seria no tener que utilizar este metodo. */
+    getFormElement: function(){
+        return this.form;
+    },
+
+    /**
+     * Esta funcion maneja los eventos key down en los inputs de tipo text. Puede ser reescrita.
+     * Por defecto, si esta activada la variable submit_on_key_return, ejecuta la funcion
+     * on_submit_hd si esta definida, o hace en caso contrario hace un submit del form.
+    */
+    onInputKeyDown: function (e) {
+        if (e.keyCode == Event.KEY_RETURN && this.submit_on_key_return ){
+            Event.stop(e);
+            this.submit();
+        }
+    },
+
+    /** Esta funcion se invoca al llamar la funcion {@link #submit}. Solo se validan los campos que tiene el parametro
+     * validar con una funcion asignada. Ademas setea un array con los elementos invalidos, consultable
+     * via {@link #getInvalidElements}.
+     * Puede ser reimplementada para personalizar la validacion.
+     * @return {Bool} true en caso de que sea valido o false en caso contrario.
+    */
+    validate: function(){
+        this.invalid_elements = $A();
+
+        this.getElements().each( function(el) {
+            if( el.line) el.line.removeClassName('invalid');
+            if( el.validar ){
+                if( ! el.validar(this, el) ){
+                    if( el.line ) el.line.addClassName('invalid') ;
+                    this.invalid_elements.push(el);
+                    return false;
+                }
+            }
+        }, this );
+
+        if( this.invalid_elements.size() ) return false;
+
+        return true;
+    },
+
+    /** Retorna un array con los elementos invalidos luego de invocar a {@link #validate}. */
+    getInvalidElements: function(){ return this.invalid_elements || [] },
+
+    /** Realizar un submit del form, en caso de que la funcion {@link #validate} devuelva true.
+     * En caso de que este definido el parametro {@link #on_submit_hd}, llama a este metodo y nada mas, por
+     * backward compatibility.
+     */
+    submit: function(){
+
+        if( this.on_submit_hd ) return this.on_submit_hd();
+
+        if( this.validate() ) return this.getFormElement().submit();
+    }
+
+});
+
+Educativa.FormSimple.Admin =  Class.create(Educativa.FormSimple,
+/** @lends Educativa.AdminFormSimple# */
+{
+
+/**
+  PARAMETROS AGREGADOS A FormSimple
+
+  @param options.descrip Se utiliza con el field tipo 'check' para indicar el detalle a la
+                        derecha en lugar de la opcion por defecto del 'label'
+  @param options.error Mensaje de error (string) a mostrar para ese campo
+
+**/
+
+    /** @ignore */
+    initialize : function( $super, options, elements) {
+        Object.extend( options, {
+          method: 'POST',
+          cancel_button: false,
+          submit_button: true,
+          submit_on_key_return: true,
+          submit_button_text: options.submit_button_text || 'GUARDAR'.termcap(),
+          on_submit_hd : this.onFormSubmit.bindAsEventListener(this)
+        });
+
+        $super(options, elements);
+        this.form.observe('submit', this.onFormSubmit.bindAsEventListener(this) );
+    },
+
+    /** @private **/
+    renderSubmitBar: function(){
+        this.form.insert(
+            this.btns_fr = new Element('div', { className: this.className+' row actions edu-btn-group' })
+        );
+        if( this.cancel_button ){
+            this.btns_fr.insert(
+                this.cancel_b = new Element('span',{className:'button', value: this.cancel_button_text}));
+        }
+        if( this.submit_button ){
+            this.btns_fr.insert(
+                this.submit_b = new Element('input',{type: 'submit', className:'edu-btn edu-btn-primary', value: this.submit_button_text })
+            );
+        }
+
+        if( this.on_cancel_hd ){ this.cancel_b.observe('click', this.on_cancel_hd.bind(this) ); }
+        if( this.on_submit_hd ){ this.onFormSubmit.bindAsEventListener( this );}
+    },
+
+    /** @private */
+    render_error_area: function(){
+        this.submit_errors = new Element('div', { id:'submit_error', className:'submit_error', style:"display:none;" })
+          .update( 'POR_FAVOR_REVISA_EL_FORMULARIO'.termcap() );
+        this.form.insert( this.submit_errors );
+    },
+
+    _add_control_label: function( obj, data_elem ){
+        obj.line.insert( obj.label_obj = new Element('label', { for: data_elem.id } ).update( obj.label ));
+    },
+
+    _add_linecontent: function( obj ){
+        var line_options = { className: obj.line_classes + ( obj.obligatorio ? ' obligatorio': '' ) };
+
+        if (obj.line_id) line_options.id = obj.line_id;
+
+        this.form.insert( obj.line = new Element('div', line_options) );
+    },
+
+    _add_text_element: function( obj, data_elem ){
+        data_elem.classes = data_elem.classes || 'large';
+        obj.line.insert( obj.element =  new Element('input', {
+            id        : data_elem.id,
+            name      : data_elem.name,
+            disabled  : obj.readonly,
+            className : data_elem.classes,
+            value     : obj.value,
+            maxlength : obj.maxlength,
+            type      : obj.type
+        }));
+        obj.element.observe( 'keydown', this.onInputKeyDown.bindAsEventListener(this, obj));
+    },
+
+    _add_check_element: function ( obj, data_elem ){
+        /* devuelve algo de la forma:
+            <div>
+                <label for="...">
+                    <input ... type='checkbox' ... >
+                    <span>...</span>
+                </label>
+            </div>
+        */
+
+        obj.line.insert( new Element('div').insert(
+          new Element('label',{ for: data_elem.id }).insert(
+            ie_bug_element( 'input', {
+                type     : 'checkbox',
+                id       : data_elem.id,
+                name     : data_elem.name,
+                value    : obj.value || obj.name,
+                disabled : obj.readonly
+            })
+          ).insert( new Element('span').update( obj.descrip ))
+        ));
+
+        obj.element = $(data_elem.id);
+        obj.element.checked = obj.checked ? 'checked' : '';
+    },
+
+    _get_radio_element: function( data ){
+        var opt_line = new Element('label');
+        var radio_params = {
+            type     : 'radio',
+            id       : data.id,
+            name     : data.name,
+            value    : data.value,
+            disabled : data.readonly
+        };
+
+        if( data.checked ) Object.extend( radio_params, { checked : 'checked' } );
+
+        var radio = ie_bug_element( 'input', radio_params );
+        opt_line.insert( radio );
+        const label = typeof data.label == 'function' ? data.label(opt_line, data) :
+          new Element('label',{id:data.id + '-line'}).update( data.label );
+        opt_line.insert( label );
+
+        return opt_line;
+    },
+
+    _add_radiogroup_element: function ( obj, data_elem ){
+
+        var container = new Element('div', { id : data_elem.id + '-' + data_elem.name, 'class' : 'multi_control' });
+        var self = this;
+
+        obj.options.each( function(e) {
+            container.insert( self._get_radio_element({
+              id              : data_elem.id + '-' + e.value,
+              name            : data_elem.name,
+              label           : e.label,
+              value           : obj.name + '-' + e.value,
+              disabled        : obj.readonly,
+              checked         : e.value == obj.default_checked
+            }))
+        });
+
+        obj.line.insert( container );
+        obj.element = $(data_elem.id);
+    },
+
+    _add_combo_element : function ( obj, data_elem ){
+        var combo_attr = {
+            id        : data_elem.id,
+            name      : data_elem.name,
+            disabled  : obj.readonly,
+            className : data_elem.classes+'-Combo'
+        };
+        if( ! Object.isUndefined(obj.multiple) ){
+          combo_attr.multiple = 'multiple';
+        }
+        if( ! Object.isUndefined(obj.size) ){
+          combo_attr.size = obj.size;
+        }
+        obj.element = new Element( 'select', combo_attr );
+
+        obj.items.each( function(h) {
+            var option_args = { value : h.value };
+
+            if( ! Object.isUndefined(h['class']) ){
+              option_args.className =  h['class'];
+            }
+            if( ! Object.isUndefined(h['selected']) ){
+              option_args.selected =  'selected';
+            }
+            obj.element.insert(new Element('option', option_args ).update(h.name) );
+
+        }, this );
+
+        obj.element.setValue( obj.value );
+        obj.line.insert( obj.element );
+    },
+
+    _add_richtext_element: function ( obj, data_elem ){
+
+        data_elem.classes = data_elem.classes || 'document';
+        obj.element = new Element('textarea', {
+            id       : data_elem.id,
+            name     : data_elem.name,
+            disabled : obj.readonly,
+            className: data_elem.classes+' mceEditor',
+        });
+        obj.element.setAttribute( 'aria-hidden', true );
+        obj.line.insert( obj.element );
+        try { obj.element.setValue( obj.value ) }catch(e){}; //IE7 hack.
+    },
+
+    _add_label_element: function (obj, data_elem){
+       obj.line.insert( obj.element = new Element(
+          'span', {
+              id        : data_elem.id,
+          }).update( obj.value ));
+    },
+
+    _add_buttonbar_element: function(obj, data_elem){
+        console.log('_add_buttonbar_element');
+    },
+
+    _get_file_change_ctrls : function( obj ){
+        var file_ctrls = {
+            radiogroup : new Element('div', { className: 'multi_control' }),
+            mantener :  {
+                elem :  new Element( 'label' ),
+                label:  new Element( 'span' ).update('MANTENER'.termcap())
+            },
+            eliminar:  {
+                elem:   null,
+                label:  null,
+            },
+            cambiar:  {
+                elem:   new Element( 'label' ),
+                label:  new Element( 'span').update('CAMBIAR'.termcap())
+            }
+        };
+
+        if( obj.file_name ){
+
+            file_ctrls.eliminar.elem = new Element( 'label' );
+            file_ctrls.eliminar.label = new Element( 'span', {
+              'id': 'lbl_'+obj.name+'eliminar',
+              'name': 'lbl_'+obj.name+'eliminar'
+            }).update('ELIMINAR'.termcap());
+        }
+
+        file_ctrls.radiogroup.insert( file_ctrls.mantener.elem );
+        file_ctrls.radiogroup.insert( file_ctrls.cambiar.elem );
+        file_ctrls.radiogroup.insert( file_ctrls.eliminar.elem );
+
+        return file_ctrls;
+    },
+
+    add_element: function( $super, obj ){
+        if( ! obj.line_classes ) obj.line_classes = 'row';
+        if( ! obj.line_id ) obj.line_id = 'line_' + this.id +obj.name;
+        return $super(obj);
+    },
+
+    onFormSubmit: function (e) {
+        Event.stop(e);
+        if ( this.validate() ) {
+            this.form.stopObserving( 'submit', this.onFormSubmit );
+            this.form.submit();
+        }
+    },
+
+    validate: function( $super ){
+
+        this.cleanErrors();
+
+        if ( $super() ){
+            $('submit_error').hide();
+            return true;
+        } else {
+            $('submit_error').show();
+            this.showErrors( this.getInvalidElements() );
+            return false;
+        }
+    },
+
+    showErrors: function( campos_invalidos ){
+        campos_invalidos.each(function(field) {
+            var element = this.getElement(field.name);
+            if( element ){
+                if( field.error ){
+                  let error = field.error
+                  if (typeof error === 'function') {
+                    error = error(this, field);
+                  }
+                  element.line_invalid = new Element('div', { className: 'row invalid_reason' }).update( error );
+                  $(element.line_id).insert( { after: element.line_invalid });
+                }
+                element.line.addClassName( 'invalid' );
+            }
+        }, this);
+    },
+    cleanElement: function(element) {
+        if( element.line_invalid ){
+            element.line_invalid.remove();
+            element.line_invalid = null;
+        }
+    },
+    cleanErrors: function(){
+        this.getElements().each(this.cleanElement, this);
+    }
+});
+
+
+/**
+   Este namespace agrupa los modulos encargados de manejar varios tipo de vistas utilizadas en la plataforma.
+   @namespace */
+Educativa.View = {};
+
+
+/**
+ * @class
+ * @classdesc Sirve para renderizar los controles js de Calendario
+ *
+ * @warning Es el homologo de Calendar de Educativa/Modules/Base.js
+ * Si se cambia este debe cambiarse en el otro
+ *
+ * @param args Utiliza los mismos argumentos que Calendar.setup
+ */
+Educativa.Calendar = Class.create({
+    initialize: function(args) {
+        var defaults = {
+            inputField:     null,
+            displayArea:    null,
+            button:         null,
+            eventName:      "click",
+            ifFormat:       "%Y/%m/%d",
+            daFormat:       "%Y/%m/%d",
+            singleClick:    true,
+            disableFunc:    null,
+            dateStatusFunc: null,
+            dateText:       null,
+            firstDay:       null,
+            align:          "bR",
+            range:          [1900, 2999],
+            weekNumbers:    false,
+            flat:           null,
+            flatCallback:   null,
+            onSelect:       null,
+            onClose:        null,
+            onUpdate:       null,
+            date:           null,
+            showsTime:      false,
+            timeFormat:     "24",
+            electric:       true,
+            step:           2,
+            position:       null,
+            cache:          false,
+            showOthers:     false,
+            multiple:       null
+        }
+
+        var options = Object.extend(defaults, args);
+
+        Calendar.setup( options );
+    }
+});
+
+Educativa.Tab = Class.create({
+    initialize: function(args) {
+        Object.extend(this, args);
+
+        this.tab = $(this.name+'_span');
+        this.content = $(this.name);
+
+        this.tab.observe( 'click', this.on_click.bindAsEventListener(this) );
+    },
+    on_click: function(e) {
+        if(this.onClick) this.onClick(this.name);
+    },
+    is_selected: function() {
+        return this.tab.hasClassName('selected');
+    },
+    show: function() {
+        this.tab.addClassName('selected');
+        this.content.show();
+    },
+    hide: function() {
+        this.tab.removeClassName('selected');
+        this.content.hide();
+    }
+});
+
+Educativa.TabController = Class.create({
+    initialize: function(tabs) {
+        this.tabs = new Object();
+        tabs.each(function(tab_name){
+            this.tabs[tab_name] = new Educativa.Tab({
+                name: tab_name,
+                onClick: this.change_tab.bind(this)
+            });
+        }, this);
+        this.selected = this.get_tab( tabs[0] );
+        this.placeholder = Educativa.placeholder;
+    },
+    get_tab: function(tab_name) {
+        return this.tabs[tab_name];
+    },
+    change_tab: function(tab_name) {
+        var new_tab = this.get_tab(tab_name);
+        if( tab_name != this.selected.name  ){
+
+            this.selected.hide();
+            new_tab.show();
+            this.selected = new_tab;
+
+            this.hide_placeholder(tab_name);
+        }
+    },
+    hide_placeholder: function(tab_name){
+        if ( !this.placeholder ){ return };
+        if( tab_name == this.placeholder.get_tab_name() ){
+            this.placeholder.show();
+        } else {
+            this.placeholder.hide();
+        }
+    }
+});
+
+Educativa.Placeholder = Class.create({
+    initialize: function(args) {
+        Object.extend(this,args);
+
+        this.placeholder = new Element('span', {
+            id:        'clave_placeholder',
+            className: 'clave_placeholder',
+            style:     'position: absolute;'
+        }).insert( this.term );
+
+        this.over.insert({ 'before': this.placeholder });
+
+        this.placeholder.observe( 'click', this.on_focus.bindAsEventListener(this) );
+        this.over.observe( 'keyup', this.on_keyup.bindAsEventListener(this) );
+
+    },
+    show: function() {
+        if( this.placeholder && this.over.value == "" ){
+            this.placeholder.show();
+        }
+    },
+    hide: function() {
+        if( this.placeholder ){
+            this.placeholder.hide();
+        }
+    },
+    on_focus: function (e) {
+        this.over.focus();
+    },
+    on_keyup: function (e) {
+        if( this.over.value == "" ){
+            this.placeholder.show();
+            if( this.on_show ) this.on_show();
+        } else {
+            this.placeholder.hide();
+            if( this.on_hide ) this.on_hide();
+        }
+    },
+    get_tab_name: function () {
+      return this.tab_name;
+    }
+});
+
+
+
+
+
+/**********************************************************
+*   AGREGAR LAS NUEVAS CLASES ARRIBA DE ESTE COMENTARIO   *
+***********************************************************/
+
+// esta funcion ejecuta el codigo en el onload si la pagina aun no se ha cargado.
+// si la pagina esta cargada, la ejecuta directamente
+// Utilizado solo en Educativa/Control/Form.js
+// NO UTILIZAR - ELIMINAR de ser posible
+(function(){
+    /** @ignore */
+    window.$ready = function( fn ){
+        Event.observe(window, 'load', fn);
+    }
+
+    Event.observe(window, 'load', function(){
+        /** @ignore */
+        window.$ready = function(fn){
+            fn();
+        }
+    });
+})();
+
+
+function small_window(myurl, ventana_x, ventana_y) {
+    var winl = (screen.width - ventana_x) / 2;
+    var wint = (screen.height - ventana_y) / 2;
+    var props = 'scrollBars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,width='+ventana_x
+                +',height='+ventana_y+',top='+wint+',left='+winl;
+
+    var uri = myurl.split(/[?#]/);
+
+    if( uri[1] ){
+        var query = uri[1].toQueryParams();
+        query['id_curso'] = id_grupo;
+        uri[1] = $H(query).toQueryString();
+    }
+    myurl = uri[0] +'?'+uri[1]+ (uri[2] ? '#'+uri[2] : '' );
+
+    // HACK -- Los links a correlativas ya no deben abrirse en popups
+    // Se deja esto para no tener que transformar los links existentes
+    if ( uri[0] == 'correlativas.cgi' ) {
+        window.location = myurl;
+    } else {
+        var newWindow = window.open(myurl, "microsite", props);
+        newWindow.focus();
+    }
+}
+
+/**
+* Metodos agregados para el manejo de opciones en los select
+* El elemento select esta definido en el DOM.
+* REIMPLEMENTAR de ser posible
+* @name select
+* @class
+*/
+
+Element.addMethods('select',
+{
+    /**
+    *  Elimina todas las opciones de un select
+    *  @memberOf select#
+    */
+    clear : function(element){
+            while (element.length> 0) {
+                element.remove(0);
+            }
+        },
+    /**
+    *  Agrega opciones a un elemento select
+    *  @param element SELECT
+    *  @param list Array de objetos con las propiedades label y value
+    *  @memberOf select#
+    */
+    add_options : function(element, list){
+        list.each(function(i){
+            element.appendChild(new Element('option', {value : i.value}).update(i.label) );
+        });
+    },
+
+    /** mueve los elementos seleccionados a otra lista
+        @memberOf select# */
+    moveSelectedItemsTo : function(element,hasta) {
+        element.select('option')
+            .findAll(function(o){return ! o.disabled && o.selected})
+            .invoke('remove')
+            .each(function(e){ $(hasta).appendChild( e ) });
+        element.sortItems();
+    },
+    /** ordena los elementos del select de forma ascendente
+       @memberOf select# */
+    sortItems : function(element){
+        element.select('option')
+            .invoke('remove').sort(function(a,b){
+                return a.innerHTML.localeCompare( b.innerHTML );
+            })
+            .each(function(e){ element.appendChild( e ) });
+    },
+    /** selecciona todos los elementos del select
+       @memberOf select# */
+    selectAllItems : function(element) {
+        if(! (element.multiple && element.multiple) ) return ;
+        element.select('option').each(function(o){o.selected = true});
+    }
+});
+
+
+// genera una cadena de caracteres aleatorios de longitud [LENGTH]
+function generar_random( length ) {
+    var chars = [];
+
+    for( var i = 'a'.charCodeAt(0); i <= 'z'.charCodeAt(0); i++ ) chars.push( String.fromCharCode(i) );
+    for( var i = 'A'.charCodeAt(0); i <= 'Z'.charCodeAt(0); i++ ) chars.push( String.fromCharCode(i) );
+    for( var i = 0; i <= 9; i++ ) chars.push( i.toString() );
+
+    var str = '';
+    for( var i = 0; i < length; i++ ) {
+        var index = Math.floor( Math.random() * 100 ) % chars.length;
+        str += chars[ index ];
+    }
+
+    return str;
+}
+
+// Determina si el string what aparece dentro del string where ignorando
+// las diferencias entre vocales con y sin acento latino y entre la u con y sin dieresis
+// La busqueda es case insensitive
+function search_ignore_accents( what, where ) {
+
+    what = what.toLowerCase();
+    where = where.toLowerCase();
+
+    var re = /\xE1|\xE9|\xED|\xF3|\xFA|\xFC/ig;
+
+     var corresp = {
+        '\xE1' : 'a', // a acentuada
+        '\xE9' : 'e', // e acentuada
+        '\xED' : 'i', // i acentuada
+        '\xF3' : 'o', // o acentuada
+        '\xFA' : 'u', // u acentuada
+        '\xFC' : 'u'  // u dieresis
+    };
+
+    var rep = function(a) {
+        return corresp[a];
+    }
+
+    what = what.replace( re, rep );
+    where = where.replace( re, rep );
+
+    if ( where.include( what ) ) {
+        return true;
+    }
+
+    return false;
+}
+
+/***************************************************************************
+*   IMPORTANTE: AGREGAR LAS NUEVAS CLASES ANTES DEL ULTIMO Event.observe   *
+***************************************************************************/

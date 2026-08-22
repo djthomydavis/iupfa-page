@@ -1,0 +1,276 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-MENU-VARIABLE Component - Flexible Column Layout
+   ==================================== */
+
+:root {
+    /* Spacing */
+    --edu-menu-variable-gap: 10px;
+
+    /* Responsive breakpoints */
+    --edu-menu-variable-breakpoint-stack: 600px;
+    --edu-menu-variable-breakpoint-wrap: 900px;
+}
+
+/* ====================================
+   Base Styles
+   ==================================== */
+
+.edu-menu-variable {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--edu-menu-variable-gap) var(--edu-menu-variable-gap);
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.edu-menu-variable-column {
+    display: flex;
+    align-items: center;
+    gap: var(--edu-menu-variable-gap);
+    flex-wrap: wrap;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.edu-menu-variable-column > .edu-component-group {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* ====================================
+   Auto-split Alignment Logic
+   First half of columns align left, second half align right
+   ==================================== */
+
+/* Odd number of columns: first half + 1 goes left */
+/* 1 column: left */
+.edu-menu-variable-column:only-child {
+    justify-content: flex-start;
+}
+
+/* 2 columns: first left, second right */
+.edu-menu-variable-column:first-child:nth-last-child(2) {
+    justify-content: flex-start;
+}
+
+.edu-menu-variable-column:last-child:nth-child(2) {
+    justify-content: flex-end;
+}
+
+/* 3 columns: first 2 left, last right */
+.edu-menu-variable-column:first-child:nth-last-child(3),
+.edu-menu-variable-column:nth-child(2):nth-last-child(2) {
+    justify-content: flex-start;
+}
+
+.edu-menu-variable-column:last-child:nth-child(3) {
+    justify-content: flex-end;
+}
+
+/* 4 columns: first 2 left, last 2 right */
+.edu-menu-variable-column:first-child:nth-last-child(4),
+.edu-menu-variable-column:nth-child(2):nth-last-child(3) {
+    justify-content: flex-start;
+}
+
+.edu-menu-variable-column:nth-child(3):nth-last-child(2),
+.edu-menu-variable-column:last-child:nth-child(4) {
+    justify-content: flex-end;
+}
+
+/* 5 columns: first 3 left, last 2 right */
+.edu-menu-variable-column:first-child:nth-last-child(5),
+.edu-menu-variable-column:nth-child(2):nth-last-child(4),
+.edu-menu-variable-column:nth-child(3):nth-last-child(3) {
+    justify-content: flex-start;
+}
+
+.edu-menu-variable-column:nth-child(4):nth-last-child(2),
+.edu-menu-variable-column:last-child:nth-child(5) {
+    justify-content: flex-end;
+}
+
+/* 6 columns: first 3 left, last 3 right */
+.edu-menu-variable-column:first-child:nth-last-child(6),
+.edu-menu-variable-column:nth-child(2):nth-last-child(5),
+.edu-menu-variable-column:nth-child(3):nth-last-child(4) {
+    justify-content: flex-start;
+}
+
+.edu-menu-variable-column:nth-child(4):nth-last-child(3),
+.edu-menu-variable-column:nth-child(5):nth-last-child(2),
+.edu-menu-variable-column:last-child:nth-child(6) {
+    justify-content: flex-end;
+}
+
+/* ====================================
+   Container Wrapper (enables container queries)
+   ==================================== */
+
+.edu-menu-variable-container {
+    container-type: inline-size;
+    container-name: menu-variable;
+    width: 100%;
+}
+
+/* ====================================
+   Responsive Behavior
+   ==================================== */
+
+/* Medium screens: Allow parent to wrap but keep horizontal layout */
+@container menu-variable (max-width: 900px) {
+    .edu-menu-variable {
+        gap: 12px;
+    }
+
+    .edu-menu-variable-column {
+        gap: 12px;
+    }
+}
+
+/* Small screens: Full stack, all columns take full width */
+@container menu-variable (max-width: 600px) {
+    .edu-menu-variable {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .edu-menu-variable-column {
+        justify-content: flex-start !important;
+        width: 100%;
+        gap: 12px;
+    }
+
+    /* Stack component groups vertically on small screens */
+    .edu-menu-variable-column > .edu-component-group {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .edu-menu-variable-column > .edu-component-group > * {
+        width: 100%;
+    }
+
+    /* Make inline filter forms expand to full width */
+    .edu-menu-variable-column > .edu-component-group > form {
+        display: block;
+        width: 100%;
+    }
+
+    .edu-menu-variable-column > .edu-component-group .edu-inline-filter {
+        display: flex;
+        width: 100%;
+    }
+
+    .edu-menu-variable-column > .edu-component-group .edu-inline-filter > .edu-inline-filter-select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .edu-menu-variable-column > .edu-component-group .edu-inline-filter > .edu-inline-filter-input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .edu-menu-variable-column > .edu-component-group .edu-inline-filter .edu-dropdown {
+        flex: 1;
+        min-width: 0;
+    }
+
+
+    /* Stack button groups vertically on small screens */
+    .edu-menu-variable-column > .edu-btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .edu-menu-variable-column > .edu-btn-group > .edu-btn {
+        width: 100%;
+    }
+}
+
+/* ====================================
+   Fallback for browsers without container queries
+   ==================================== */
+
+@supports not (container-type: inline-size) {
+    @media (max-width: 900px) {
+        .edu-menu-variable {
+            gap: 12px;
+        }
+
+        .edu-menu-variable-column {
+            gap: 12px;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .edu-menu-variable {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .edu-menu-variable-column {
+            justify-content: flex-start !important;
+            width: 100%;
+            gap: 12px;
+        }
+
+        .edu-menu-variable-column > .edu-component-group {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .edu-menu-variable-column > .edu-component-group > * {
+            width: 100%;
+        }
+
+        /* Make inline filter forms expand to full width */
+        .edu-menu-variable-column > .edu-component-group > form {
+            display: block;
+            width: 100%;
+        }
+
+        .edu-menu-variable-column > .edu-component-group .edu-inline-filter {
+            display: flex;
+            width: 100%;
+        }
+
+        .edu-menu-variable-column > .edu-component-group .edu-inline-filter > .edu-inline-filter-select {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .edu-menu-variable-column > .edu-component-group .edu-inline-filter > .edu-inline-filter-input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .edu-menu-variable-column > .edu-component-group .edu-inline-filter .edu-dropdown {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .edu-menu-variable-column > .edu-btn-group {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .edu-menu-variable-column > .edu-btn-group > .edu-btn {
+            width: 100%;
+        }
+    }
+}

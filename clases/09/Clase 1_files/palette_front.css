@@ -1,0 +1,24 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*
+    Variables comunes en el frontend.
+
+    --theme-primary/secondary aliasean a --variable-color-curso/plataforma
+    (color configurable del campus). En palette_back.css NO aliasean - son
+    hex fijos Educativa. Por eso archivos CSS shared front+admin que deben
+    respetar el color del campus (topbar, sidebar global) usan
+    --variable-color-plataforma* directo, NO --theme-secondary*.
+*/
+:root {
+    --theme-primary: var(--variable-color-curso);
+    --theme-primary-hover: var(--variable-color-curso-gamma2);
+    --theme-primary-contrast: var(--variable-color-curso-contraste);
+    --theme-secondary: var(--variable-color-plataforma);
+    --theme-secondary-hover: var(--variable-color-plataforma-gamma2);
+    --theme-secondary-contrast: var(--variable-color-plataforma-contraste);
+}

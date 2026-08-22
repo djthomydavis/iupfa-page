@@ -20,23 +20,24 @@
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div>
-        <div>
+        <div class="sidebar-text">
           <strong>CS IUPFA</strong>
           <span>Administración</span>
         </div>
       </div>
 
       <nav class="sidebar-nav">
-        <a class="nav-link" href="index.html">Volver al portal</a>
-        <button class="nav-link active" data-admin-view="panel">Panel</button>
-        <button class="nav-link" data-admin-view="materias">Materias</button>
-        <button class="nav-link" data-admin-view="usuarios">Usuarios</button>
-        <button class="nav-link" data-admin-view="discord">Discord</button>
+        <a class="nav-link" href="index.html"><span class="nav-icon"><span class="icon icon-arrow-left"></span></span><span class="nav-label sidebar-text">Volver al portal</span></a>
+        <button class="nav-link active" data-admin-view="panel"><span class="nav-icon"><span class="icon icon-bar-chart"></span></span><span class="nav-label sidebar-text">Panel</span></button>
+        <button class="nav-link" data-admin-view="materias"><span class="nav-icon"><span class="icon icon-book"></span></span><span class="nav-label sidebar-text">Materias</span></button>
+        <button class="nav-link" data-admin-view="usuarios"><span class="nav-icon"><span class="icon icon-users"></span></span><span class="nav-label sidebar-text">Usuarios</span></button>
+        <button class="nav-link" data-admin-view="discord"><span class="nav-icon"><span class="icon icon-gamepad"></span></span><span class="nav-label sidebar-text">Discord</span></button>
       </nav>
 
       <div class="sidebar-footer">
         <label class="theme-toggle">
-          <span>🌙 Modo oscuro</span>
+          <span class="nav-icon"><span class="icon icon-moon"></span></span>
+          <span class="sidebar-text">Modo oscuro</span>
           <input type="checkbox" id="darkModeToggle" />
           <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
         </label>
@@ -88,12 +89,12 @@
             <p class="form-hint">Las materias y el progreso de los alumnos ya viven en Supabase y se comparten entre dominios. El calendario, el foro general y las unidades/opiniones/encuestas de cada materia todavía se guardan en el navegador — usá esto para pasarlos de un dominio a otro (por ejemplo, de tu prueba local al sitio ya publicado).</p>
             <div id="dataTransferNotice" class="notice"></div>
             <div class="stack-row">
-              <button type="button" id="exportLocalDataBtn" class="ghost-btn">⬇ Exportar datos locales</button>
+              <button type="button" id="exportLocalDataBtn" class="ghost-btn"><span class="icon icon-download"></span> Exportar datos locales</button>
               <label class="ghost-btn file-label-btn">
-                ⬆ Importar datos locales
+                <span class="icon icon-upload"></span> Importar datos locales
                 <input type="file" id="importLocalDataInput" accept="application/json" class="hidden" />
               </label>
-              <button type="button" id="clearImportedDataBtn" class="ghost-btn danger-btn small-btn">🗑 Vaciar calendario, foro y contenido</button>
+              <button type="button" id="clearImportedDataBtn" class="ghost-btn danger-btn small-btn"><span class="icon icon-trash"></span> Vaciar calendario, foro y contenido</button>
             </div>
             <label class="checkbox-row small"><input type="checkbox" id="clearBeforeImportCheckbox" /> Vaciar todo antes de importar (evita duplicados)</label>
           </section>
@@ -148,6 +149,18 @@
             <div class="section-head"><h3>Materias cargadas</h3></div>
             <div id="adminSubjectsTable"></div>
           </section>
+
+          <section class="card">
+            <div class="section-head"><h3>Importar clases guardadas (HTML)</h3></div>
+            <p class="form-hint">Seleccioná la carpeta "Clases" (la que tiene adentro una carpeta por cada código de materia, ej. "09", y dentro los "Clase N.html" guardados desde el campus con su carpeta "..._files" de imágenes al lado). Se importan automáticamente a la unidad "Clases" de cada materia que coincida por código, subiendo las imágenes al storage del sitio.</p>
+            <input type="file" id="importClasesInput" webkitdirectory directory multiple />
+            <label class="checkbox-row small"><input type="checkbox" id="importClasesForce" /> Sobrescribir clases que ya existan (mismo título)</label>
+            <div class="stack-row">
+              <button type="button" id="importClasesStart">Iniciar importación</button>
+            </div>
+            <div id="importClasesNotice" class="notice"></div>
+            <div id="importClasesLog" class="stack"></div>
+          </section>
         </section>
 
         <section id="adminUsuariosView" class="admin-view-section hidden">
@@ -182,7 +195,7 @@
                 <button type="button" class="md-btn" data-md="code" title="Código en línea">{ }</button>
                 <button type="button" class="md-btn" data-md="quote" title="Cita">"</button>
                 <button type="button" class="md-btn" data-md="list" title="Lista">•</button>
-                <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+                <button type="button" class="md-btn" data-md="link" title="Enlace"><span class="icon icon-link"></span></button>
               </div>
               <textarea id="outboxContent" placeholder="Mensaje a enviar (admite Markdown de Discord)" rows="3"></textarea>
               <label class="checkbox-row"><input type="checkbox" id="outboxEmbedToggle" /> Agregar embed (tarjeta enriquecida)</label>
@@ -207,7 +220,7 @@
                 <button type="button" class="md-btn" data-md="code" title="Código en línea">{ }</button>
                 <button type="button" class="md-btn" data-md="quote" title="Cita">"</button>
                 <button type="button" class="md-btn" data-md="list" title="Lista">•</button>
-                <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+                <button type="button" class="md-btn" data-md="link" title="Enlace"><span class="icon icon-link"></span></button>
               </div>
               <textarea id="scheduledContent" placeholder="Mensaje a enviar (admite Markdown de Discord)" rows="3"></textarea>
               <label class="checkbox-row"><input type="checkbox" id="scheduledEmbedToggle" /> Agregar embed (tarjeta enriquecida)</label>
@@ -308,9 +321,9 @@
                 <div class="md-toolbar" id="faqMdToolbar">
                   <button type="button" class="md-btn" data-md="bold" title="Negrita"><b>N</b></button>
                   <button type="button" class="md-btn" data-md="italic" title="Cursiva"><i>C</i></button>
-                  <button type="button" class="md-btn" data-md="link" title="Enlace">🔗</button>
+                  <button type="button" class="md-btn" data-md="link" title="Enlace"><span class="icon icon-link"></span></button>
                 </div>
-                <textarea id="faqAnswerInput" placeholder="Respuesta. Para poner un link seleccioná el texto y apretá 🔗, o escribí [texto](https://...)" rows="3" required></textarea>
+                <textarea id="faqAnswerInput" placeholder="Respuesta. Para poner un link seleccioná el texto y apretá el ícono de enlace, o escribí [texto](https://...)" rows="3" required></textarea>
                 <div class="stack-row">
                   <button type="submit" id="faqFormSubmit">Agregar pregunta</button>
                   <button type="button" id="faqFormCancel" class="ghost-btn hidden">Cancelar edición</button>

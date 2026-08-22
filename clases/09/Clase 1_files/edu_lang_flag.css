@@ -1,0 +1,22 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* --- #LangFlag --- */
+/* Bandera SVG renderizada por Educativa::Aula::Model::Idioma->bandera_html.
+   Se usa en cualquier <select data-edu-lang-flag="1"> y en checkboxes/labels
+   donde se quiera mostrar la bandera al lado del nombre del idioma.
+   El selector arranca con img para ganar specificity sobre reglas genericas
+   de imagenes en formularios. */
+img.edu_lang_flag {
+    display: inline-block;
+    width: 1.4em;
+    height: 1.05em;
+    margin: 0 .4em 0 .25em;
+    vertical-align: -.15em;
+    border: 1px solid #e0e0e0;
+    object-fit: cover;
+}

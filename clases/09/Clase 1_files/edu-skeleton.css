@@ -1,0 +1,253 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*********************
+  @Componente: edu-skeleton
+  Placeholder de carga con animacion shimmer.
+  Reemplaza contenido mientras se cargan datos via AJAX.
+**********************/
+
+/* --- #Variables --- */
+:root {
+    --edu-skeleton-bg: #ffffff;
+    --edu-skeleton-color-base: #e8e8e8;
+    --edu-skeleton-color-mid: #dcdcdc;
+    --edu-skeleton-color-dark: #d2d2d2;
+    --edu-skeleton-shimmer: rgba(0, 0, 0, .08);
+    --edu-skeleton-duration: .8s;
+    --edu-skeleton-radius: 3px;
+}
+
+/* --- #Container --- */
+.edu-skeleton {
+    position: relative;
+    background-color: var(--edu-skeleton-bg);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.edu-skeleton::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg, transparent, transparent, transparent,
+        var(--edu-skeleton-shimmer),
+        transparent, transparent, transparent
+    );
+    transform: translateX(-100%);
+    animation: edu-skeleton-shimmer var(--edu-skeleton-duration) infinite;
+}
+
+/* --- #SVG placeholder --- */
+.edu-skeleton svg {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+}
+
+/* --- #Variant: cards (lista de tarjetas tipo anuncio) --- */
+.edu-skeleton-cards {
+    padding: 0;
+    background-color: transparent;
+}
+
+/* El shimmer vive en cada tarjeta, no en el wrapper: asi
+   el gap entre tarjetas queda transparente (se ve el fondo
+   de la pagina) y el efecto shimmer se limita a cada card. */
+.edu-skeleton-cards::after {
+    display: none;
+}
+
+.edu-skeleton-cards .edu-skeleton-card {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    border: 1px solid #eeeeee;
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+.edu-skeleton-cards .edu-skeleton-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg, transparent, transparent, transparent,
+        var(--edu-skeleton-shimmer),
+        transparent, transparent, transparent
+    );
+    transform: translateX(-100%);
+    animation: edu-skeleton-shimmer var(--edu-skeleton-duration) infinite;
+}
+
+.edu-skeleton-cards .edu-skeleton-card:last-child {
+    margin-bottom: 0;
+}
+
+.edu-skeleton-cards .edu-skeleton-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.edu-skeleton-cards .edu-skeleton-avatar {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-cards .edu-skeleton-name {
+    width: 180px;
+    height: 10px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-cards .edu-skeleton-date {
+    width: 90px;
+    height: 10px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-mid);
+}
+
+.edu-skeleton-cards .edu-skeleton-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 0 14px;
+}
+
+.edu-skeleton-cards .edu-skeleton-line {
+    height: 10px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-cards .edu-skeleton-card-foot {
+    width: 120px;
+    height: 9px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-mid);
+}
+
+/* --- #Variant: rows (lista de filas tipo historial wiki) --- */
+.edu-skeleton-rows {
+    padding: 12px 0;
+}
+
+.edu-skeleton-rows .edu-skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px dotted #e5e5e5;
+}
+
+.edu-skeleton-rows .edu-skeleton-row:last-child {
+    border-bottom: none;
+}
+
+.edu-skeleton-rows .edu-skeleton-bar {
+    height: 9px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-rows .edu-skeleton-bar-mid {
+    background: var(--edu-skeleton-color-mid);
+}
+
+/* --- #Variant: grid (grilla de tarjetas tipo planes/aulas) --- */
+.edu-skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 0;
+    background: transparent;
+}
+
+/* El shimmer vive en cada card, no en el wrapper, igual que en .edu-skeleton-cards. */
+.edu-skeleton-grid::after { display: none; }
+
+.edu-skeleton-grid .edu-skeleton-grid-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+.edu-skeleton-grid .edu-skeleton-grid-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg, transparent, transparent, transparent,
+        var(--edu-skeleton-shimmer),
+        transparent, transparent, transparent
+    );
+    transform: translateX(-100%);
+    animation: edu-skeleton-shimmer var(--edu-skeleton-duration) infinite;
+}
+
+.edu-skeleton-grid .edu-skeleton-grid-banner {
+    width: 100%;
+    height: 130px;
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-grid .edu-skeleton-grid-title {
+    width: 70%;
+    height: 14px;
+    margin: 16px 16px 8px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-base);
+}
+
+.edu-skeleton-grid .edu-skeleton-grid-line {
+    height: 10px;
+    margin: 0 16px 16px;
+    border-radius: var(--edu-skeleton-radius);
+    background: var(--edu-skeleton-color-mid);
+}
+
+.edu-skeleton-grid .edu-skeleton-grid-footer {
+    height: 36px;
+    margin-top: 14px;
+    background: var(--edu-skeleton-color-mid);
+}
+
+@media (max-width: 1024px) {
+    .edu-skeleton-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .edu-skeleton-grid { grid-template-columns: 1fr; }
+}
+
+/* --- #Keyframes --- */
+@keyframes edu-skeleton-shimmer {
+    100% { transform: translateX(100%); }
+}

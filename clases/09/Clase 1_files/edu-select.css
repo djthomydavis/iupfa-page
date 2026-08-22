@@ -1,0 +1,233 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-SELECT Component - Select Element
+   ==================================== */
+
+:root {
+    /* Theme colors */
+    --edu-select-light: var(--theme-light-base);
+    --edu-select-dark: var(--theme-dark-base);
+    --edu-select-disabled: var(--theme-disabled);
+
+    --edu-select-primary: var(--theme-primary);
+    --edu-select-secondary: var(--theme-secondary);
+
+    /* Typography */
+    --edu-select-font-size-sm: 14px;
+    --edu-select-font-size: 16px;
+    --edu-select-font-size-lg: 18px;
+
+    /* Sizing */
+    /* Height tokens - map to global theme */
+    --edu-select-height-sm: var(--theme-component-height-sm);
+    --edu-select-height: var(--theme-component-height);
+    --edu-select-height-lg: var(--theme-component-height-lg);
+
+    --edu-select-padding-x-sm: 10px;
+    --edu-select-padding-x: 12px;
+    --edu-select-padding-x-lg: 16px;
+
+    --edu-select-padding-right-sm: 28px;
+    --edu-select-padding-right: 32px;
+    --edu-select-padding-right-lg: 36px;
+
+    --edu-select-min-width: 120px;
+
+    /* Visual design */
+    --edu-select-border-width: 1px;
+
+    /* Border radius - map to global theme */
+    --edu-select-border-radius: var(--theme-component-border-radius);
+
+    --edu-select-arrow-size: 0.75em;
+}
+
+/* ====================================
+   Base Styles
+   ==================================== */
+
+.edu-select {
+    display: inline-flex;
+    position: relative;
+}
+
+.edu-select-wrapper {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    min-width: var(--edu-select-min-width);
+    flex: 1;
+}
+
+.edu-select select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 0 var(--edu-select-padding-right) 0 var(--edu-select-padding-x);
+    height: var(--edu-select-height);
+    border: var(--edu-select-border-width) solid transparent;
+    border-radius: var(--edu-select-border-radius);
+    box-sizing: border-box;
+    font-size: var(--edu-select-font-size);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                border-color var(--theme-transition-duration) var(--theme-transition-timing),
+                box-shadow var(--theme-transition-duration) var(--theme-transition-timing);
+    width: 100%;
+}
+
+.edu-select select:disabled {
+    cursor: not-allowed;
+}
+
+.edu-select-wrapper::after {
+    content: '\25BC';
+    position: absolute;
+    right: var(--edu-select-padding-x);
+    pointer-events: none;
+    font-size: var(--edu-select-arrow-size);
+}
+
+/* ====================================
+   Label Styles
+   ==================================== */
+
+.edu-select-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--edu-select-padding-x);
+    height: var(--edu-select-height);
+    font-size: var(--edu-select-font-size-sm);
+    white-space: nowrap;
+    user-select: none;
+    border: var(--edu-select-border-width) solid transparent;
+    border-radius: var(--edu-select-border-radius) 0 0 var(--edu-select-border-radius);
+    border-right: none;
+    box-sizing: border-box;
+    gap: 6px;
+}
+
+/* With label: select gets right radius and no left border */
+.edu-select:has(.edu-select-label) select {
+    border-radius: 0 var(--edu-select-border-radius) var(--edu-select-border-radius) 0;
+    border-left: none;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+/* Small */
+.edu-select-sm .edu-select-label {
+    padding: 0 var(--edu-select-padding-x-sm);
+    height: var(--edu-select-height-sm);
+    font-size: 12px;
+}
+
+.edu-select-sm select {
+    padding: 0 var(--edu-select-padding-right-sm) 0 var(--edu-select-padding-x-sm);
+    height: var(--edu-select-height-sm);
+    font-size: var(--edu-select-font-size-sm);
+}
+
+.edu-select-sm .edu-select-wrapper::after {
+    right: var(--edu-select-padding-x-sm);
+}
+
+/* Large */
+.edu-select-lg .edu-select-label {
+    padding: 0 var(--edu-select-padding-x-lg);
+    height: var(--edu-select-height-lg);
+    font-size: var(--edu-select-font-size);
+}
+
+.edu-select-lg select {
+    padding: 0 var(--edu-select-padding-right-lg) 0 var(--edu-select-padding-x-lg);
+    height: var(--edu-select-height-lg);
+    font-size: var(--edu-select-font-size-lg);
+}
+
+.edu-select-lg .edu-select-wrapper::after {
+    right: var(--edu-select-padding-x-lg);
+}
+
+/* ====================================
+   Color Variants
+   ==================================== */
+
+/* Primary */
+.edu-select-primary select {
+    background-color: var(--edu-select-light);
+    color: var(--edu-select-dark);
+    border-color: var(--edu-select-primary);
+}
+
+.edu-select-primary .edu-select-wrapper::after {
+    color: var(--edu-select-primary);
+}
+
+.edu-select-primary select:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-select-primary) var(--theme-hover-mix), var(--edu-select-light));
+    border-color: var(--edu-select-primary);
+}
+
+.edu-select-primary select:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-select-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-select-primary .edu-select-label {
+    background-color: color-mix(in srgb, var(--edu-select-primary) var(--theme-label-bg-mix), var(--edu-select-light));
+    color: var(--edu-select-dark);
+    border-color: var(--edu-select-primary);
+}
+
+/* Secondary */
+.edu-select-secondary select {
+    background-color: var(--edu-select-light);
+    color: var(--edu-select-dark);
+    border-color: var(--edu-select-secondary);
+}
+
+.edu-select-secondary .edu-select-wrapper::after {
+    color: var(--edu-select-secondary);
+}
+
+.edu-select-secondary select:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-select-secondary) var(--theme-hover-mix), var(--edu-select-light));
+    border-color: var(--edu-select-secondary);
+}
+
+.edu-select-secondary select:focus {
+    outline: none;
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-select-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-select-secondary .edu-select-label {
+    background-color: color-mix(in srgb, var(--edu-select-secondary) var(--theme-label-bg-mix), var(--edu-select-light));
+    color: var(--edu-select-dark);
+    border-color: var(--edu-select-secondary);
+}
+
+/* ====================================
+   Disabled State
+   ==================================== */
+
+.edu-select select:disabled {
+    opacity: 0.6;
+}
+
+.edu-select:has(select:disabled) .edu-select-label {
+    opacity: 0.6;
+}
+
+.edu-select:has(select:disabled) .edu-select-wrapper::after {
+    opacity: 0.6;
+}

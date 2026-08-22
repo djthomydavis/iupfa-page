@@ -1,0 +1,90 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+:root {
+    --edu-front-nav-color: var(--theme-primary);
+    --edu-front-nav-color-contrast: var(--theme-primary-contrast);
+    --edu-front-nav-color_hover: var(--theme-primary-hover);
+
+    --edu-front-nav-color-light-contrast: #515151;
+
+    --edu-front-section-margin: 36px;
+    --menu-secciones-z-index: 105;
+}
+/* Oculta el menu secciones mientras cargan los iconos fontawesome (removida por document.fonts.ready) */
+.menu_secciones_loading { opacity: 0; }
+
+/* Marco del menu secciones, elemento padre del menu */
+.menu_secciones {
+    display: flex;
+    flex-direction: column;
+}
+.nav-show,
+.nav-hide { display: none; }
+
+
+/* margin-bottom evita que el input quede pegado al borde inferior del menu
+   cuando hay muchas secciones y el footer queda justo debajo (#18316 issue 3) */
+.menu_secciones .search {
+    margin: 8px 0 24px;
+    font-family: 'Roboto', sans-serif;
+    font-size: .875rem;
+    border: solid 1px #d2d2d2;
+    border-radius: 3px;
+}
+
+.menu_secciones .search input {
+    width: 100%;
+    margin: 0;
+    padding: 8px 5px 8px 34px;
+    font-size: .875rem;
+    border: 0;
+    background-color: #f5f5f5;
+    background-image: url(../img/comunes/icon_search.png);
+    background-position: 10px 10px;
+    background-repeat: no-repeat;
+    box-sizing: border-box;
+    transition: background-color .2s;
+}
+
+.menu_secciones .search input:focus {
+    background-color: #fff;
+}
+
+/* secciones */
+.menu_secciones .seccion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    text-decoration: none;
+    font-size: .938rem;
+    color: var(--edu-front-nav-color-light-contrast);
+    user-select: none;
+}
+
+.menu_secciones .seccion:not(.activa):active,
+.menu_secciones .seccion:not(.activa):hover {
+    background-color: var(--edu-front-nav-color_hover);
+    color: var(--edu-front-nav-color-contrast);
+}
+
+.menu_secciones .seccion.activa {
+    font-weight: 700;
+    color: var(--edu-front-nav-color-contrast);
+    background-color: var(--edu-front-nav-color);
+}
+
+/* separadores */
+.menu_secciones .separador {
+    margin-bottom: 3px;
+    border-bottom: solid 1px #ddd;
+    padding-bottom: 3px;
+    color: #9E9E9E;
+}
+
+

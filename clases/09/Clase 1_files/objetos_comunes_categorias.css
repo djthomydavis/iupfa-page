@@ -1,0 +1,370 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+ /* ----------------------------
+    @objeto: Lista de CATEGORIAS
+    ---------------------------- */
+:root {
+    --categorias-color-curso: var(--theme-primary);
+    --categorias-color-blanco: var(--theme-light-base);
+    --categorias-color-negro: var(--theme-dark-base);
+    --categorias--list-bgcolor_hover: var(--theme-list-bg-color_hover);
+    --categorias--color-danger: var(--theme-danger);
+    --categorias--color-danger_hover: var(--theme-danger-hover);
+}
+
+/* Reset */
+.lista_categorias,
+.lista_categorias > li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lista_categorias .link {
+    position: relative;
+    display: flex;
+    gap: 20px;
+    padding: 14px;
+    border-bottom: 1px solid #eeeeee;
+    text-decoration: none;
+    transition: all .1s;
+}
+.lista_categorias .link:hover,
+.lista_categorias .link:active {
+    border-bottom-color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-blanco) 78%);
+    background-color: var(--categorias--list-bgcolor_hover);
+}
+
+/* ---- layout interno ---- */
+/* --Columna izquierda-- */
+.lista_categorias .col_izq {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    max-width: 24px;
+    height: min-content;
+    margin-top: 8px;
+    padding: 8px 12px 4px;
+    text-align: center;
+    color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-negro) 40%);
+    border-radius: 4px 0 4px 4px;
+    background-color: color-mix(in srgb, var(--categorias-color-curso) 7%, var(--categorias-color-blanco));
+    filter: drop-shadow(0 0px 1px color-mix(in srgb, var(--categorias-color-curso) 34%, var(--categorias-color-negro) 30%));
+}
+.lista_categorias .col_izq::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -6px;
+    width: 18px;
+    height: 8px;
+    background: #f5edf9;
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+/* Icono globo categorias */
+.lista_categorias .icono {
+    display: inline-block;
+    max-width: 24px;
+    max-height: 24px;
+    font-size: 1.125rem
+}
+/* Valor globo categorias */
+.lista_categorias .contador {
+    font-size: .875rem;
+    font-weight: 700;
+}
+
+/* --Columna derecha-- */
+.lista_categorias .col_der {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    transition: all .2s;
+}
+/* Contenedor para mostrar pastilla "No leidos" */
+.lista_categorias .burbuja_estado {
+    position: absolute;
+    top: -2px;
+    right: 0;
+}
+.lista_categorias .nombre {
+    display: block;
+    padding: 0 0 0;
+    font-weight: 700;
+    text-decoration: none;
+    color: #595959;
+}
+.lista_categorias .descripcion {
+    color: #595959;
+    font-size: .938rem;
+}
+.lista_categorias .ultima_actualizacion {
+    margin-top: 6px;
+    font-size: .813rem;
+    color: #757575;
+}
+.lista_categorias .ultima_actualizacion a {
+    color: #000000;
+    text-decoration: none;
+}
+.lista_categorias .ultima_actualizacion a:hover { text-decoration: underline; }
+
+.Categorizador {
+    margin: 25px 0 0 0;
+    padding: 5px 0 5px;
+    color: #8a8a8a;
+    font-weight: 300;
+    font-size: 1rem;
+}
+
+
+/* --------------------------
+@objeto: Grupos de trabajo
+-------------------------- */
+.Contenido-ListadoGruposTrabajo { clear: both; }
+
+
+/* ---------------------------------
+@objeto: Lista ITEMS de la categoria
+------------------------------------ */
+.subtitulo_items  {
+    margin: 0;
+    padding: 15px 0 10px;
+    color: #8a8a8a;
+    font-weight: 300;
+    font-size: 1rem;
+}
+/* Reset */
+.lista_items,
+.lista_items .item {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* ---- Layout ---- */
+/* Ya leidos */
+.lista_items .item {
+    position: relative;
+    border-bottom: 1px solid #ebebeb;
+    transition-duration: .2s;
+}
+.lista_items .item:hover {
+    border-bottom-color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-blanco) 78%);
+    background-color: var(--categorias--list-bgcolor_hover);
+}
+
+/* No leidos */
+.lista_items .item.no_leido,
+.lista_items .item.pendientes {
+    border-bottom-color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-blanco) 78%);
+    background-color: #ffffff;
+}
+.lista_items .item.no_leido:hover,
+.lista_items .item.pendientes:hover { background-color: var(--categorias--list-bgcolor_hover); }
+/* --------- */
+
+.lista_items .item .btn-eliminar {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+}
+.lista_items .item .link_item {
+    display: flex;
+    gap: 8px;
+    padding: 14px 14px 10px;
+    text-decoration: none;
+    word-break: break-word;
+    color: #595959;
+    cursor: pointer;
+}
+
+/* --- Columna izquierda (lista-items) --- */
+.lista_items .item .col_izq { display: flex; }
+
+.lista_items .item .icono {
+    align-self: baseline;
+    font-size: 1.25rem;
+    color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-negro) 40%);
+    opacity: .8;
+}
+.lista_items .item.no_leido .icono { opacity: 1; }
+
+/* --- Columna derecha (lista-items) --- */
+.lista_items .item .col_der {
+    flex: 1;
+    min-width: 0;
+}
+.lista_items .item .nombre_info {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 0 28px 0 0;
+}
+.lista_items .item .nombre {
+    display: block;
+    box-sizing: border-box;
+    text-decoration: none;
+    color: #000000;
+}
+/* Remarco el nombre en los "No leidos" y "Pendientes" */
+.lista_items .item.no_leido .nombre,
+.lista_items .item.pendientes .nombre {
+    font-weight: 700;
+    color: #000000;
+}
+/* Valor, luego del nombre */
+.lista_items .info_adicional {
+    padding: 0 6px;
+    font-size: .813rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    color: #595959;
+    background-color: var(--categorias-color-blanco);
+}
+
+/* Metadata */
+.lista_items .item .metadata {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: .813rem;
+    color: #767676;
+}
+.lista_items .metadata .user {
+    color: #3a3a3a;
+    text-decoration: none;
+}
+.lista_items .metadata .user:hover { text-decoration: underline; }
+
+.lista_items .metadata .link_categoria {
+    padding: 0 4px;
+    text-decoration: none;
+    border: 1px solid #dedede;
+    border-radius: 4px;
+    color: #475c78;
+    cursor: pointer;
+}
+.lista_items .metadata .link_categoria:hover { text-decoration: underline; }
+
+/* Detalle extra*/
+.lista_items .detalle_extra {
+    font-size: .813rem;
+    color: #767676;
+}
+.lista_items .detalle_extra .user {
+    color: #3a3a3a;
+    text-decoration: none;
+}
+.lista_items .detalle_extra .user:hover { text-decoration: underline; }
+
+/* Descripcion (desplegable) */
+.lista_items .item .descripcion {
+    font-size: .938rem;
+    color: #595959;
+}
+.lista_items .item .descripcion .descripcion_button {
+    display: inline-block;
+    padding: 6px 0 0px 1px;
+    font-size: .875rem;
+    color: #2766be;
+    cursor: pointer;
+}
+.lista_items .item .descripcion .descripcion_button:hover { text-decoration: underline; }
+
+.lista_items .item .descripcion .descripcion_button .icon_toggle { transition: transform .05s ease; }
+
+.lista_items .item .descripcion .descripcion_button.open .icon_toggle { transform: rotate(180deg); }
+
+.lista_items .item .descripcion .tiny_personalizado {
+    margin: 2px 0 0 0;
+    padding: 4px 22px 0 1px;
+    font-size: .938rem;
+    color: #595959;
+    border-top: 1px dotted #b6c2d3;
+}
+
+/* Indicador de estado (mayormente usado para no leido) */
+.lista_items .burbuja_estado {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+}
+.publicado_por {
+    font-size: .813rem;
+    color: #8f8f8f;
+}
+span.publicado_por {
+    display: inline-block;
+    vertical-align: middle;
+}
+.foto_usuario img { border-radius: 100px; }
+
+.publicado_por a {
+    color: #000000;
+    text-decoration: none;
+    cursor: pointer;
+}
+.publicado_por a:hover { text-decoration: underline; }
+
+
+/* ---- Vista GRILLA ---- */
+.lista_items.grilla:after {
+    content: '';
+    display: block;
+    clear: both;
+}
+.lista_items.grilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 18px 16px;
+}
+.lista_items.grilla .item {
+    border: 1px solid #ebebeb;
+    border-radius: 4px;
+}
+.lista_items.grilla .item:hover {
+    border-color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-blanco) 78%);
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, .02);
+}
+.lista_items.grilla .item.item.no_leido {
+    border-color: color-mix(in srgb, var(--categorias-color-curso), var(--categorias-color-blanco) 78%);
+}
+
+.lista_items.grilla .item .link_item {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 14px 12px;
+}
+.lista_items.grilla .item .nombre { text-align: center; }
+
+.lista_items.grilla .info_adicional { display: none; }
+
+.lista_items.grilla .descripcion { display: none; }
+
+.lista_items.grilla .metadata {
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 4px;
+    padding-left: 0px;
+}
+
+.lista_items.grilla .metadata .flex {
+    display: flex;
+    justify-content: center;
+}

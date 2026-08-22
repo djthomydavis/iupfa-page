@@ -1,0 +1,1369 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* NAVIGATION
+   -------------------------------------------
+   Estilos visuales para icon_sidebar y topbar
+   ------------------------------------------- */
+:root {
+    /* Variables para navegacion - Dimensiones */
+    --icon-sidebar-width: 56px;
+    --icon-sidebar-expanded: 210px;
+    --icon-sidebar-safe-margin: 16px;
+    --topbar-height: 64px;
+    --footer-height: 50px;
+    --navigation-transition: .15s ease-in-out;
+    --icon-sidebar-z-index: 99;
+    --footer-z-index: 120;
+    --floating-components-z-index: 121;
+
+    /* Topbar/sidebar viven en front Y admin: usan --variable-color-plataforma*
+       (no --theme-secondary*, que en palette_back es azul Educativa fijo). */
+    --icon-sidebar-bg: var(--variable-color-plataforma);
+    --icon-sidebar-text: var(--variable-color-plataforma-contraste);
+    --icon-sidebar-hover-bg: var(--variable-color-plataforma-gamma2);
+    --icon-sidebar-selected-bg: var(--variable-color-plataforma-gamma3);
+
+    /* Sidebar secundaria front: basada en color curso (front-only) */
+    --content-sidebar-bg: color-mix(in srgb, var(--variable-color-curso) 3%, #ffffff);
+    --content-sidebar-text: #333333;
+    --content-sidebar-hover-bg: color-mix(in srgb, var(--variable-color-curso) 12%, #ffffff);
+    --content-sidebar-active-bg: color-mix(in srgb, var(--variable-color-curso) 18%, #ffffff);
+    --content-sidebar-border: color-mix(in srgb, var(--variable-color-curso) 10%, #ffffff);
+
+    /* Topbar: misma regla que icon-sidebar (color campus en ambos contextos) */
+    --topbar-bg: var(--variable-color-plataforma);
+    --topbar-text: var(--variable-color-plataforma-contraste);
+    --topbar-border: var(--variable-color-plataforma-gamma2);
+}
+
+/* ---------------------------------
+   #Icon SIDEBAR (Navegacion Global)
+   --------------------------------- */
+.icon-sidebar {
+    position: fixed;
+    top: var(--topbar-height);
+    bottom: var(--sidebar-bottom-offset, 0);
+    left: 0;
+    width: var(--icon-sidebar-width);
+    background-color: var(--icon-sidebar-bg);
+    transition: width var(--navigation-transition);
+    overflow: hidden;
+    z-index: var(--icon-sidebar-z-index);
+}
+/* Header con boton cerrar (solo visible en movil) */
+.icon-sidebar-header { display: none; }
+
+/* Sidebar fijada: mantiene ancho expandido */
+.icon-sidebar.pinned { width: var(--icon-sidebar-expanded); }
+
+.icon-sidebar.pinned .icon-nav-item .icon-label { opacity: 1; }
+
+.icon-sidebar.pinned .icon-nav-item .icon-external-link {
+    display: inline;
+    opacity: .6;
+}
+/* Pin button (oculto por defecto, visible solo en desktop via media query) */
+.icon-sidebar-pin { display: none; }
+
+/* Ocultar pin button en backend */
+body.backend .icon-sidebar-pin { display: none; }
+
+/* Ocultar boton toggle y overlay cuando no hay sidebar (usuario no logueado) */
+body:not(:has(.icon-sidebar)) .sidebar-toggle-float,
+body:not(:has(.icon-sidebar)) .sidebar-overlay { display: none; }
+
+/* --- Navigation container (con iconos) --- */
+.icon-nav {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    height: 100%;
+    user-select: none;
+}
+/* padding-right = margen seguro derecho (rozar el borde no dispara expansion). */
+.icon-nav-top,
+.icon-nav-bottom {
+    display: flex;
+    flex-direction: column;
+    padding-right: var(--icon-sidebar-safe-margin);
+}
+
+/* overflow: hidden clipea .icon-label que sino desborda al buffer derecho y dispara hover. */
+.icon-nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 4px 12px 12px;
+    overflow: hidden;
+    text-decoration: none;
+    white-space: nowrap;
+    border-left: 3px solid transparent;
+    color: var(--icon-sidebar-text);
+}
+/* box-shadow lateral cubre el margen seguro derecho con el bg del item. */
+.icon-nav-item:hover {
+    background-color: var(--icon-sidebar-hover-bg);
+    box-shadow: var(--icon-sidebar-safe-margin) 0 0 0 var(--icon-sidebar-hover-bg);
+}
+.icon-nav-item:active {
+    border-left-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+}
+/* Estado selected - Cuando estamos en esa seccion */
+.icon-nav-item.selected {
+    font-weight: 700;
+    border-left-color: var(--variable-color-plataforma-contraste);
+    background-color: var(--icon-sidebar-selected-bg);
+    box-shadow: var(--icon-sidebar-safe-margin) 0 0 0 var(--icon-sidebar-selected-bg);
+}
+.icon-nav-item.selected:hover {
+    background-color: var(--icon-sidebar-hover-bg);
+    box-shadow: var(--icon-sidebar-safe-margin) 0 0 0 var(--icon-sidebar-hover-bg);
+}
+
+.icon-nav-item .icon {
+    flex-shrink: 0;
+    min-width: 20px;
+    font-size: 1.25rem;
+    text-align: center;
+}
+/* Label - oculto por defecto, visible en hover del sidebar */
+.icon-nav-item .icon-label {
+    font-size: .875rem;
+    font-weight: 400;
+    opacity: 0;
+    transition: opacity var(--navigation-transition);
+}
+/* Badge (indicador visual - punto rojo) */
+.icon-nav-item .badge {
+    position: absolute;
+    top: 8px;
+    left: 28px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    font-size: 0;
+    background-color: #e74c3c;
+}
+/* External link icon (para links que abren en nueva ventana) */
+.icon-nav-item .icon-external-link {
+    display: none;
+    margin-left: auto;
+    font-size: .75rem;
+    color: var(--icon-sidebar-text);
+    opacity: 0;
+    transition: opacity var(--navigation-transition);
+}
+/* Aumentar opacidad en hover del item (icono external link) */
+.icon-nav-item:hover .icon-external-link { opacity: 1; }
+
+/* --- Badge "NOVEDAD" para nuevas caracteristicas --- */
+.new-feature-container { position: relative; }
+
+.new-feature-badge {
+    position: absolute;
+    left: 10px;
+    bottom: 8px;
+    width: 8px;
+    height: 8px;
+    color: #1bec29;
+    border: 2px solid var(--icon-sidebar-bg);
+    border-radius: 50%;
+    transition: opacity .4s ease;
+    animation-name: badge-alert;
+    animation-duration: 1.5s;
+    animation-iteration-count: 2;
+    animation-timing-function: ease-in-out;
+    animation-delay: 1.3s;
+}
+/* Animacion de badge (mensajes no leidos y nueva caracteristica) */
+/* Se repite solo 2 veces y luego para */
+@keyframes badge-alert {
+    0%,
+    25%,
+    50%,
+    75%,
+    100% { transform: scale(1); }
+
+    12.5%,
+    37.5%,
+    62.5%,
+    87.5% { transform: scale(1.2); }
+}
+
+/* -----------------------
+   TOPBAR (Barra Superior)
+   ----------------------- */
+.topbar {
+    box-sizing: border-box;
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: calc(var(--topbar-height) + 1px);
+    padding: 0 8px 0 14px;
+    border-bottom: 1px solid var(--topbar-border);
+    background-color: var(--topbar-bg);
+    overflow-x: clip;
+    overflow-y: visible;
+    /* z-index 200: por encima de footer (120) y floating components (121).
+       Necesario para que el dropdown del lang switcher (bug #18341), que es
+       descendiente del topbar, pueda quedar visualmente encima de los botones
+       flotantes (IA, WhatsApp). El topbar nunca overlapsa visualmente con
+       esos componentes (topbar arriba, flotantes abajo-derecha), asi que
+       elevarlo no genera regresiones visibles. */
+    z-index: 200;
+}
+.topbar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    color: var(--topbar-text);
+}
+
+/* --- Left section --- */
+.topbar-left {
+    display: flex;
+    flex-shrink: 1;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+}
+/* Logo */
+.topbar-logo {
+    display: block;
+    height: calc(var(--topbar-height) - 14px);
+    width: auto;
+    border-radius: 4px;
+}
+.topbar-logo-link,
+.topbar-logo-wrapper {
+    display: flex;
+    align-items: center;
+}
+.topbar-logo-link:hover { opacity: .8; }
+
+/* Nombre instalacion */
+.topbar-nombre-instalacion {
+    display: block;
+    height: 40px;
+    line-height: 40px;
+    padding: 0 8px;
+    max-width: 276px;
+    font-size: .938rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-decoration: none;
+    user-select: none;
+    border-radius: 4px;
+    color: var(--topbar-text);
+    transition: background-color .2s ease;
+    overflow: hidden;
+}
+.topbar-nombre-instalacion:hover { background-color: rgba(255, 255, 255, .1); }
+
+/* --- Center section (contiene al Breadcrumb) --- */
+.topbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 16px;
+    overflow: visible;
+}
+/* --- Breadcrumb --- */
+/* Contenedor */
+.topbar-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    min-width: 0;
+    font-size: .875rem;
+    color: var(--topbar-text);
+    overflow: visible;
+    user-select: none;
+}
+.topbar-breadcrumb .breadcrumb-item {
+    white-space: nowrap;
+    text-decoration: none;
+    color: var(--topbar-text);
+}
+.topbar-breadcrumb .breadcrumb_curso_name {
+    min-width: 80px;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+}
+.topbar-breadcrumb .breadcrumb-item:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}
+.topbar-breadcrumb .breadcrumb-item.breadcrumb_curso_name:hover {
+    text-decoration: none;
+    cursor: default;
+}
+.topbar-breadcrumb .breadcrumb-separator {
+    flex-shrink: 0;
+    font-size: .625rem;
+    opacity: .6;
+}
+.topbar-breadcrumb .breadcrumb-current,
+.topbar-breadcrumb span.breadcrumb-item:last-child {
+    min-width: 50px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    opacity: 1;
+    cursor: default;
+    overflow: hidden;
+}
+.topbar-breadcrumb .breadcrumb-current:hover,
+.topbar-breadcrumb span.breadcrumb-item:last-child:hover {
+    text-decoration: none;
+    cursor: default;
+}
+
+/* Nombre de aula en breadcrumb de administracion (sin selector desplegable).
+   display:contents en el wrapper hace que sus hijos sean flex items directos del nav. */
+.topbar-breadcrumb [data-breadcrumb-aula-context] { display: contents; }
+.topbar-breadcrumb .breadcrumb_item_aula {
+    min-width: 80px;
+    max-width: 300px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--topbar-text);
+}
+
+/* Breadcrumb colapsable: ellipsis + dropdown overrides */
+.topbar-breadcrumb .edu-breadcrumb-ellipsis-btn { padding: 2px 6px; }
+
+.topbar-breadcrumb .edu-breadcrumb-ellipsis-btn:hover { background: rgba(255, 255, 255, .1); }
+
+.topbar-breadcrumb .edu-breadcrumb-dot { background: var(--topbar-text); }
+
+.topbar-breadcrumb .edu-dropdown-wrapper { min-width: 0; }
+
+.topbar-breadcrumb .edu-dropdown-wrapper::after { display: none; }
+
+.topbar-breadcrumb .edu-dropdown-toggle { width: auto; }
+
+.topbar-breadcrumb .edu-dropdown-menu {
+    min-width: 180px;
+    max-width: min(400px, 100vw - 20px);
+    padding: 6px 0;
+    margin-top: 10px;
+}
+.topbar-breadcrumb .edu-dropdown-item { margin: 2px 6px; }
+.topbar-breadcrumb .edu-dropdown-link {
+    height: auto;
+    padding: 8px 10px;
+    overflow: visible;
+    font-size: .938rem;
+    white-space: normal;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+.topbar-breadcrumb .edu-dropdown-link:hover {
+    border-color: #dadada;
+    background-color: #fdfdfd;
+}
+.topbar-breadcrumb .edu-dropdown-current {
+    font-weight: 600;
+    color: #333333;
+    cursor: default;
+}
+
+/* Selector nativo del aula (oculto, reemplazado por Choices.js) */
+.topbar-breadcrumb .breadcrumb-selector-aula { display: none; }
+
+/* Oculta el nav del breadcrumb mientras Choices.js inicializa (removida por callbackOnInit) */
+.breadcrumb-loading { opacity: 0; }
+
+/* Oculta el topbar-right mientras cargan las fuentes (removida por document.fonts.ready) */
+.topbar-right-loading { opacity: 0; }
+
+/* Selector de administracion (campus/sitio web) en breadcrumb */
+.topbar-breadcrumb-selector-wrapper {
+    position: relative;
+    display: inline-block;
+}
+.breadcrumb-selector-admin {
+    padding: 4px 24px 4px 8px;
+    font-size: .875rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: var(--topbar-text);
+    background-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+.breadcrumb-selector-icon {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    font-size: .625rem;
+    color: var(--topbar-text);
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+.breadcrumb-selector-admin:hover {
+    border-color: rgba(255, 255, 255, .3);
+    background-color: rgba(255, 255, 255, .15);
+}
+.breadcrumb-selector-admin:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, .4);
+    background-color: rgba(255, 255, 255, .15);
+}
+.breadcrumb-selector-admin option {
+    color: #333333;
+    background-color: #ffffff;
+}
+
+/* --- Select CHOICES --- */
+/* Estilos del selector de aulas en el breadcrumb (clases propias con aula_sel_*) */
+
+/* Contenedor externo del widget Choices (wrapper general) */
+.topbar-breadcrumb .aula_sel_container {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 1;
+    min-width: 80px;
+    max-width: 300px;
+    margin: 0;
+}
+/* Caja visible clickeable que muestra el aula seleccionada */
+.topbar-breadcrumb .aula_sel_inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    height: 40px;
+    padding: 0 22px 0 8px;
+    overflow: hidden;
+    box-sizing: border-box;
+    font-size: .875rem;
+    color: var(--topbar-text);
+    border: none;
+    border-radius: 4px;
+    background-color: transparent;
+}
+/* Hover sobre la caja visible */
+.topbar-breadcrumb .aula_sel_inner:hover { background-color: rgba(255, 255, 255, .1); }
+
+/* Icono mobile: oculto en desktop, visible en pantallas reducidas */
+.topbar-breadcrumb .aula_sel_icon_mobile { display: none; }
+
+/* Texto del item seleccionado dentro de la caja visible (modo single) */
+.topbar-breadcrumb .aula_sel_list_single {
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Oculta el triangulo nativo de Choices.js (choices.css) reemplazado por .aula_sel_arrow (FA icon) */
+.topbar-breadcrumb .aula_sel_container::after { display: none; }
+
+/* Icono FontAwesome fa-chevron-down inyectado via callbackOnCreateTemplates */
+.topbar-breadcrumb .aula_sel_arrow {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    font-size: .625rem;
+    color: var(--topbar-text);
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: transform .02s ease;
+}
+/* Rotacion del icono flecha cuando el dropdown esta abierto (aula_sel_open via evento showDropdown) */
+.topbar-breadcrumb .aula_sel_container.aula_sel_open .aula_sel_arrow { transform: translateY(-50%) rotate(180deg); }
+
+/* Color del texto del item seleccionado en la caja visible (aula_sel_item via callbackOnCreateTemplates) */
+.topbar-breadcrumb .aula_sel_inner .aula_sel_item { color: var(--topbar-text); }
+
+/* Panel desplegable con la lista de aulas */
+.topbar-breadcrumb .aula_sel_dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 200;
+    width: auto;
+    min-width: clamp(280px, 30vw, 480px);
+    max-width: min(600px, 100vw - 20px);
+    margin-top: 8px;
+    border: 1px solid #dddddd;
+    border-radius: 4px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+}
+/* Contenedor scrollable de la lista de opciones dentro del dropdown */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_list {
+    max-height: 300px;
+    padding: 8px 12px 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    cursor: default;
+}
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_list:has(.aula_sel_plan_group) { padding-top: 18px; }
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_list::-webkit-scrollbar { width: 6px; }
+/* Cada opcion de aula dentro del dropdown (aula_sel_item via callbackOnCreateTemplates) */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item {
+    margin: 2px 0;
+    padding: 6px 10px;
+    white-space: normal;
+    word-break: break-word;
+    color: #333333;
+    border-radius: 4px;
+}
+/* Opcion resaltada al hacer hover dentro del dropdown (is-highlighted: clase
+   nativa de estado). Excluye is-selected: el item seleccionado queda fijo.
+   Mismo bg color-mix que items con plan para uniformidad entre modos. */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-highlighted:not(.is-selected) {
+    background-color: color-mix(in srgb, var(--variable-color-plataforma) 4%, #ffffff);
+    border: 1px solid #dadada;
+}
+/* Opcion seleccionada/activa: gris claro fijo, independiente del theme. */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-selected {
+    color: #333333;
+    background-color: #eeeeee;
+    border: none;
+    cursor: default;
+}
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-selected::before {
+    content: "\25b8\00a0";
+    font-weight: 700;
+}
+
+/* Input de busqueda y lupa dentro del dropdown */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_search_icon {
+    position: absolute;
+    top: 16px;
+    left: 10px;
+    font-size: .938rem;
+    color: #626262;
+    pointer-events: none;
+}
+.topbar-breadcrumb .aula_sel_container .aula_sel_dropdown .aula_sel_input {
+    width: 100% !important;
+    padding: 12px 12px 12px 34px;
+    box-sizing: border-box;
+    border: none;
+    border-bottom: 1px solid #c4c4c4;
+    background: #ffffff none !important;
+}
+.topbar-breadcrumb .aula_sel_container .aula_sel_dropdown .aula_sel_input:focus {
+    border: none;
+    border-bottom: 1px solid #c4c4c4;
+}
+
+/* --- Selector de aulas agrupado por planes ---
+   --plan-color / --plan-color-contrast: variables de dominio seteadas
+   per-element desde JS (ver Display.pm / menu.cgi) en los callbacks de
+   Choices. Mismo nombre usado en aula/templates/escritorio/planes.htm +
+   aula/skins/axis/css/escritorio.css (pagina de planes), seteado alla
+   via style="..." inline. No hay declaracion :root global -- cada var()
+   tiene fallback inline para cuando el plan no tiene color en BD. */
+
+/* Titulo del plan: top + laterales + fondo pleno.
+   border-bottom dotted con contraste APCA para verse sobre el bg del plan
+   (blanco sobre rojo/azul saturado). Para "Otras aulas" (sin plan-color)
+   se override mas abajo a solid + gris medio para que la division se note. */
+.topbar-breadcrumb .aula_sel_plan_group {
+    margin-top: 16px;
+    padding: 8px 10px;
+    font-weight: 700;
+    color: var(--plan-color-contrast, #000000);
+    background-color: var(--plan-color, #ffffff);
+    border: 2px solid var(--plan-color, #dddddd);
+    border-bottom: 1px dotted var(--plan-color-contrast, #cccccc);
+    cursor: pointer;
+}
+.topbar-breadcrumb .aula_sel_plan_group[data-id-plan="otros"] {
+    border-bottom: 2px solid var(--plan-color, #dddddd);
+}
+.topbar-breadcrumb .aula_sel_plan_group:first-child,
+.topbar-breadcrumb .aula_sel_plan_group.aula_sel_first_visible { margin-top: 0; }
+
+.topbar-breadcrumb .aula_sel_plan_group:hover { box-shadow: inset 0 0 0 999px rgba(0, 0, 0, .06); }
+
+/* Heading interno: clase custom para overridear defaults de choices.css.
+   overflow-wrap: anywhere permite cortar nombres sin espacios para que no
+   desborden el contenedor del plan en caso de strings concatenados largos. */
+.topbar-breadcrumb .aula_sel_plan_heading {
+    padding: 0;
+    overflow-wrap: anywhere;
+    font-size: .875rem;
+    color: inherit;
+    border-bottom: none;
+}
+
+/* Items (aulas) del plan: laterales sin radius */
+.topbar-breadcrumb .aula_sel_item[data-id-plan] {
+    margin: 0;
+    border-left: 2px solid var(--plan-color, #dddddd);
+    border-right: 2px solid var(--plan-color, #dddddd);
+    border-radius: 0;
+}
+
+/* Ultimo item del plan: cierra el borde con bottom */
+.topbar-breadcrumb .aula_sel_item.aula_sel_plan_member_last {
+    border-bottom: 2px solid var(--plan-color, #dddddd);
+    border-radius: 0 0 4px 4px;
+}
+
+/* Item seleccionado dentro de un plan: bordes del plan (fallback #dddddd
+   cuando no hay --plan-color, como en el grupo virtual "Otras aulas"). */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-selected[data-id-plan] {
+    border-left: 2px solid var(--plan-color, #dddddd);
+    border-right: 2px solid var(--plan-color, #dddddd);
+}
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-selected.aula_sel_plan_member_last {
+    border-bottom: 2px solid var(--plan-color, #dddddd);
+}
+
+/* Hover dentro de un plan (solo si NO esta selected): bg color-mix claro del
+   theme, bordes del plan (mismo fallback claro que items normales), color
+   fijo oscuro para contraste sobre bg claro. */
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-highlighted[data-id-plan]:not(.is-selected) {
+    color: #333333;
+    background-color: color-mix(in srgb, var(--variable-color-plataforma) 4%, #ffffff);
+    border-left: 2px solid var(--plan-color, #dddddd);
+    border-right: 2px solid var(--plan-color, #dddddd);
+}
+.topbar-breadcrumb .aula_sel_dropdown .aula_sel_item.is-highlighted.aula_sel_plan_member_last:not(.is-selected) {
+    border-bottom: 2px solid var(--plan-color, #dddddd);
+}
+
+
+/* --- Right section - User --- */
+.topbar-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+/* User info */
+.topbar-user {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+.topbar-user:hover { background-color: rgba(255, 255, 255, .1); }
+
+.topbar-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.topbar-user-icon { font-size: 2rem; }
+
+.topbar-user-name {
+    font-size: .875rem;
+    font-weight: 400;
+    color: var(--topbar-text);
+    user-select: none;
+}
+.topbar-user-arrow {
+    font-size: .625rem;
+    opacity: .7;
+    transition: transform .02s ease;
+}
+/* Indicador de novedad (punto verde) sobre el menu de usuario.
+   Onboarding: invita a abrir "Perfil y preferencias"; se remueve via JS
+   tras 3 aperturas (contador en localStorage). */
+.topbar-user-indicator {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    box-sizing: content-box;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--topbar-bg);
+    border-radius: 50%;
+    background-color: #1bec29;
+    animation-name: badge-alert;
+    animation-duration: 1.5s;
+    animation-iteration-count: 2;
+    animation-timing-function: ease-in-out;
+    animation-delay: 1.3s;
+}
+/* Login button (usuario no logueado) */
+.topbar-btn-catalogo,
+.topbar-btn-login {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: .875rem;
+    font-weight: 400;
+    text-decoration: none;
+    color: var(--topbar-text);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, .1);
+    transition: background-color .2s ease;
+}
+.topbar-btn-catalogo:hover,
+.topbar-btn-login:hover { background-color: rgba(255, 255, 255, .2); }
+
+.topbar-btn-catalogo { margin-right: 8px; }
+
+/* User dropdown menu */
+/* position fixed (no absolute): escapa al overflow del ancestro .topbar.
+   Safari iOS trata overflow-x:clip como hidden y recorta el dropdown a la
+   altura del topbar (~65px). .topbar ya es fixed top:0 full-width, asi que
+   el anclaje visual es identico en desktop. */
+.topbar-user-dropdown {
+    position: fixed;
+    top: calc(var(--topbar-height) - 5px);
+    right: 16px;
+    min-width: 220px;
+    border: 1px solid #dddddd;
+    border-radius: 4px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+    user-select: none;
+    z-index: 1000;
+}
+.topbar-user-menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.topbar-user-menu-item {
+    margin: 0;
+    padding: 0;
+}
+.topbar-user-menu-link {
+    display: block;
+    padding: 10px 16px;
+    font-size: .875rem;
+    text-decoration: none;
+    color: #333;
+    transition: background-color .2s ease;
+}
+.topbar-user-menu-link:hover {
+    color: #333333;
+    background-color: #f5f5f5;
+}
+.topbar-user-menu-item-logout {
+    border-top: 1px solid #e4e4e4;
+    background-color: #f6fafd;
+}
+/* Indicador de novedad (punto verde) inline, pegado al texto del item
+   "Perfil y preferencias". Comparte el contador de onboarding con
+   .topbar-user-indicator; ambos se remueven via JS tras 3 aperturas. */
+.topbar-user-menu-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+    border-radius: 50%;
+    background-color: #1bec29;
+}
+
+/* Estado activo del trigger */
+.topbar-user.active .topbar-user-arrow { transform: rotate(180deg); }
+
+/* ---------------------------
+   MENSAJES NO LEIDOS (Topbar)
+   --------------------------- */
+
+/* Paginador en modo reducido dentro del popup. Alineamos el info text con
+ * el padding-left de los items de .lista_mensajes para que "Mostrando: X
+ * - Y de Z" comience en la misma columna que los subjects. Tambien
+ * acortamos el margen superior del paginador para que no quede tanto
+ * espacio blanco entre el ultimo mail y el footer. */
+.paginador.paginador_reducido {
+    margin: 6px 12px 4px 4px;
+}
+
+.paginador.paginador_reducido .paginador_content {
+    padding: 0 12px 0 6px;
+}
+
+.mensajes_link { position: relative; }
+.topbar-novedades-link { position: relative; }
+.topbar-novedades-link .topbar-mensajes-btn { position: relative; }
+
+/* Badge del icono de novedades en el topbar (solo webmasters) */
+.edu-topbar__novedades-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #e23b3b;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+.edu-topbar__novedades-badge[hidden] { display: none; }
+
+/* TODO: migrar a .edu-icon-btn cuando se cree en admin_development_styles.cgi
+   una variante con bg de color solido + color del icono usando el contraste
+   APCA correspondiente (--*-contrast). Sin esa variante en el catalogo del
+   DS NO migrar para no romper la consistencia. */
+.topbar-mensajes-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    text-decoration: none;
+    color: var(--topbar-text);
+    border-radius: 4px;
+    transition: background-color .2s ease;
+}
+.topbar-mensajes-btn:hover { background-color: rgba(255, 255, 255, .1); }
+
+.topbar-mensajes-btn i { font-size: 1.125rem; }
+
+/* Badge - indicador de mensajes no leidos */
+.topbar-mensajes-btn .badge {
+    box-sizing: initial;
+    position: absolute;
+    left: 2px;
+    bottom: 8px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--topbar-bg);
+    border-radius: 50%;
+    background-color: #e23b3b;
+    animation-name: badge-alert;
+    animation-duration: 1.5s;
+    animation-iteration-count: 2;
+    animation-timing-function: ease-in-out;
+    animation-delay: 1.3s;
+}
+/* Popup de mensajes no leidos - Container para MensajesNoLeidos */
+.mensajes_popup {
+    display: none;
+    position: absolute;
+    top: calc(var(--topbar-height) - 16px);
+    right: 0;
+    width: 500px;
+    min-height: 0;
+    /* header(~35px) + 5 mensajes(~86px c/u) + paginador(~40px) = ~505px; 560 da margen */
+    max-height: 560px;
+    border: 1px solid #dddddd;
+    border-radius: 4px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+    user-select: none;
+    overflow: visible;
+    transition: min-height .15s ease;
+    z-index: 1000;
+}
+.mensajes_popup.mensajes_popup_visible { display: block; }
+
+/* Estado de carga: flex para centrar el spinner FA; declarado despues para ganar a display:block */
+.mensajes_popup:has(.mensajes_spinner) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+}
+.mensajes_spinner {
+    font-size: 2rem;
+    color: #999;
+}
+/* Estilos para el contenido interno .mensajes_function
+   Flex column para que header y footer sean fijos y solo el body scrollee */
+.mensajes_function {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    max-height: inherit;
+    overflow: visible;
+}
+.mensajes_function > .body {
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.mensajes_function > .mensajes_header {
+    display: flex;
+    align-items: center;
+    padding: 6px 6px 6px 10px;
+    border-bottom: 1px solid #c3c3c3;
+}
+.mensajes_function .mensajes_titulo {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    font-size: .938rem;
+    font-weight: 400;
+    color: #484848;
+}
+.mensajes_function .cerrar_bt {
+    margin-left: auto;
+    border: none;
+    background-color: transparent;
+    transition-duration: .3s;
+}
+.mensajes_function .cerrar_bt:hover {
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.mensajes_function .cerrar {
+    width: 12px;
+    height: 12px;
+    padding: 4px;
+    color: var(--topbar-text);
+    border-radius: 50%;
+    background-color: var(--topbar-bg);
+    opacity: .7;
+    transition-duration: .4s;
+}
+.mensajes_function .cerrar:hover {
+    color: #ffffff;
+    background-color: #666666;
+    opacity: 1;
+}
+.mensajes_function .seccion_vacia {
+    margin: 10px 10px;
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    background-color: #f5f5f5;
+}
+.mensajes_function .lista_mensajes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.mensajes_function .lista_mensajes li {
+    margin-bottom: 1px;
+    border-bottom: 1px dotted #a0a0a0;
+}
+.mensajes_function .lista_mensajes li > a {
+    display: block;
+    padding: 12px 10px;
+    text-decoration: none;
+    color: #6f6f6f;
+    background-color: #f5f5f5;
+    transition-duration: .2s;
+}
+.mensajes_function .lista_mensajes li > a:hover { background-color: #ffffff; }
+
+.mensajes_function .lista_mensajes .adjunto {
+    display: inline-block;
+    width: .875rem;
+    padding-right: 4px;
+}
+.mensajes_function .lista_mensajes .subject {
+    padding: 3px 0;
+    font-size: .938rem;
+    font-weight: 700;
+    color: #000000;
+}
+.mensajes_function .lista_mensajes .from {
+    font-size: .875rem;
+    color: #000000;
+}
+.mensajes_function .lista_mensajes .aula { font-size: .875rem; }
+
+.mensajes_function .lista_mensajes .date {
+    padding-top: 3px;
+    font-size: .75rem;
+    font-weight: 300;
+}
+
+/* -----------------------
+   MODAL (para QR y otros)
+   ----------------------- */
+.modal_overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, .7);
+    z-index: 999;
+}
+.modal_overlay.oculto { display: none; }
+
+.modal_container {
+    position: relative;
+    padding: 10px;
+    background-color: #FFF;
+    box-shadow: 0 0 20px 0 rgba(0, 0, 0, .8);
+}
+.modal_container .modal_close_btn {
+    position: absolute;
+    top: -15px;
+    right: -15px;
+    width: 30px;
+    height: 30px;
+    border-radius: 30px;
+    background-color: #000000;
+    transition-duration: .4s;
+    cursor: pointer;
+}
+.modal_container .modal_close_btn .icon {
+    width: 30px;
+    height: 30px;
+    color: #fff;
+    transition-duration: .4s;
+}
+.modal_container .modal_close_btn:hover { background-color: #ffffff; }
+
+.modal_container .modal_close_btn:hover .icon { color: #000000; }
+
+body.noscroll { overflow: hidden; }
+
+/* Ajustar altura del modal de perfil de navegacion */
+.modal_window .modal_wrapper.perfil_nav {
+    height: 100%;
+    max-height: 90vh;
+}
+
+/* Modal QR especifico */
+.modal_container.qr { width: 300px; box-sizing: content-box; }
+
+.modal_container.qr .desc {
+    padding: 10px 0;
+    font-size: .875rem;
+}
+.qr_data { position: relative; }
+
+.qr_data .qr_overlay {
+    position: absolute;
+    top: 145px;
+    left: 145px;
+    width: 75px;
+    height: 89px;
+    margin-top: -3px;
+    margin-left: -3px;
+    outline: none;
+    background-image: url(../img/comunes/qr_overlay.png);
+    transform: translate(-50%, -50%);
+}
+.qr_update {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(50, 50, 50, .95);
+    transition-duration: .4s;
+    cursor: pointer;
+}
+.qr_update .icon {
+    width: 175px;
+    height: 175px;
+    color: rgba(100, 100, 100, .9);
+    transition-duration: .4;
+}
+.qr_update:hover { background-color: rgba(0, 0, 0, .95); }
+
+.qr_update:hover .icon { color: rgba(255, 255, 255, .8); }
+
+
+/* -------------------
+   RESPONSIVE - Mobile
+   ------------------- */
+@media (max-width: 960px) {
+    /* Topbar ajustes mobile */
+    .topbar {
+        padding: 0 8px;
+        z-index: 200;
+    }
+    .topbar-nombre-instalacion { display: none; }
+
+    .topbar-logo { height: calc(var(--topbar-height) - 20px); }
+
+    .topbar-right { gap: 2px; }
+
+    .topbar-center { padding: 0 12px; }
+
+    /* Selector aula: reemplazar texto por icono en mobile */
+    .topbar-breadcrumb .aula_sel_container { min-width: 0; }
+
+    .topbar-breadcrumb .aula_sel_inner {
+        justify-content: center;
+        width: 36px;
+        padding: 0;
+    }
+
+    .topbar-breadcrumb .aula_sel_list_single,
+    .topbar-breadcrumb .aula_sel_arrow { display: none; }
+
+    .topbar-breadcrumb .aula_sel_icon_mobile {
+        display: block;
+        font-size: 1.125rem;
+        color: var(--topbar-text);
+        pointer-events: none;
+    }
+
+    .topbar-user-name,
+    .topbar-user-arrow { display: none; }
+
+    .topbar-breadcrumb .breadcrumb-current {
+        display: inline-block;
+        vertical-align: middle;
+        max-width: 120px;
+    }
+
+    /* Sidebar colapsada por defecto en movil */
+    .icon-sidebar {
+        left: -100%;
+        width: 78%;
+        max-width: 300px;
+        box-shadow: 5px 0 150px 0 rgba(0, 0, 0, .6);
+        transition: left .3s ease;
+    }
+    /* Sidebar visible cuando tiene clase 'show' */
+    .icon-sidebar.show { left: 0; }
+
+    /* Boton toggle para sidebar en movil. Color campus (no --theme-secondary*; ver nota en :root). */
+    .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        margin-right: 12px;
+        font-size: 1.25rem;
+        color: var(--variable-color-plataforma-contraste);
+        border: 2px solid var(--variable-color-plataforma-contraste);
+        border-radius: 4px;
+        background-color: var(--variable-color-plataforma);
+        cursor: pointer;
+    }
+    /* Boton flotante para sidebar en movil */
+    .sidebar-toggle-float {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        width: 34px;
+        height: 34px;
+        z-index: 98;
+    }
+    /* Cuando el footer esta visible, mover el boton toggle para no solaparse */
+    body:has(.icon-sidebar.footer-visible) .sidebar-toggle-float { bottom: calc(var(--footer-height) + 10px); }
+
+    .sidebar-toggle-float .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        font-size: 1.125rem;
+        color: #fff;
+        border: none;
+        border-radius: 30px;
+        background-color: var(--variable-color-plataforma);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+        opacity: .7;
+        transition: all .4s;
+    }
+    .sidebar-toggle-float .sidebar-toggle:hover { background-color: var(--variable-color-plataforma-gamma2); }
+
+    /* Overlay oscuro */
+    .sidebar-overlay {
+        position: fixed;
+        top: var(--topbar-height);
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background-color: rgba(0, 0, 0, .4);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .3s ease;
+        z-index: 50;
+    }
+    .sidebar-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    /* Boton cerrar sidebar en movil */
+    .icon-sidebar.show .icon-sidebar-header {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .icon-sidebar-close {
+        padding: 12px 14px;
+        font-size: .875rem;
+        color: #fff;
+        background: none;
+        border: none;
+        cursor: pointer;
+        opacity: .75;
+        transition: opacity .2s;
+    }
+    .icon-sidebar-close:hover { opacity: 1; }
+
+    /* Mostrar labels cuando la sidebar esta desplegada en movil */
+    .icon-sidebar.show .icon-nav-item .icon-label {
+        display: block;
+        opacity: 1;
+    }
+    /* Expandir sidebar cuando esta desplegada */
+    /* Flex column para que header y nav compartan el alto correctamente */
+    .icon-sidebar.show {
+        display: flex;
+        flex-direction: column;
+        width: 78%;
+        max-width: 300px;
+        z-index: var(--icon-sidebar-z-index);
+    }
+    /* El nav toma el espacio restante despues del header de cierre */
+    .icon-sidebar.show .icon-nav {
+        flex: 1;
+        height: auto;
+        min-height: 0;
+    }
+    /* Mostrar iconos de external link siempre visibles en movil */
+    .icon-sidebar .icon-nav-item .icon-external-link {
+        display: inline;
+        opacity: 1;
+    }
+
+    /* Ocultar pin button en movil */
+    .icon-sidebar-pin { display: none !important; }
+}
+
+/* Ocultar boton toggle y overlay en desktop */
+@media (min-width: 961px) {
+    .sidebar-toggle-float { display: none; }
+
+    .sidebar-overlay { display: none; }
+
+    /* Hover sobre el <a> expande el sidebar (solo desktop). En mobile el
+       sidebar overlay tiene su propio width fijo (.icon-sidebar.show) y
+       NO debe expandirse al hover, sino el ancho saltaria entre items. */
+    .icon-sidebar:has(.icon-nav-item:hover) { width: var(--icon-sidebar-expanded); }
+
+    .icon-sidebar:has(.icon-nav-item:hover) .icon-nav-item .icon-label { opacity: 1; }
+
+    .icon-sidebar:has(.icon-nav-item:hover) .icon-nav-item .icon-external-link {
+        display: inline;
+        opacity: .6;
+    }
+
+    /* Pin button: estilo visual. La posicion la maneja .icon-nav-bottom
+       (justify-content: space-between en .icon-nav lo deja al fondo). */
+    .icon-sidebar-pin {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px 12px 12px;
+        white-space: nowrap;
+        border: none;
+        border-left: 3px solid transparent;
+        color: var(--icon-sidebar-text);
+        background: none;
+        cursor: pointer;
+        opacity: .45;
+        transition: opacity .2s;
+    }
+    .icon-sidebar-pin:hover { opacity: .75; }
+    .icon-sidebar.pinned .icon-sidebar-pin { opacity: 1; }
+
+    /* Icono: rotado = libre, derecho = pinned */
+    .icon-sidebar-pin .fa-thumbtack {
+        flex-shrink: 0;
+        min-width: 20px;
+        font-size: 1.25rem;
+        text-align: center;
+        transform: rotate(45deg);
+        transition: transform .3s ease;
+    }
+    .icon-sidebar.pinned .icon-sidebar-pin .fa-thumbtack {
+        transform: rotate(0deg);
+    }
+
+}
+
+/* Pin button: oculto en viewports donde el pin no aplica (961-1659px).
+   El hover sigue disponible (transitorio); solo el pin permanente queda deshabilitado. */
+@media (min-width: 961px) and (max-width: 1659px) {
+    .icon-sidebar-pin { display: none; }
+}
+
+/* --- |Dropdowns topbar en pantallas muy reducidas --- */
+@media (max-width: 648px) {
+    .mensajes_popup {
+        position: fixed;
+        top: calc(var(--topbar-height) - 5px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+    }
+}
+
+/* --- |Dropdown selector de aulas: centrado full-width en pantallas chicas --- */
+@media (max-width: 648px) {
+    .topbar-breadcrumb .aula_sel_dropdown {
+        position: fixed;
+        top: calc(var(--topbar-height) - 12px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+        min-width: 0;
+        max-width: 600px;
+        margin: 8px auto 0;
+    }
+}
+
+/* --- |Dropdown menu usuario: centrado full-width en movil --- */
+@media (max-width: 768px) {
+    .topbar-breadcrumb .edu-dropdown-menu {
+        position: fixed;
+        top: calc(var(--topbar-height) - 5px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        margin-top: 0;
+    }
+}
+
+/* Deshabilita transiciones durante resize para evitar flash al cruzar breakpoints */
+.resize-in-progress .icon-sidebar { transition: none; }
+

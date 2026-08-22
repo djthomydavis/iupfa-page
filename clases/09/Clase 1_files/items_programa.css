@@ -1,0 +1,46 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+:root{
+    --programa-color-curso: var(--variable-color-curso);
+}
+
+
+.item_programa > .header,
+.item_programa > header { margin-bottom: 14px; }
+
+.item_programa > .header .unidad_nombre,
+.item_programa > header .unidad_nombre {
+    font-weight: 300;
+    font-size: .9rem;
+    color: #505050;
+    padding-bottom: 6px;
+}
+}
+.item_programa .titulo { border-color: var(--programa-color-curso); }
+
+/* icono con alcance */
+.item_programa .edu-header-h5 span.con_alcance {
+    margin-left: 5px;
+    color: #969696;
+}
+.item_programa .descripcion_title {
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 300;
+    color: #8a8a8a;
+}
+.item_programa .descripcion .tiny_personalizado {
+    margin-bottom: 10px;
+    padding-bottom: 20px;
+    border-bottom: 1px dashed #d3d3d3;
+}
+.indice_resumido .item_programa > header .unidad_nombre,
+.indice_resumido .item_programa > .header .unidad_nombre {
+    height: 0;
+    opacity: 0;
+}

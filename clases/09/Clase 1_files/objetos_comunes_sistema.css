@@ -1,0 +1,706 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ------------------
+   @objeto: Generales
+   ------------------ */
+.cerrar_ventana {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    cursor: pointer;
+    z-index: 1;
+}
+.clicktext {
+    color: #2766be;
+    text-decoration: none;
+    cursor: pointer;
+}
+.clicktext:hover { text-decoration: underline; }
+
+/* Helpers */
+.clearfix { display: block; }
+
+.clearfix:after {
+    content: '';
+    display: block;
+    clear: both;
+}
+/* Puntos suspensivos en linea de texto */
+.linea_unica {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.icono_menu {
+    font-size: 1.375rem;
+    width: 24px;
+}
+/* Para que funcione linea unica en celdas */
+.maxwidth_0 { max-width: 0; }
+
+.ajuste_largo { width: 30%; }
+
+.ajuste_ancho {width: 70%;}
+
+/* Separa en silabas si definimos lang en el html */
+.corte_palabras {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+    -ms-hyphens: auto;
+    -moz-hyphens: auto;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+/* Corta palabras sin separar en silabas */
+.text_overflow {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+/* No permitir seleccionar texto */
+.noselect {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+.el_loading { position: relative; }
+
+.el_loading:after {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: url(../img/comunes/spinner.gif) 50% 50% no-repeat #eee;
+    z-index: 3;
+}
+/* botones accion -- TODO: deben implementarse en cajas de alta puesto que tienen los mismo estilos */
+.boton_accion {
+    padding: 3px 18px 4px;
+    font-size: 0.85em;
+    text-shadow: 1px 1px #ffffff;
+    color: #4b4b4b;
+    border: solid 1px #4b4b4b;
+    border-color: #fff #bbb #bbb #fff;
+    background-color: #e0e0e0;
+    cursor: pointer;
+}
+.boton_accion:hover {
+    color: #000;
+    border-color: #dadada;
+    background-color: #fff;
+}
+/* ------------------------------------------------------------------------------------------------ */
+
+/* -------------------
+   @objeto: Breadcrumb
+   ------------------- */
+
+/*.breadcrumb > * { display: inline-block; vertical-align: middle; }*/
+.breadcrumb                 { display: inline-block; vertical-align: middle; font-size: 1.2rem; }
+.breadcrumb a               { font-weight: 300; color: #2766be; text-decoration: none; }
+.breadcrumb a:hover         { color: #2766be; text-decoration: underline}
+.breadcrumb .current        { color: #4f4f4f; }
+.breadcrumb .separador      { color: #b1b1b1; font-weight: 300; }
+.breadcrumb .volver         { cursor: pointer; margin-left: 5px; color: #5d5d5d; }
+.breadcrumb .volver:hover   { color: #2766be; }
+
+.sin_menu_secciones_aula .breadcrumb .linea_unica {  max-width: 180px; }
+
+/* -------------------------------------------------------------------------------------------- */
+
+/* ---------------------------
+   @objeto: Ventanas flotantes
+   --------------------------- */
+.ventana_flotante {
+    position: relative;
+    padding: 3px;
+    border: 1px solid #c0c0c0;
+    background-color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+/* .ventana_flotante_overflow { height: 100%; overflow: auto; } */
+.ventana_flotante .header {
+    padding: 8px;
+    font-size: .9rem;
+    color: #545454;
+    background-color: #E5E5E5;
+}
+/* centrada absolutamente en pantalla */
+.ventana_flotante.center_viewport {
+    position: fixed;
+    top: 15%;
+    left: 25%;
+    width: 50%;
+    box-shadow: 0 2px 5px 0 #474747;
+}
+
+/* ----------------------
+   @objeto: Tinys - vista
+   ---------------------- */
+/* Se cambia por js luego de determinar si el contenido es o no responsive */
+.frontend .contenido_620 { visibility: hidden; }
+
+/* Layout */
+.tiny_personalizado {
+    position: relative;
+    font-size: 1rem;
+    overflow: auto;
+}
+.tiny_personalizado a {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.contenido_620 .tiny_personalizado {
+    overflow: hidden;
+    max-width: 800px;
+    margin: 25px auto;
+    font-size: 1rem;
+    transition: all .4s;
+}
+
+/* alto del iframe del tiny */
+div.mce-edit-area > iframe {
+    height: 150px;
+    width: 100%;
+}
+/* el important debe ir si sacamos el codigo q saca el style q pone automaticamente el tiny,
+que esta en Editor.pm y Display.pm */
+.RichTextWrapper.large .mce-edit-area > iframe { height: 455px !important; }
+.RichTextWrapper.medium .mce-edit-area > iframe { height: 200px !important; }
+.RichTextWrapper.small .mce-edit-area > iframe { height: 100px !important; }
+/* wiki es distinto, usa RichTextWrapper generico */
+#wiki .RichTextWrapper iframe { height: 455px !important; }
+/* foros es distinto, no usa RichTextWrapper */
+.mce-edit-area > #form_tema_descripcion_ifr,
+.mce-edit-area > #alta_intervencion_mensaje_ifr,
+.mce-edit-area > #tema_modi_descripcion_ifr,
+.mce-edit-area > #int_modi_mensaje_ifr { height: 200px !important;}
+/* mensajeria sin login */
+.RichTextWrapper.medium > textarea { height: 200px !important; width: 100%; }
+
+/* Visor contenido 620 para moviles */
+body.visor_620 > *   { display: none; }
+#contenido_620_visor { display: block;}
+#contenido_620_visor .tiny_personalizado    { background-color: #fff; width: 800px; }
+.contenido_620_boton { display: none; }
+
+/* contenido */
+
+ /* contenido web y 620 */
+.tiny_personalizado a       { color: #2766be; }
+.tiny_personalizado audio   { width: 300px; }
+.tiny_personalizado embed,
+.tiny_personalizado video,
+.tiny_personalizado object,
+.tiny_personalizado iframe  { max-width: 100%; }
+.tiny_personalizado h1 { font-size: 2rem; }
+.tiny_personalizado h2 { font-size: 1.5rem; }
+.tiny_personalizado h3 { font-size: 1.17rem; }
+.tiny_personalizado h4 { font-size: 1rem; }
+.tiny_personalizado h5 { font-size: 0.83rem; }
+.tiny_personalizado h6 { font-size: 0.67rem; }
+
+/* Primer elemento sin margin top - Comienzan todos en la misma linea */
+.tiny_personalizado > p:first-child,
+.tiny_personalizado > h1:first-child,
+.tiny_personalizado > h2:first-child,
+.tiny_personalizado > h3:first-child,
+.tiny_personalizado > h4:first-child,
+.tiny_personalizado > h5:first-child,
+.tiny_personalizado > h6:first-child,
+.tiny_personalizado > pre:first-child { margin-top: 0; }
+
+/* imagenes */
+.tiny_personalizado img { max-width: 100%; height: auto; }
+
+span[class~="mce-text"] { background-color: transparent !important; } /* Hack que soluciona fondo gris en formatos y parrafos*/
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+
+/* -------------------------
+   @objeto: Visor de iframes
+   ------------------------- */
+
+/* visualizador abierto */
+.contenido_iframe               { position: relative; border: 1px solid rgba(0,0,0,0); position: relative; transition: border .4s; }
+.contenido_iframe:hover         { border-color: rgba(0,0,0,0.1); }
+.contenido_iframe .controles    { padding: 5px; max-height: 44px; box-sizing: border-box; text-align: right; }
+.contenido_iframe > iframe      { display: block; width: 100%; height: calc(70vh - 44px); }
+.contenido_iframe .zoom_button {
+    display: inline-block;
+    font-size: .85rem;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    margin-right: 10px;
+    color: #fff;
+    background-color: #8a8a8a;
+    text-transform: capitalize;
+    transition-duration: .4s;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.contenido_iframe .zoom_button:hover      { background-color: #2766be !important; }
+.contenido_iframe .zoom_button:last-child { margin-right: 0; }
+.contenido_iframe .zoom_out               { display: none; }
+
+/* fullscreen */
+.contenido_iframe:-ms-fullscreen        { width: 100%; height: 100%;}
+.contenido_iframe:-moz-full-screen      { width: 100%; height: 100%;}
+.contenido_iframe:-webkit-full-screen   { width: 100%; height: 100%;}
+.contenido_iframe:fullscreen            { width: 100%; height: 100%;}
+
+.contenido_iframe:-ms-fullscreen      .zoom_in  { display: none; }
+.contenido_iframe:-moz-full-screen    .zoom_in  { display: none; }
+.contenido_iframe:-webkit-full-screen .zoom_in  { display: none; }
+.contenido_iframe:fullscreen          .zoom_in  { display: none; }
+
+.contenido_iframe:-ms-fullscreen      .zoom_out { display: inline-block; }
+.contenido_iframe:-moz-full-screen    .zoom_out { display: inline-block; }
+.contenido_iframe:-webkit-full-screen .zoom_out { display: inline-block; }
+.contenido_iframe:fullscreen          .zoom_out { display: inline-block; }
+
+.contenido_iframe:-ms-fullscreen      > iframe { width: 100%; height: calc(100% - 44px); }
+.contenido_iframe:-moz-full-screen    > iframe { width: 100%; height: calc(100% - 44px); }
+.contenido_iframe:-webkit-full-screen > iframe { width: 100%; height: calc(100% - 44px); }
+.contenido_iframe:fullscreen          > iframe { width: 100%; height: calc(100% - 44px); }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* -----------------------
+   @objeto: Cajas de Aviso
+   ----------------------- */
+
+.caja_aviso a        { color: #2766be; text-decoration: none; }
+.caja_aviso a:hover  { text-decoration: underline; }
+
+.seccion_vacia {
+    margin: 10px 0;
+    padding: 40px 20px;
+    font-size: .875rem;
+    text-align: center;
+    border: dashed 1px #b2b2b2;
+    background-color: #ffffff; /*gg . refuerzo x migracion html*/
+ }
+.ventana_flotante .seccion_vacia  { margin: 10px; }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* --------------------------
+   @Objeto: mensaje de system
+   -------------------------- */
+.sys_msg {
+    flex: 100%;
+    order: -2;
+    position: relative;
+    margin: 20px 0 6px;
+    padding: 14px 16px;
+    font-size: .875rem;
+    line-height: 1.25rem;
+    border: 1px solid;
+    border-left: 4px solid;
+    color: rgba(0,0,0,.8);
+}
+.sys_msg .cerrar_ventana {
+    position: absolute;
+    right: -10px;
+    top: -10px;
+    z-index: 6;
+    width: 25px;
+    height: 25px;
+    background: transparent url(../img/comunes/close_window.png) no-repeat center;
+}
+.sys_msg a {
+    text-decoration: underline;
+    color: #2766be;
+}
+.sys_msg a:hover {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.sys_msg.danger {
+    border-color: #e0483a;
+    background-color: #ffeeef;
+}
+.sys_msg.warning {
+    border-color: #ecbf58;
+    background-color: #fff7e3;
+}
+.sys_msg.success {
+    border-color: #27be7f;
+    background-color: #e1f7ed;
+}
+.sys_msg.data {
+    border-color: #6fb1c7;
+    background-color: #e8f2f7;
+}
+.sys_msg.data svg {
+    font-size: 1rem;
+    color: #3c91ad;
+}
+.sys_msg.data.no-margin { margin: 0; }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* --------------------------
+   @Objeto: burbuja de estado
+   -------------------------- */
+.burbuja_estado {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7px;
+    padding: 6px 10px;
+    font-size: .813rem;
+    border-radius: 45px;
+    white-space: nowrap;
+    color: #333;
+}
+.burbuja_estado.no_leido,
+.burbuja_estado.nuevo {
+    color: var(--theme-primary-contrast);
+    background-color: var(--theme-primary);
+}
+
+.burbuja_estado.pendiente   {
+    gap: 4px;
+    color: #fff;
+    background: var(--theme-item-obligatorio-color);
+}
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* -----------------
+   @Objeto: buscador
+   ----------------- */
+.form_buscador {
+    display: inline-block;
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+input.buscador {
+    padding: 6px 8px 5px 30px;
+    border-radius: 2px;
+    box-sizing: border-box;
+    font-size: .875rem;
+    border: solid 1px #d2d2d2;
+    outline: none;
+    background: url(../img/comunes/icon_search.png) no-repeat 8px center transparent;
+    background-color: #f9f9f9;
+    transition-duration: .3s;
+}
+input.buscador:hover,
+input.buscador:focus {
+    border: 1px solid #999999;
+    background-color: #ffffff;
+}
+.clean-search {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    width: 13px;
+    height: 12px;
+    background-repeat: no-repeat;
+    background-image: url(../img/comunes/busqueda_clear.png);
+}
+.resultado .Categorizador { margin-top: 0; } /* hack para el buscador*/
+
+/* Reubicar si se crea un css para el buscador gral del aula (ej. buscador.css) */
+.buscar_wrap #actions { margin-bottom: 12px; }
+.buscar_wrap .cont_busqueda {
+    margin: 0 0 16px;
+    color: #626262;
+}
+.buscar_wrap .cont_busqueda .palabra_clave {
+    display: inline-block;
+    padding: 4px 8px;
+    color: var(--theme-dark-base);
+    border: 1px solid #d1d1d1;
+    border-radius: 4px;
+    background-color: color-mix(in srgb, var(--theme-primary) 4%, var(--theme-light-base));
+}
+.buscar_wrap .cont_busqueda .cantidad_total {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: .813rem;
+    font-weight: 700;
+    color: #475c78;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    background-color: color-mix(in srgb, var(--theme-primary) 8%, #ffffff);
+}
+.buscar_wrap .inputCheckGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+.buscar_wrap .inputCheckGroup .labelCheckbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 400;
+}
+.buscar_wrap .inputCheckGroup .labelCheckbox .inputCheckbox { margin: 0; }
+
+/* Categoria destacada en primera fila (items de programa) */
+.buscar_wrap .lista_items .categoria_arriba {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 4px;
+    font-size: .813rem;
+    color: #595959;
+}
+.buscar_wrap .lista_items .categoria_arriba .termino_categoria {
+    font-weight: 700;
+    color: #475c78;
+}
+.buscar_wrap .lista_items .categoria_arriba .link_categoria {
+    padding: 1px 6px;
+    text-decoration: none;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    color: #475c78;
+    background-color: color-mix(in srgb, var(--theme-primary) 6%, #ffffff);
+    cursor: pointer;
+}
+.buscar_wrap .lista_items .categoria_arriba .link_categoria:hover { text-decoration: underline; }
+/* ----------------------------- */
+
+.resultado > section { margin: 15px 0 24px; scroll-margin-top: var(--topbar-height); }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* -------------------
+   @Objeto: Filter bar
+   ------------------- */
+.filter_bar { padding: 0 0 10px; position: relative; }
+
+.filter_bar > input,
+.filter_bar > span { display: inline-block; vertical-align: middle; }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* --------------------
+   @Objeto: Fake select
+   -------------------- */
+.fselect { position: relative; }
+
+span.fselect { display: inline-block; }
+
+.fselect .selected {
+    padding: 5px 22px 5px 8px;
+    font-size: .875rem;
+    border: 1px solid #cccccc;
+    border-radius: 2px;
+    color: #666666;
+    background: url(../img/comunes/fselect_flecha.png) no-repeat right 7px top 14px #ffffff;
+    cursor: pointer;
+}
+.fselect .selected:hover    { border-color: #999999; background-image: url(../img/comunes/fselect_flecha_hover.png); }
+.fselect span.selected      { display: inline-block; }
+.fselect .selected > b      { max-width: 150px; display: inline-block; vertical-align: text-bottom; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* list.js */
+.fselect .active:after            { content: ''; display: inline-block; margin-left: 5px; width: 8px; height: 11px; background-repeat: no-repeat; }
+
+.sort_bar { padding: 15px 0 5px; }
+
+.fselect .options,
+.fselect .content {
+    position: absolute;
+    z-index: 3;
+    top: 100%;
+    left: 0;
+    width: max-content;
+    min-width: 180px;
+    max-width: 360px;
+    list-style: none;
+    margin: -2px 0 0;
+    border: 1px solid #c0c0c0;
+    padding: 3px;
+    font-size: .85rem;
+    background-color: #fff;
+    box-shadow: 0 2px 5px 0 #adadad;
+    box-sizing: border-box;
+}
+
+.fselect .options li > *        { cursor: pointer; display: block; padding: 5px; text-decoration: none; color: #000; }
+.fselect .options li > *:hover  { color: #2766be; background-color: #f5f5f5 }
+
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+/* ---------------------------------------------
+   @Objeto: Combo select (un selector con label)
+   --------------------------------------------- */
+.combo_select {
+    padding: 3px 5px 3px 8px;
+    font-size: .875rem;
+    border: 1px solid #cccccc;
+    border-radius: 2px;
+    color: #666666;
+    background-color: #ffffff;
+    transition-duration: .3s;
+}
+.combo_select:hover,
+.combo_select:focus {
+    border: 1px solid #999999;
+    background-color: #ffffff;
+}
+.combo_select select {
+    padding: 3px;
+    font-weight: bold;
+    color: #515151;
+    border: none;
+    outline: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+
+/* --------------------------------------------
+   @Objeto: controles para Vista lista - grilla
+   -------------------------------------------- */
+  .view_control {
+        border-radius: 3px;
+        border: 1px solid #ccc;
+        padding: 8px;
+        width: 12px;
+        height: 12px;
+        font-size: 0;
+        background-color: #fff;
+        background-repeat: no-repeat;
+        background-position: center;
+        cursor: pointer;
+    }
+    .view_control:hover     { border-color: #eee #bfbfbf #999999; }
+    .view_control.list      { background-image: url(../img/comunes/view_list.png); }
+    .view_control.grid      { background-image: url(../img/comunes/view_grid.png); }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+
+/* ----------------------------
+   @Objeto: Paginador - filtros
+   ---------------------------- */
+
+.filtros_container,
+.search_input_container { display: inline-block; }
+
+.filtros_container { margin-left: 10px }
+
+.search_input_container .buscador { min-width: 200px }
+
+.filtros_container .select_filtros { min-width: 100px }
+
+.btn_search { margin-left: 10px }
+
+.search_input_container { position: relative; }
+
+.search_input_container .limpiarBusqueda {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+    width: 13px;
+    height: 12px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.search_input_container .limpiarBusqueda { background-image: url(../img/comunes/busqueda_clear.png) }
+.search_input_container .limpiarBusqueda:hover { background-image: url(../img/comunes/busqueda_clear_over.png) }
+
+/*-----------------------------------------------------------------------------------------------------*/
+
+
+/* -----------------------------------
+   @Objeto: Lista de archivos adjuntos
+   ----------------------------------- */
+
+.archivos_adjuntos                      { margin: 0 0 20px; padding: 10px; }
+.archivos_adjuntos .titulo              { margin: 10px 0; padding: 0 0 0 12px; font-weight: normal; font-size: .8rem; background: url(../img/comunes/attach.png) no-repeat 0 center; }
+.archivos_adjuntos > ul                 { list-style: none; padding: 0; margin: 0; }
+.archivos_adjuntos > ul > li            { display: inline-block; border: solid 1px #eee; margin-bottom: 5px; padding: 5px; text-align: center; max-width: 130px; line-height: 1.1rem; transition-duration: .4s; }
+.archivos_adjuntos > ul > li:hover      { border-color: #2766be; }
+.archivos_adjuntos .link                { display: block; text-decoration: none; }
+.archivos_adjuntos .icono               { display: block; margin: 0 auto; }
+.archivos_adjuntos .nombre              { color: #000; font-family: 'Roboto Condensed'; font-size: .8rem; }
+.archivos_adjuntos .link:hover .nombre  { color: #2766be; }
+
+.archivos_adjuntos .metadata { font-size: .7rem; }
+
+
+/* TODO - Eliminar al quitar .btn-grid de admin_obligatorios_alta
+   y admin_obligatorios_modificar (fue agregado por tom) */
+.btn-grid {
+    display: grid;
+    align-items: center;
+    grid-auto-columns: min-content;
+}
+.btn-grid >.one {
+    grid-column: 1;
+    grid-row: 1;
+}
+.btn-grid >.two {
+    grid-column: 2;
+    grid-row: 1;
+}
+.btn-grid >.four {
+    grid-column: 2;
+    grid-row: 2;
+}
+/* -------------------------------------------------------------- */
+
+.archivo-container {
+    display: flex;
+    flex-direction: column;
+}
+.maximo-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    font-weight: normal;
+    color: #757575;
+}
+.maximo-info .fa-file-upload { }
+
+td.dummy {
+    width: 1%;
+    white-space: nowrap;
+}
+
+/* ----------------------------------- */
+
+
+/* ---------------------------
+   @Objeto: Google ReCaptchaV2
+   --------------------------- */
+.g-recaptcha > div { margin: 0 auto; }

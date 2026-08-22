@@ -370,6 +370,65 @@ async function updateCalendarSeriesRoomAndCode(seriesId, room, classCode) {
   if (error) console.error('No se pudo actualizar el aula/código de la serie:', error);
 }
 
+// Recalcula el patrón Presencial/Virtual de una serie ya generada. OJO: las
+// clases pasadas se auto-borran del calendario 1 semana después de darse (ver
+// CALENDAR_RETENTION_DAYS_DEFAULT), así que para cuando se recalcula, las
+// primeras fechas de la serie ya pueden no existir más como evento. Por eso
+// el índice del patrón NO se calcula sobre los eventos que sobreviven, sino
+// sobre la lista completa y teórica de fechas de ese día de la semana dentro
+// del cuatrimestre activo (la misma lógica que generateRecurringClasses),
+// salteando feriados — así una clase ya borrada por antigua sigue "ocupando"
+// su lugar en el ciclo y no se corre el patrón. "anchorDate" (opcional) fija
+// a mano cuál fue la primera clase real (índice 0 = Presencial ahí), para
+// los casos en que el inicio real de cursada no coincide con la fecha de
+// inicio del evento "Cuatrimestre" cargado en el calendario.
+async function recalculateSeriesModality(seriesId, presencialCount, virtualCount, anchorDate) {
+  const seriesEvents = state.data.calendar.filter(item => item.seriesId === seriesId && item.type === 'Clase');
+  if (!seriesEvents.length) return;
+
+  const semesterEvent = getCurrentSemesterEvent();
+  if (!semesterEvent) return;
+
+  const sampleDate = seriesEvents[0].date;
+  const [sy, sm, sd] = sampleDate.split('-').map(Number);
+  const weekday = new Date(sy, sm - 1, sd).getDay();
+
+  const rangeStart = anchorDate || semesterEvent.date;
+  const rangeEnd = semesterEvent.endDate || semesterEvent.date;
+
+  const pattern = [
+    ...Array(Math.max(0, presencialCount)).fill('Presencial'),
+    ...Array(Math.max(0, virtualCount)).fill('Virtual')
+  ];
+  if (!pattern.length) return;
+
+  const modalityByDate = {};
+  let index = 0;
+  let cursor = rangeStart;
+  while (cursor <= rangeEnd) {
+    const [y, m, d] = cursor.split('-').map(Number);
+    if (new Date(y, m - 1, d).getDay() === weekday && !isHolidayDate(cursor)) {
+      modalityByDate[cursor] = pattern[index % pattern.length];
+      index += 1;
+    }
+    cursor = addDaysISO(cursor, 1);
+  }
+
+  for (const event of seriesEvents) {
+    if (isHolidayDate(event.date)) {
+      await deleteCalendarEvent(event.id);
+      continue;
+    }
+    const modality = modalityByDate[event.date];
+    if (!modality || event.modality === modality) continue;
+    event.modality = modality;
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from('calendar_events').update({ modality }).eq('id', event.id);
+      if (error) console.error('No se pudo actualizar la modalidad:', error);
+    }
+  }
+}
+
 // Genera una tanda de "Clase" para una materia, una por cada día de la semana
 // elegido dentro del rango del cuatrimestre activo, alternando modalidad según
 // el patrón (ej. 1 presencial + 2 virtuales => P, V, V, P, V, V...). Todas
@@ -674,6 +733,28 @@ function applyViewMode() {
     toggleBtn.classList.toggle('hidden', !isAdminAccount);
     toggleBtn.textContent = state.viewMode === 'user' ? 'Ver como admin' : 'Ver como usuario';
   }
+
+  const sidebarToggleBtn = document.getElementById('sidebarViewModeToggle');
+  const sidebarToggleLabel = document.getElementById('sidebarViewModeLabel');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.classList.toggle('hidden', !isAdminAccount);
+    if (sidebarToggleLabel) sidebarToggleLabel.textContent = state.viewMode === 'user' ? 'Ver como admin' : 'Ver como usuario';
+  }
+}
+
+function toggleViewMode() {
+  if (!state.currentUser || state.currentUser.role !== 'admin') return;
+  state.viewMode = state.viewMode === 'user' ? 'admin' : 'user';
+  state.editingCalendarId = null;
+  state.editingForumId = null;
+  updatePortalHeader(state.currentUser);
+  renderCalendarList();
+  renderForumList();
+}
+
+async function performLogout() {
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  window.location.reload();
 }
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -707,10 +788,180 @@ async function loadFaqFromSupabase() {
 }
 
 function mapContentItemRow(row) {
-  const base = { id: row.id, type: row.type, title: row.title, uploadedBy: row.uploaded_by };
+  const base = { id: row.id, type: row.type, title: row.title, uploadedBy: row.uploaded_by, position: row.position };
   return row.type === 'pdf'
     ? { ...base, fileName: row.file_name, url: row.url, storagePath: row.storage_path }
     : { ...base, body: row.body };
+}
+
+// Importador de "Clase N.html" guardadas desde el campus (con su carpeta
+// "..._files" de imágenes al lado) directamente desde admin.html, sin pasar
+// por un script aparte. Reutiliza el mismo modelo que ya usa el editor de
+// Contenido de Materias (unidad "Clases" + subject_content_items tipo "clase").
+function groupImportFilesBySubject(fileList, subjects) {
+  const groups = new Map();
+  const files = Array.from(fileList).filter(file => file.webkitRelativePath);
+  if (!files.length) return groups;
+
+  const sample = files[0].webkitRelativePath.split('/');
+  const rootIsSubjectFolder = subjects.some(subject => Number(subject.code) === Number(sample[0]));
+
+  files.forEach(file => {
+    const segments = file.webkitRelativePath.split('/');
+    const codeFolder = rootIsSubjectFolder ? segments[0] : segments[1];
+    const restPath = rootIsSubjectFolder ? segments.slice(1).join('/') : segments.slice(2).join('/');
+    if (!restPath) return;
+    const subject = subjects.find(item => Number(item.code) === Number(codeFolder));
+    if (!subject) return;
+
+    if (!groups.has(subject.id)) groups.set(subject.id, { subject, htmlFiles: [], assets: new Map() });
+    const group = groups.get(subject.id);
+    if (/\.html?$/i.test(restPath) && !restPath.includes('/')) {
+      group.htmlFiles.push({ file, relPath: restPath });
+    } else {
+      group.assets.set(restPath, file);
+    }
+  });
+  return groups;
+}
+
+async function decodeHtmlFile(file) {
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder('windows-1252').decode(buffer);
+  } catch (error) {
+    return new TextDecoder('utf-8').decode(buffer);
+  }
+}
+
+// El campus guarda la clase dentro de <article class="contenido item_programa">,
+// con el título en un <h3 class="edu-header-h3"> y el cuerpo real en el
+// <div class="item_unidad">. El resto del archivo es chrome de la plataforma
+// (menú, header, nav) que no nos interesa.
+function extractClaseFromHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const article = doc.querySelector('article.contenido.item_programa');
+  if (!article) return null;
+  const bodyEl = article.querySelector('.item_unidad');
+  if (!bodyEl) return null;
+  const titleEl = article.querySelector('h3.edu-header-h3');
+  const title = titleEl ? titleEl.textContent.replace(/\s+/g, ' ').trim() : '';
+
+  bodyEl.querySelectorAll('script, style').forEach(el => el.remove());
+  bodyEl.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+    });
+  });
+  return { title, bodyEl };
+}
+
+async function uploadClaseImage(subjectId, file) {
+  const path = `clases-import/${subjectId}/${generateLocalId('img')}_${sanitizeStorageFilename(file.name)}`;
+  const { error } = await supabaseClient.storage.from('subject-content').upload(path, file, { contentType: file.type || 'image/png' });
+  if (error) return null;
+  const { data } = supabaseClient.storage.from('subject-content').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function ensureClasesUnit(subject) {
+  const existing = subject.units.find(unit => unit.title === 'Clases');
+  if (existing) return existing;
+  const { data, error } = await supabaseClient.from('subject_units').insert({ subject_id: subject.id, title: 'Clases' }).select().single();
+  if (error) throw new Error(error.message);
+  const unit = { id: data.id, title: data.title, items: [] };
+  subject.units.push(unit);
+  return unit;
+}
+
+async function runClasesImport(fileList, force, logEl, noticeEl) {
+  if (!supabaseClient || !isAdminView()) return;
+  const groups = groupImportFilesBySubject(fileList, state.data.subjects);
+  if (!groups.size) {
+    noticeEl.className = 'notice show error';
+    noticeEl.textContent = 'No se encontraron materias que coincidan por código dentro de la carpeta elegida.';
+    return;
+  }
+
+  logEl.innerHTML = '';
+  const appendLog = text => {
+    const line = document.createElement('div');
+    line.textContent = text;
+    logEl.appendChild(line);
+  };
+
+  let imported = 0, updated = 0, skipped = 0, failed = 0;
+
+  for (const { subject, htmlFiles, assets } of groups.values()) {
+    if (!htmlFiles.length) continue;
+    appendLog(`Materia ${subject.code} · ${subject.name}`);
+
+    let unit;
+    try {
+      unit = await ensureClasesUnit(subject);
+    } catch (error) {
+      appendLog(`  ! no se pudo crear/leer la unidad "Clases": ${error.message}`);
+      failed += htmlFiles.length;
+      continue;
+    }
+
+    const sortedHtmlFiles = htmlFiles.slice().sort((a, b) => a.relPath.localeCompare(b.relPath, 'es', { numeric: true }));
+    for (const { file, relPath } of sortedHtmlFiles) {
+      const html = await decodeHtmlFile(file);
+      const extracted = extractClaseFromHtml(html);
+      if (!extracted) {
+        appendLog(`  ! no se pudo leer el contenido de "${relPath}", se saltea.`);
+        failed += 1;
+        continue;
+      }
+      const title = extracted.title || relPath.replace(/\.html?$/i, '');
+
+      const imgEls = [...extracted.bodyEl.querySelectorAll('img[src^="./"]')];
+      for (const img of imgEls) {
+        const ref = img.getAttribute('src').replace(/^\.\//, '');
+        const assetFile = assets.get(ref);
+        if (!assetFile) continue;
+        const url = await uploadClaseImage(subject.id, assetFile);
+        if (url) img.setAttribute('src', url);
+      }
+
+      const body = extracted.bodyEl.innerHTML.trim();
+      if (!body) {
+        appendLog(`  ! "${title}" quedó vacía, se saltea.`);
+        failed += 1;
+        continue;
+      }
+
+      const existingItem = unit.items.find(item => item.title === title);
+      const uploadedBy = getFullName(state.currentUser);
+
+      if (existingItem && !force) {
+        appendLog(`  = "${title}" ya existe, se saltea.`);
+        skipped += 1;
+        continue;
+      }
+
+      if (existingItem && force) {
+        const { error } = await supabaseClient.from('subject_content_items').update({ body, uploaded_by: uploadedBy }).eq('id', existingItem.id);
+        if (error) { appendLog(`  ! no se pudo actualizar "${title}": ${error.message}`); failed += 1; continue; }
+        existingItem.body = body;
+        appendLog(`  ↻ "${title}" actualizada.`);
+        updated += 1;
+        continue;
+      }
+
+      const { data, error } = await supabaseClient.from('subject_content_items')
+        .insert({ unit_id: unit.id, subject_id: subject.id, type: 'clase', title, body, uploaded_by: uploadedBy, position: unit.items.length })
+        .select().single();
+      if (error) { appendLog(`  ! no se pudo crear "${title}": ${error.message}`); failed += 1; continue; }
+      unit.items.push(mapContentItemRow(data));
+      appendLog(`  + "${title}" importada.`);
+      imported += 1;
+    }
+  }
+
+  noticeEl.className = 'notice show';
+  noticeEl.textContent = `Listo: ${imported} nuevas, ${updated} actualizadas, ${skipped} saltedas, ${failed} con error.`;
 }
 
 // Carga en bloque (pocas queries en vez de una por materia) todo el
@@ -732,7 +983,7 @@ async function loadSubjectContentFromSupabase() {
 
   const [unitsRes, itemsRes, forumRes, opinionsRes, pollsRes, optionsRes, votesRes, summariesRes] = await Promise.all([
     supabaseClient.from('subject_units').select('*').order('created_at', { ascending: true }),
-    supabaseClient.from('subject_content_items').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_content_items').select('*').order('position', { ascending: true }).order('created_at', { ascending: true }),
     supabaseClient.from('subject_forum_posts').select('*').order('created_at', { ascending: false }),
     supabaseClient.from('subject_opinions').select('*').order('created_at', { ascending: false }),
     supabaseClient.from('subject_polls').select('*').order('created_at', { ascending: false }),
@@ -998,7 +1249,7 @@ function renderYears() {
     const button = document.createElement('button');
     button.className = 'nav-link year-btn';
     button.dataset.year = year;
-    button.textContent = `${year}° año`;
+    button.innerHTML = `<span class="nav-icon">${year}°</span><span class="nav-label sidebar-text">${year}° año</span>`;
     button.addEventListener('click', () => openYear(year));
     container.appendChild(button);
   });
@@ -1016,7 +1267,7 @@ function openYear(year) {
   renderList('subjectsGrid', subjects, subject => {
     const status = state.currentUser ? getSubjectProgress(state.currentUser.email, subject.id).status : 'No cursable';
     const statusClass = STATUS_CLASSES[status] || '';
-    const modalityIcon = subject.modality === 'Presencial' ? '🏫' : '💻';
+    const modalityIcon = subject.modality === 'Presencial' ? '<span class="icon icon-pin"></span>' : '<span class="icon icon-monitor"></span>';
     return `
       <button class="subject-card" data-subject-id="${subject.id}">
         <div class="subject-card-top">
@@ -1025,7 +1276,7 @@ function openYear(year) {
         </div>
         <strong class="subject-card-name">${subject.name}</strong>
         <div class="subject-card-meta">
-          <span>⏱ ${subject.hours}</span>
+          <span><span class="icon icon-clock"></span> ${subject.hours}</span>
           <span>${modalityIcon} ${subject.modality}</span>
         </div>
       </button>
@@ -1058,6 +1309,17 @@ function isHolidayDate(iso) {
   return state.data.calendar.some(event => event.type === 'Feriado' && eventCoversDate(event, iso));
 }
 
+// Convierte un link de "compartir" de Google Drive (view/open) a su URL de
+// preview embebible, para que el video se vea adentro de la página en vez de
+// redirigir a Drive. Si no reconoce el formato, deja la URL tal cual (por si
+// ya es un link de preview u otro host embebible).
+function driveEmbedUrl(rawUrl) {
+  const trimmed = (rawUrl || '').trim();
+  const match = trimmed.match(/[-\w]{25,}/);
+  if (!match) return trimmed;
+  return `https://drive.google.com/file/d/${match[0]}/preview`;
+}
+
 function zoomLinkFor(code) {
   const trimmed = (code || '').trim();
   if (!trimmed) return '';
@@ -1068,10 +1330,10 @@ function zoomLinkFor(code) {
 // virtuales — se muestra uno u otro según la modalidad real del evento/ocurrencia.
 function buildRoomOrCodeBadge(item) {
   if (item.modality === 'Presencial' && item.room) {
-    return `<span class="event-room-badge">📍 ${escapeHtml(item.room)}</span>`;
+    return `<span class="event-room-badge"><span class="icon icon-pin"></span> ${escapeHtml(item.room)}</span>`;
   }
   if (item.modality === 'Virtual' && item.classCode) {
-    return `<a class="event-room-badge event-zoom-link" href="${zoomLinkFor(item.classCode)}" target="_blank" rel="noopener">🔗 ${escapeHtml(item.classCode)}</a>`;
+    return `<a class="event-room-badge event-zoom-link" href="${zoomLinkFor(item.classCode)}" target="_blank" rel="noopener"><span class="icon icon-link"></span> ${escapeHtml(item.classCode)}</a>`;
   }
   return '';
 }
@@ -1131,6 +1393,8 @@ function formatEventSchedule(event) {
   return `${dateLabel}${timeLabel} · ${event.type}`;
 }
 
+const CALENDAR_GRID_SLOTS = 42; // 6 filas x 7 días: altura fija sin importar el mes
+
 function renderCalendarMonth() {
   const grid = document.getElementById('calendarGrid');
   const label = document.getElementById('calendarMonthLabel');
@@ -1146,34 +1410,62 @@ function renderCalendarMonth() {
 
   grid.innerHTML = '';
 
-  for (let i = 0; i < startOffset; i += 1) {
-    const empty = document.createElement('span');
-    empty.className = 'calendar-cell empty';
-    grid.appendChild(empty);
+  // Franja de fondo del cuatrimestre: sigue exactamente los días que
+  // pertenecen al cuatrimestre (no todo el ancho de la semana). Se dibuja una
+  // pieza por fila, y las esquinas que tocan una pieza en la fila de
+  // arriba/abajo se dejan cuadradas para que todo se vea como una sola forma
+  // continua en vez de rectángulos sueltos.
+  const semesterFlags = new Array(CALENDAR_GRID_SLOTS).fill(false);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    semesterFlags[startOffset + day - 1] = isSemesterDay(toISODate(year, month, day));
+  }
+  const isSemesterSlot = (row, col) => {
+    if (row < 0 || row > 5 || col < 0 || col > 6) return false;
+    return semesterFlags[row * 7 + col];
+  };
+  for (let row = 0; row < 6; row += 1) {
+    let col = 0;
+    while (col < 7) {
+      if (!isSemesterSlot(row, col)) { col += 1; continue; }
+      let colEnd = col;
+      while (colEnd < 6 && isSemesterSlot(row, colEnd + 1)) colEnd += 1;
+      const el = document.createElement('div');
+      el.className = 'semester-band';
+      el.style.gridRow = String(row + 1);
+      el.style.gridColumn = `${col + 1} / ${colEnd + 2}`;
+      if (isSemesterSlot(row - 1, col)) el.style.borderTopLeftRadius = '0';
+      if (isSemesterSlot(row - 1, colEnd)) el.style.borderTopRightRadius = '0';
+      if (isSemesterSlot(row + 1, col)) el.style.borderBottomLeftRadius = '0';
+      if (isSemesterSlot(row + 1, colEnd)) el.style.borderBottomRightRadius = '0';
+      grid.appendChild(el);
+      col = colEnd + 1;
+    }
   }
 
-  for (let day = 1; day <= daysInMonth; day += 1) {
+  for (let slot = 0; slot < CALENDAR_GRID_SLOTS; slot += 1) {
+    const row = Math.floor(slot / 7);
+    const col = slot % 7;
+    const day = slot - startOffset + 1;
+    if (day < 1 || day > daysInMonth) {
+      const empty = document.createElement('span');
+      empty.className = 'calendar-cell empty';
+      empty.style.gridRow = String(row + 1);
+      empty.style.gridColumn = String(col + 1);
+      grid.appendChild(empty);
+      continue;
+    }
     const iso = toISODate(year, month, day);
     const dayEvents = state.data.calendar.filter(event => eventCoversDate(event, iso));
-    const semesterEvents = dayEvents.filter(event => event.type === 'Cuatrimestre');
     const dotEvents = dayEvents.filter(event => event.type !== 'Cuatrimestre');
     const isHoliday = dayEvents.some(event => event.type === 'Feriado');
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'calendar-cell';
+    cell.style.gridRow = String(row + 1);
+    cell.style.gridColumn = String(col + 1);
     if (isHoliday) cell.classList.add('holiday');
     if (iso === todayISO) cell.classList.add('today');
     if (iso === selectedDate) cell.classList.add('selected');
-    if (semesterEvents.length) {
-      const weekdayIndex = (startOffset + day - 1) % 7;
-      const isRowFirst = weekdayIndex === 0;
-      const isRowLast = weekdayIndex === 6;
-      const runStart = isRowFirst || !isSemesterDay(addDaysISO(iso, -1));
-      const runEnd = isRowLast || !isSemesterDay(addDaysISO(iso, 1));
-      cell.classList.add('semester-range');
-      if (runStart) cell.classList.add('semester-run-start'); else cell.classList.add('semester-bridge-left');
-      if (runEnd) cell.classList.add('semester-run-end'); else cell.classList.add('semester-bridge-right');
-    }
     const dots = dotEvents.map(event => `<i class="event-dot" style="background:${EVENT_TYPE_COLORS[event.type] || 'var(--primary)'}"></i>`).join('');
     cell.innerHTML = `<span>${day}</span>${dots ? `<span class="event-dots">${dots}</span>` : ''}`;
     cell.addEventListener('click', () => {
@@ -1253,7 +1545,7 @@ function buildCalendarCard(item) {
   const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality}</span>` : '';
   const roomBadge = buildRoomOrCodeBadge(item);
   const isHoliday = item.type !== 'Feriado' && item.type !== 'Cuatrimestre' && isHolidayDate(item.date);
-  const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
+  const holidayBadge = isHoliday ? '<span class="event-holiday-badge"><span class="icon icon-alert-triangle"></span> Feriado: no hay clase</span>' : '';
   return `<article class="item-card${stickyClass}"><strong>${item.title}</strong><span><i class="event-dot" style="background:${color}"></i>${formatEventSchedule(item)}</span>${subjectBadge}${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
 }
 
@@ -1291,6 +1583,12 @@ function buildRecurringClassSummaryCard(item) {
       <input type="text" name="room" value="${item.room || ''}" placeholder="Aula" class="${item.room ? '' : 'hidden'}" />
       <label class="checkbox-row small"><input type="checkbox" class="code-toggle" ${item.classCode ? 'checked' : ''} /> Código de clase (link de Zoom, clase virtual)</label>
       <input type="text" name="classCode" value="${item.classCode || ''}" placeholder="Código o link de Zoom" class="${item.classCode ? '' : 'hidden'}" />
+      <p class="form-hint">Recalcular patrón (opcional): borra las fechas que caigan en feriado y reordena Presencial/Virtual desde la fecha ancla, sin "pisar" turnos por los feriados. Dejá los 3 campos vacíos para no tocar el patrón.</p>
+      <div class="two-cols">
+        <label class="field-label">Presenciales seguidas<input type="number" name="presencialCount" min="0" placeholder="ej. 1" /></label>
+        <label class="field-label">Virtuales seguidas<input type="number" name="virtualCount" min="0" placeholder="ej. 2" /></label>
+      </div>
+      <label class="field-label">Fecha de la primera clase (ancla del patrón, esa fecha = primer turno)<input type="date" name="anchorDate" /></label>
       <div class="stack-row">
         <button type="submit" class="small-btn">Guardar</button>
         <button type="button" class="ghost-btn small-btn" data-class-series-cancel="${item.seriesId}">Cancelar</button>
@@ -1301,7 +1599,7 @@ function buildRecurringClassSummaryCard(item) {
   const modalityBadge = item.modality ? `<span class="event-modality-badge ${item.modality === 'Presencial' ? 'presencial' : 'virtual'}">${item.modality} esta semana</span>` : '';
   const roomBadge = buildRoomOrCodeBadge(item);
   const isHoliday = isHolidayDate(item.date);
-  const holidayBadge = isHoliday ? '<span class="event-holiday-badge">⚠ Feriado: no hay clase</span>' : '';
+  const holidayBadge = isHoliday ? '<span class="event-holiday-badge"><span class="icon icon-alert-triangle"></span> Feriado: no hay clase</span>' : '';
   const adminControls = (isAdminView() && item.seriesId) ? `<div class="stack-row">
       <button type="button" class="ghost-btn small-btn" data-class-series-edit="${item.seriesId}">Editar</button>
       <button type="button" class="ghost-btn small-btn danger-btn" data-calendar-delete-series="${item.seriesId}">Borrar serie</button>
@@ -1309,40 +1607,53 @@ function buildRecurringClassSummaryCard(item) {
   return `<article class="item-card"><strong>${name}</strong><span><i class="event-dot" style="background:${EVENT_TYPE_COLORS.Clase}"></i>${item.weekdayLabel} · ${timeLabel} · Clase</span>${modalityBadge}${roomBadge}${holidayBadge}${adminControls}</article>`;
 }
 
+// "Calendario académico" agrupa todo lo que no es una clase puntual (las
+// clases tienen su propio panel, ver más abajo). El feriado no forma parte de
+// este conjunto fijo porque solo se lista bajo demanda (botón "Ver feriados").
+const ACADEMIC_CALENDAR_TYPES = ['Cuatrimestre', 'Inscripción', 'Entrega', 'Examen', 'Académico'];
+
 function renderCalendarList() {
   const { selectedDate, holidaysListOpen } = state.calendarView;
-  const target = document.getElementById('calendarFull');
-  if (!target) return;
+  const academicTarget = document.getElementById('calendarFull');
+  const clasesTarget = document.getElementById('calendarClasesList');
+  if (!academicTarget && !clasesTarget) return;
 
-  let html;
+  let academicHtml;
   if (holidaysListOpen) {
     // Todos los feriados cargados, del más reciente al más antiguo.
     const holidays = state.data.calendar
       .filter(event => event.type === 'Feriado')
       .slice()
       .sort((a, b) => b.date.localeCompare(a.date));
-    html = holidays.map(buildCalendarCard).join('');
+    academicHtml = holidays.map(buildCalendarCard).join('');
   } else if (selectedDate) {
-    // Un día puntual: se ve tal cual, incluido el feriado o la clase específica de ese día si la hay.
-    const events = state.data.calendar.filter(event => eventCoversDate(event, selectedDate));
-    const sorted = sortEventsForDisplay(events);
-    html = sorted.map(buildCalendarCard).join('');
+    // Un día puntual: los eventos académicos (y el feriado si lo hay) de ese día.
+    const events = state.data.calendar.filter(event => eventCoversDate(event, selectedDate) && event.type !== 'Clase');
+    academicHtml = sortEventsForDisplay(events).map(buildCalendarCard).join('');
   } else {
-    // Vista general: ni los feriados ni las "Clase" se listan uno por uno (serían
-    // decenas); las clases se resumen por serie y los feriados se ven con el
-    // botón dedicado. Igual siguen coloreados en la grilla del mes.
-    const classEvents = state.data.calendar.filter(event => event.type === 'Clase');
-    const otherEvents = state.data.calendar.filter(event => event.type !== 'Clase' && event.type !== 'Feriado');
-    const summaries = summarizeRecurringClasses(classEvents);
-    const sorted = sortEventsForDisplay(otherEvents);
-    html = summaries.map(buildRecurringClassSummaryCard).join('') + sorted.map(buildCalendarCard).join('');
+    const events = state.data.calendar.filter(event => ACADEMIC_CALENDAR_TYPES.includes(event.type));
+    academicHtml = sortEventsForDisplay(events).map(buildCalendarCard).join('');
   }
+  if (academicTarget) academicTarget.innerHTML = academicHtml || createItemCard('Sin datos', 'No hay información cargada.', '');
 
-  target.innerHTML = html || createItemCard('Sin datos', 'No hay información cargada.', '');
+  let clasesHtml;
+  if (selectedDate) {
+    // Las clases del día seleccionado se ven una por una (no como resumen de serie).
+    const events = state.data.calendar.filter(event => eventCoversDate(event, selectedDate) && event.type === 'Clase');
+    clasesHtml = sortEventsForDisplay(events).map(buildCalendarCard).join('');
+  } else {
+    // Vista general: las clases se resumen por serie (serían decenas una por una).
+    const classEvents = state.data.calendar.filter(event => event.type === 'Clase');
+    const summaries = summarizeRecurringClasses(classEvents)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    clasesHtml = summaries.map(buildRecurringClassSummaryCard).join('');
+  }
+  if (clasesTarget) clasesTarget.innerHTML = clasesHtml || createItemCard('Sin clases', 'No hay clases cargadas.', '');
 
   if (state.editingCalendarId) {
     const editingItem = state.data.calendar.find(item => item.id === state.editingCalendarId);
-    const select = target.querySelector('.calendar-edit-subject-select');
+    const select = (academicTarget && academicTarget.querySelector('.calendar-edit-subject-select'))
+      || (clasesTarget && clasesTarget.querySelector('.calendar-edit-subject-select'));
     if (editingItem && select) populateCalendarSubjectSelect(select, editingItem.subjectId);
   }
 }
@@ -1813,7 +2124,11 @@ function openPdfForItem(item) {
 }
 
 function renderContentItemBody(item) {
-  const meta = item.type === 'pdf' ? `PDF · Subido por ${item.uploadedBy}` : `Clase · Publicada por ${item.uploadedBy}`;
+  const meta = item.type === 'pdf'
+    ? `PDF · Subido por ${item.uploadedBy}`
+    : item.type === 'video'
+    ? `Video · Subido por ${item.uploadedBy}`
+    : `Clase · Publicada por ${item.uploadedBy}`;
   const pdfSrc = item.url || item.dataUrl;
   const isMobile = window.innerWidth <= 900;
   const body = item.type === 'pdf'
@@ -1821,16 +2136,18 @@ function renderContentItemBody(item) {
         ? `<div class="pdf-mobile-open">
              <p>En el celular, los PDFs se abren en una pestaña nueva.</p>
              <div class="pdf-toolbar">
-               <button type="button" class="download-link" data-pdf-open="${item.id}">↗ Abrir PDF</button>
-               <a class="download-link" href="${pdfSrc}" download="${item.fileName}">⬇ Descargar PDF</a>
+               <button type="button" class="download-link" data-pdf-open="${item.id}"><span class="icon icon-external-link"></span> Abrir PDF</button>
+               <a class="download-link" href="${pdfSrc}" download="${item.fileName}"><span class="icon icon-download"></span> Descargar PDF</a>
              </div>
            </div>`
         : `<iframe id="pdfPreviewFrame" class="pdf-preview" src="${pdfSrc}" title="${item.title}"></iframe>
        <div class="pdf-toolbar">
-         <button type="button" class="download-link" data-pdf-fullscreen>⛶ Pantalla completa</button>
-         <a class="download-link" href="${pdfSrc}" target="_blank" rel="noopener">↗ Abrir en pestaña nueva</a>
-         <a class="download-link" href="${pdfSrc}" download="${item.fileName}">⬇ Descargar PDF</a>
+         <button type="button" class="download-link" data-pdf-fullscreen><span class="icon icon-maximize"></span> Pantalla completa</button>
+         <a class="download-link" href="${pdfSrc}" target="_blank" rel="noopener"><span class="icon icon-external-link"></span> Abrir en pestaña nueva</a>
+         <a class="download-link" href="${pdfSrc}" download="${item.fileName}"><span class="icon icon-download"></span> Descargar PDF</a>
        </div>`)
+    : item.type === 'video'
+    ? `<iframe class="video-preview" src="${item.body}" title="${item.title}" allow="autoplay; fullscreen" allowfullscreen></iframe>`
     : `<div class="clase-body">${/^\s*</.test(item.body || '') ? item.body : parseClaseBody(item.body)}</div>`;
 
   return `
@@ -1860,20 +2177,27 @@ function renderSubjectContent(subject) {
 
   navTarget.innerHTML = subject.units.map(unit => {
     const isOpen = unit.id === state.currentUnitId;
-    const icon = itemType => (itemType === 'pdf' ? '📄' : '🎓');
+    const icon = itemType => (itemType === 'pdf' ? '<span class="icon icon-file-text"></span>' : itemType === 'video' ? '<span class="icon icon-video"></span>' : '<span class="icon icon-graduation-cap"></span>');
 
     const itemsHtml = unit.items.length
-      ? unit.items.map(item => {
+      ? unit.items.map((item, itemIndex) => {
           const itemDeleteControl = isAdminView()
             ? (state.confirmDeleteItemId === item.id
                 ? `<span class="unit-nav-confirm">
                      <button type="button" class="icon-btn tiny-btn danger-btn" data-confirm-delete-item="${item.id}" data-unit-id="${unit.id}" title="Confirmar eliminación">✓</button>
                      <button type="button" class="icon-btn tiny-btn" data-cancel-delete-item="${item.id}" title="Cancelar">✕</button>
                    </span>`
-                : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-item-trigger="${item.id}" title="Eliminar contenido">🗑</button>`)
+                : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-item-trigger="${item.id}" title="Eliminar contenido"><span class="icon icon-trash"></span></button>`)
+            : '';
+          const itemMoveControl = isAdminView()
+            ? `<span class="unit-nav-move">
+                 <button type="button" class="icon-btn tiny-btn ghost-btn" data-move-item="-1" data-unit-id="${unit.id}" data-item-id="${item.id}" title="Subir" ${itemIndex === 0 ? 'disabled' : ''}>▲</button>
+                 <button type="button" class="icon-btn tiny-btn ghost-btn" data-move-item="1" data-unit-id="${unit.id}" data-item-id="${item.id}" title="Bajar" ${itemIndex === unit.items.length - 1 ? 'disabled' : ''}>▼</button>
+               </span>`
             : '';
           return `
             <div class="unit-nav-item-row">
+              ${itemMoveControl}
               <button type="button" class="unit-nav-item ${item.id === state.currentItemId ? 'active' : ''}" data-unit-id="${unit.id}" data-item-id="${item.id}">
                 ${icon(item.type)} ${item.title}
               </button>
@@ -1889,7 +2213,7 @@ function renderSubjectContent(subject) {
                <button type="button" class="icon-btn tiny-btn danger-btn" data-confirm-delete-unit="${unit.id}" title="Confirmar eliminación de la unidad">✓</button>
                <button type="button" class="icon-btn tiny-btn" data-cancel-delete-unit="${unit.id}" title="Cancelar">✕</button>
              </span>`
-          : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-unit-trigger="${unit.id}" title="Eliminar unidad">🗑</button>`)
+          : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-unit-trigger="${unit.id}" title="Eliminar unidad"><span class="icon icon-trash"></span></button>`)
       : '';
 
     return `
@@ -1948,6 +2272,12 @@ function renderSubjectContent(subject) {
     button.addEventListener('click', () => deleteUnit(subject, button.dataset.confirmDeleteUnit));
   });
 
+  navTarget.querySelectorAll('[data-move-item]').forEach(button => {
+    button.addEventListener('click', () => {
+      moveContentItem(subject, button.dataset.unitId, button.dataset.itemId, Number(button.dataset.moveItem));
+    });
+  });
+
   navTarget.querySelectorAll('[data-delete-item-trigger]').forEach(button => {
     button.addEventListener('click', () => {
       state.confirmDeleteItemId = button.dataset.deleteItemTrigger;
@@ -1980,6 +2310,36 @@ function renderSubjectContent(subject) {
     if (openBtn && selectedItem) {
       openBtn.addEventListener('click', () => openPdfForItem(selectedItem));
     }
+  }
+}
+
+// Mueve un ítem de contenido un lugar hacia arriba/abajo dentro de su unidad,
+// intercambiando su "position" con la del vecino (solo admin).
+async function moveContentItem(subject, unitId, itemId, direction) {
+  if (!isAdminView()) return;
+  const unit = subject.units.find(item => item.id === unitId);
+  if (!unit) return;
+  const index = unit.items.findIndex(item => item.id === itemId);
+  const swapIndex = index + direction;
+  if (index === -1 || swapIndex < 0 || swapIndex >= unit.items.length) return;
+
+  const current = unit.items[index];
+  const neighbor = unit.items[swapIndex];
+  const currentPosition = current.position;
+  const neighborPosition = neighbor.position;
+  current.position = neighborPosition;
+  neighbor.position = currentPosition;
+  unit.items[index] = neighbor;
+  unit.items[swapIndex] = current;
+
+  renderSubjectLists(subject);
+
+  if (supabaseClient) {
+    const [{ error: err1 }, { error: err2 }] = await Promise.all([
+      supabaseClient.from('subject_content_items').update({ position: current.position }).eq('id', current.id),
+      supabaseClient.from('subject_content_items').update({ position: neighbor.position }).eq('id', neighbor.id)
+    ]);
+    if (err1 || err2) console.error('No se pudo guardar el nuevo orden:', err1 || err2);
   }
 }
 
@@ -2123,7 +2483,7 @@ function renderOpinions(subject) {
 function summaryCard(subject, summary) {
   const canDelete = state.currentUser && (state.currentUser.id === summary.authorId || isAdminView());
   const deleteBtn = canDelete
-    ? `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-summary="${summary.id}" title="Eliminar resumen">🗑</button>`
+    ? `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-summary="${summary.id}" title="Eliminar resumen"><span class="icon icon-trash"></span></button>`
     : '';
   return `
     <article class="item-card summary-card">
@@ -2420,10 +2780,14 @@ function updatePortalHeader(user) {
   const name = document.getElementById('userName');
   const role = document.getElementById('userRole');
   const avatar = document.getElementById('userAvatar');
+  const sidebarName = document.getElementById('sidebarUserName');
+  const sidebarAvatar = document.getElementById('sidebarUserAvatar');
 
   if (name) name.textContent = getFullName(user);
   if (role) role.textContent = state.viewMode === 'user' && user.role === 'admin' ? 'Estudiante (vista previa)' : (user.role === 'admin' ? 'Administrador' : 'Estudiante');
   renderAvatarInto(avatar, user);
+  if (sidebarName) sidebarName.textContent = getFullName(user);
+  renderAvatarInto(sidebarAvatar, user);
   applyViewMode();
 }
 
@@ -2722,7 +3086,7 @@ function openStudentProfile(studentId) {
     : '<p class="student-profile-empty">Este alumno no comparte sus datos de contacto.</p>';
 
   const whatsappHtml = student.contact_visible && student.phone
-    ? `<a class="whatsapp-btn" target="_blank" rel="noopener" href="https://wa.me/${student.phone.replace(/[^0-9]/g, '')}">💬 Contactar por WhatsApp</a>`
+    ? `<a class="whatsapp-btn" target="_blank" rel="noopener" href="https://wa.me/${student.phone.replace(/[^0-9]/g, '')}"><span class="icon icon-chat"></span> Contactar por WhatsApp</a>`
     : '';
 
   content.innerHTML = `
@@ -3118,25 +3482,16 @@ function attachPortalEvents() {
     });
   }
 
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-      if (supabaseClient) await supabaseClient.auth.signOut();
-      window.location.reload();
-    });
-  }
+  if (logoutBtn) logoutBtn.addEventListener('click', performLogout);
 
   const viewModeToggle = document.getElementById('viewModeToggle');
-  if (viewModeToggle) {
-    viewModeToggle.addEventListener('click', () => {
-      if (!state.currentUser || state.currentUser.role !== 'admin') return;
-      state.viewMode = state.viewMode === 'user' ? 'admin' : 'user';
-      state.editingCalendarId = null;
-      state.editingForumId = null;
-      updatePortalHeader(state.currentUser);
-      renderCalendarList();
-      renderForumList();
-    });
-  }
+  if (viewModeToggle) viewModeToggle.addEventListener('click', toggleViewMode);
+
+  const sidebarViewModeToggle = document.getElementById('sidebarViewModeToggle');
+  if (sidebarViewModeToggle) sidebarViewModeToggle.addEventListener('click', toggleViewMode);
+
+  const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+  if (sidebarLogoutBtn) sidebarLogoutBtn.addEventListener('click', performLogout);
 
   document.querySelectorAll('[data-view]').forEach(button => {
     button.addEventListener('click', () => setView(button.dataset.view));
@@ -3392,9 +3747,9 @@ function attachPortalEvents() {
     });
   }
 
-  const calendarFullEl = document.getElementById('calendarFull');
-  if (calendarFullEl) {
-    calendarFullEl.addEventListener('click', event => {
+  function wireCalendarListContainer(container) {
+    if (!container) return;
+    container.addEventListener('click', event => {
       if (!isAdminView()) return;
       const editBtn = event.target.closest('[data-calendar-edit]');
       if (editBtn) {
@@ -3434,7 +3789,7 @@ function attachPortalEvents() {
       }
     });
 
-    calendarFullEl.addEventListener('change', event => {
+    container.addEventListener('change', event => {
       const toggle = event.target.closest('.room-toggle, .code-toggle');
       if (!toggle) return;
       const inputName = toggle.classList.contains('room-toggle') ? 'room' : 'classCode';
@@ -3444,7 +3799,7 @@ function attachPortalEvents() {
       if (!toggle.checked) input.value = '';
     });
 
-    calendarFullEl.addEventListener('submit', async event => {
+    container.addEventListener('submit', async event => {
       const form = event.target.closest('[data-calendar-edit-form]');
       if (!form || !isAdminView()) return;
       event.preventDefault();
@@ -3465,16 +3820,27 @@ function attachPortalEvents() {
       renderCalendarViews();
     });
 
-    calendarFullEl.addEventListener('submit', async event => {
+    container.addEventListener('submit', async event => {
       const seriesForm = event.target.closest('[data-class-series-edit-form]');
       if (!seriesForm || !isAdminView()) return;
       event.preventDefault();
       const seriesId = seriesForm.dataset.classSeriesEditForm;
       await updateCalendarSeriesRoomAndCode(seriesId, seriesForm.room.value.trim(), seriesForm.classCode.value.trim());
+
+      const presencialRaw = seriesForm.presencialCount.value.trim();
+      const virtualRaw = seriesForm.virtualCount.value.trim();
+      const anchorDate = seriesForm.anchorDate.value;
+      if (presencialRaw !== '' || virtualRaw !== '') {
+        await recalculateSeriesModality(seriesId, Number(presencialRaw) || 0, Number(virtualRaw) || 0, anchorDate);
+      }
+
       state.editingClassSeriesId = null;
       renderCalendarViews();
     });
   }
+
+  wireCalendarListContainer(document.getElementById('calendarFull'));
+  wireCalendarListContainer(document.getElementById('calendarClasesList'));
 
   const forumListEl = document.getElementById('forumList');
   if (forumListEl) {
@@ -3542,10 +3908,72 @@ function attachPortalEvents() {
 
   if (contentTypeSelect) {
     contentTypeSelect.addEventListener('change', () => {
-      const isPdf = contentTypeSelect.value === 'pdf';
-      document.getElementById('contentFileInput').classList.toggle('hidden', !isPdf);
-      document.getElementById('contentBodyWrapper').classList.toggle('hidden', isPdf);
-      if (!isPdf) initClaseEditor();
+      const type = contentTypeSelect.value;
+      document.getElementById('contentFileInput').classList.toggle('hidden', type !== 'pdf');
+      document.getElementById('contentBodyWrapper').classList.toggle('hidden', type !== 'clase');
+      document.getElementById('contentVideoWrapper').classList.toggle('hidden', type !== 'video');
+      if (type === 'clase') initClaseEditor();
+    });
+  }
+
+  const claseImportFillBtn = document.getElementById('claseImportFillBtn');
+  if (claseImportFillBtn) {
+    claseImportFillBtn.addEventListener('click', async () => {
+      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
+      const notice = document.getElementById('claseImportNotice');
+      if (!subject || !isAdminView() || !supabaseClient) return;
+
+      const htmlFile = document.getElementById('claseImportHtmlInput').files[0];
+      if (!htmlFile) {
+        notice.className = 'notice show error';
+        notice.textContent = 'Elegí primero el archivo "Clase N.html".';
+        return;
+      }
+
+      claseImportFillBtn.disabled = true;
+      claseImportFillBtn.textContent = 'Importando…';
+      notice.className = 'notice show';
+      notice.textContent = 'Leyendo el archivo…';
+
+      try {
+        const html = await decodeHtmlFile(htmlFile);
+        const extracted = extractClaseFromHtml(html);
+        if (!extracted) {
+          notice.className = 'notice show error';
+          notice.textContent = 'No se pudo encontrar el contenido de la clase en ese archivo.';
+          return;
+        }
+
+        const assetFiles = Array.from(document.getElementById('claseImportAssetsInput').files || []);
+        const assetsByName = new Map(assetFiles.map(file => [file.name, file]));
+        const imgEls = [...extracted.bodyEl.querySelectorAll('img[src^="./"]')];
+        let uploaded = 0;
+        for (const img of imgEls) {
+          const ref = img.getAttribute('src').replace(/^\.\//, '');
+          const basename = ref.split('/').pop();
+          const assetFile = assetsByName.get(basename);
+          if (!assetFile) continue;
+          const url = await uploadClaseImage(subject.id, assetFile);
+          if (url) { img.setAttribute('src', url); uploaded += 1; }
+        }
+
+        const titleInput = document.getElementById('contentTitleInput');
+        if (extracted.title) titleInput.value = extracted.title;
+
+        const bodyHtml = extracted.bodyEl.innerHTML.trim();
+        const editor = getClaseEditorContent();
+        if (editor) editor.setContent(bodyHtml);
+        else document.getElementById('contentBodyInput').value = bodyHtml;
+
+        notice.className = 'notice show';
+        notice.textContent = `Listo: se completó el título y el contenido (${uploaded}/${imgEls.length} imágenes subidas). Revisá y guardá con "Agregar contenido".`;
+      } catch (error) {
+        notice.className = 'notice show error';
+        notice.textContent = 'Error al importar: ' + error.message;
+      }
+
+      claseImportFillBtn.disabled = false;
+      claseImportFillBtn.textContent = 'Completar título y contenido desde el HTML';
     });
   }
 
@@ -3635,7 +4063,8 @@ function attachPortalEvents() {
           .from('subject_content_items')
           .insert({
             unit_id: unit.id, subject_id: subject.id, type: 'pdf', title,
-            file_name: file.name, url: urlData.publicUrl, storage_path: path, uploaded_by: uploadedBy
+            file_name: file.name, url: urlData.publicUrl, storage_path: path, uploaded_by: uploadedBy,
+            position: unit.items.length
           })
           .select().single();
 
@@ -3651,10 +4080,37 @@ function attachPortalEvents() {
         }
 
         const newItem = mapContentItemRow(data);
-        unit.items.unshift(newItem);
+        unit.items.push(newItem);
         state.currentItemId = newItem.id;
         renderSubjectLists(subject);
         contentItemForm.reset();
+        if (contentItemNotice) contentItemNotice.className = 'notice';
+      } else if (type === 'video') {
+        const rawUrl = document.getElementById('contentVideoUrlInput').value.trim();
+        if (!rawUrl) return;
+        const body = driveEmbedUrl(rawUrl);
+
+        const uploadedBy = getFullName(state.currentUser);
+        const { data, error } = await supabaseClient
+          .from('subject_content_items')
+          .insert({ unit_id: unit.id, subject_id: subject.id, type: 'video', title, body, uploaded_by: uploadedBy, position: unit.items.length })
+          .select().single();
+
+        if (error) {
+          if (contentItemNotice) {
+            contentItemNotice.className = 'notice show error';
+            contentItemNotice.textContent = 'No se pudo guardar el video: ' + error.message;
+          }
+          return;
+        }
+
+        const newItem = mapContentItemRow(data);
+        unit.items.push(newItem);
+        state.currentItemId = newItem.id;
+        renderSubjectLists(subject);
+        contentItemForm.reset();
+        document.getElementById('contentFileInput').classList.remove('hidden');
+        document.getElementById('contentVideoWrapper').classList.add('hidden');
         if (contentItemNotice) contentItemNotice.className = 'notice';
       } else {
         const editor = getClaseEditorContent();
@@ -3664,7 +4120,7 @@ function attachPortalEvents() {
         const uploadedBy = getFullName(state.currentUser);
         const { data, error } = await supabaseClient
           .from('subject_content_items')
-          .insert({ unit_id: unit.id, subject_id: subject.id, type: 'clase', title, body, uploaded_by: uploadedBy })
+          .insert({ unit_id: unit.id, subject_id: subject.id, type: 'clase', title, body, uploaded_by: uploadedBy, position: unit.items.length })
           .select().single();
 
         if (error) {
@@ -3676,7 +4132,7 @@ function attachPortalEvents() {
         }
 
         const newItem = mapContentItemRow(data);
-        unit.items.unshift(newItem);
+        unit.items.push(newItem);
         state.currentItemId = newItem.id;
         renderSubjectLists(subject);
         contentItemForm.reset();
@@ -5022,6 +5478,33 @@ function attachAdminEvents() {
     });
   }
 
+  const importClasesStart = document.getElementById('importClasesStart');
+  if (importClasesStart) {
+    importClasesStart.addEventListener('click', async () => {
+      const input = document.getElementById('importClasesInput');
+      const force = document.getElementById('importClasesForce').checked;
+      const notice = document.getElementById('importClasesNotice');
+      const log = document.getElementById('importClasesLog');
+      if (!input.files || !input.files.length) {
+        notice.className = 'notice show error';
+        notice.textContent = 'Elegí primero la carpeta "Clases".';
+        return;
+      }
+      importClasesStart.disabled = true;
+      importClasesStart.textContent = 'Importando…';
+      notice.className = 'notice show';
+      notice.textContent = 'Importando, puede tardar unos minutos si hay muchas imágenes…';
+      try {
+        await runClasesImport(input.files, force, log, notice);
+      } catch (error) {
+        notice.className = 'notice show error';
+        notice.textContent = 'Error inesperado: ' + error.message;
+      }
+      importClasesStart.disabled = false;
+      importClasesStart.textContent = 'Iniciar importación';
+    });
+  }
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
       if (supabaseClient) await supabaseClient.auth.signOut();
@@ -5451,8 +5934,50 @@ function setupThemeToggle() {
   });
 }
 
+function setupSidebarAutoCollapse() {
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest('.sidebar .nav-link, .sidebar .year-btn, .sidebar .sidebar-label');
+    if (trigger) trigger.blur();
+  });
+}
+
+function setupSidebarUserMenu() {
+  const btn = document.getElementById('sidebarUserBtn');
+  const menu = document.getElementById('sidebarUserMenu');
+  const profileBtn = document.getElementById('sidebarUserProfileBtn');
+  if (!btn || !menu) return;
+
+  btn.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = !menu.classList.contains('hidden');
+    if (isOpen) {
+      menu.classList.add('hidden');
+      btn.classList.remove('open');
+      return;
+    }
+    const rect = btn.getBoundingClientRect();
+    menu.style.left = `${Math.round(rect.left)}px`;
+    menu.style.bottom = `${Math.round(window.innerHeight - rect.top + 10)}px`;
+    menu.classList.remove('hidden');
+    btn.classList.add('open');
+  });
+
+  document.addEventListener('click', event => {
+    if (menu.classList.contains('hidden')) return;
+    if (event.target.closest('#sidebarUserMenu') || event.target.closest('#sidebarUserBtn')) return;
+    menu.classList.add('hidden');
+    btn.classList.remove('open');
+  });
+
+  if (profileBtn) {
+    profileBtn.addEventListener('click', () => { window.location.href = 'user.html'; });
+  }
+}
+
 async function init() {
   setupThemeToggle();
+  setupSidebarUserMenu();
+  setupSidebarAutoCollapse();
   if (supabaseClient) {
     supabaseClient.auth.onAuthStateChange(event => {
       if (event === 'PASSWORD_RECOVERY') state.passwordRecovery = true;

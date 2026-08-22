@@ -1,0 +1,211 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/**
+ * Navigation Layout - CSS Grid Base
+ * Define el layout principal usando CSS Grid
+ */
+
+/* Layout principal con CSS Grid */
+.layout {
+    display: grid;
+    grid-template-rows: var(--topbar-height) 1fr auto;
+    grid-template-columns: var(--icon-sidebar-width) 1fr;
+    grid-template-areas:
+        "topbar topbar"
+        "icon-sidebar main-content"
+        "footer footer";
+    min-height: 100vh;
+}
+
+/* Sidebar pinned: reserva el ancho expandido en el grid para que el
+   contenido principal (incluido .menu_secciones del aula) no quede
+   tapado por la sidebar expandida */
+.layout:has(.icon-sidebar.pinned) {
+    grid-template-columns: var(--icon-sidebar-expanded) 1fr;
+}
+
+/* Layout cuando no hay sidebar (usuario no logueado) */
+.layout:not(:has(.icon-sidebar)) {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+        "topbar"
+        "main-content"
+        "footer";
+}
+
+/* Asignacion de areas del grid */
+.topbar {
+    grid-area: topbar;
+}
+
+.icon-sidebar {
+    grid-area: icon-sidebar;
+}
+
+.main-content {
+    grid-area: main-content;
+    min-width: 0;
+}
+
+.footer {
+    grid-area: footer;
+    position: relative;
+    z-index: var(--footer-z-index);
+}
+
+/* El dropdown del paginador (ul.control) es position:absolute y debe
+   superar al footer para no quedar tapado */
+.paginador .selector { position: relative; z-index: calc(var(--footer-z-index) + 1); }
+
+/* Layout especifico para backend */
+.layout-backend {
+    /* El backend usa la misma estructura grid base */
+    /* Los estilos especificos estan en navigation_back.css */
+}
+
+/* =============================================================================
+   COMPATIBILIDAD PAGINAS NO RECODIFICADAS (sin Grid)
+   ============================================================================= */
+
+/* Ajustar contenido en paginas que NO usan CSS Grid
+   Agregar espacio vertical para la topbar fixed
+   y espacio horizontal para el icon-sidebar fixed
+   Usar flexbox para que el footer quede al fondo */
+body:not(:has(.layout)) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-top: var(--topbar-height);
+    padding-left: var(--icon-sidebar-width);
+    box-sizing: border-box;
+}
+
+/* Sin padding-left cuando no hay sidebar (usuario no logueado) */
+body:not(:has(.layout)):not(:has(.icon-sidebar)) {
+    padding-left: 0;
+}
+
+/* Sidebar pinned en paginas sin layout grid: reservar ancho expandido */
+body:not(:has(.layout)):has(.icon-sidebar.pinned) {
+    padding-left: var(--icon-sidebar-expanded);
+}
+body:not(:has(.layout)):has(.icon-sidebar.pinned) #footer {
+    margin-left: calc(-1 * var(--icon-sidebar-expanded));
+    width: calc(100% + var(--icon-sidebar-expanded));
+}
+
+body:not(:has(.layout)) .centrado {
+    flex: 1 0 auto;
+    width: 100%;
+}
+
+/* Footer en paginas no recodificadas - visible sobre sidebar */
+body:not(:has(.layout)):has(.icon-sidebar) #footer {
+    position: relative;
+    z-index: var(--footer-z-index);
+    background-color: #fff;
+    margin-left: calc(-1 * var(--icon-sidebar-width));
+    width: calc(100% + var(--icon-sidebar-width));
+}
+
+/* Footer sin sidebar (usuario no logueado) */
+body:not(:has(.layout)):not(:has(.icon-sidebar)) #footer {
+    position: relative;
+    z-index: var(--footer-z-index);
+    background-color: #fff;
+}
+
+/* =============================================================================
+   AREA DE DEBUG
+   ============================================================================= */
+
+/* En paginas con layout (grid), el debug debe aparecer por encima de la sidebar */
+.debug-area,
+body > .debug_frame {
+    position: relative;
+    z-index: 150;
+    background: white;
+    padding: 10px 0;
+}
+
+/* Debug en paginas no recodificadas (legacy DisplayProxy): extender ancho
+   por debajo del padding del body para cubrir la columna del sidebar fixed
+   (mismo tratamiento que #footer). Aplica a webmail, contactos, buscar, etc. */
+body:not(:has(.layout)):has(.icon-sidebar) > .debug_frame {
+    margin-left: calc(-1 * var(--icon-sidebar-width));
+    width: calc(100% + var(--icon-sidebar-width));
+}
+body:not(:has(.layout)):has(.icon-sidebar.pinned) > .debug_frame {
+    margin-left: calc(-1 * var(--icon-sidebar-expanded));
+    width: calc(100% + var(--icon-sidebar-expanded));
+}
+
+/* =============================================================================
+   RESPONSIVE - MOBILE
+   ============================================================================= */
+
+@media (max-width: 960px) {
+    /* Quitar padding-left en paginas no recodificadas cuando sidebar esta oculta */
+    body:not(:has(.layout)) {
+        padding-left: 0;
+    }
+
+    /* Resetear compensacion de ancho del footer y debug en mobile
+       (la sidebar no ocupa espacio en el flujo) */
+    body:not(:has(.layout)):has(.icon-sidebar) #footer,
+    body:not(:has(.layout)):has(.icon-sidebar) > .debug_frame {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* En paginas con grid, ajustar el layout para movil */
+    .layout {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "topbar"
+            "main-content"
+            "footer";
+    }
+
+    /* La sidebar esta fuera del flujo (position fixed), no ocupa espacio en el grid */
+    .icon-sidebar {
+        grid-area: unset;
+    }
+}
+
+/* =============================================
+   Scroll to top button
+   ============================================= */
+.scroll_top {
+    position: fixed;
+    right: -100px;
+    bottom: 91px;
+    padding: 10px;
+    color: #757575;
+    border: 1px solid rgba(0, 0, 0, .1);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    cursor: pointer;
+    background-color: rgba(0, 0, 0, .1);
+    transition-duration: .2s;
+    z-index: 999;
+}
+
+.scroll_top.in_proctorizer {
+    bottom: 121px;
+}
+
+.scroll_top:hover {
+    padding-right: 15px;
+    color: #6c6c6c;
+    background-color: rgba(236, 236, 236, .7);
+}
+
+.scroll_top.show {
+    right: 0;
+}

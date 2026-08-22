@@ -1,0 +1,117 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ------------------------------------------------
+   EDU-BREADCRUMB Component - Navigation Breadcrumb
+   ------------------------------------------------ */
+:root {
+    /* Theme colors */
+    --edu-breadcrumb-color: var(--theme-dark-base);
+    --edu-breadcrumb-link-color: #555555;
+    --edu-breadcrumb-separator-color: #999999;
+
+    /* Typography */
+    --edu-breadcrumb-font-size-sm: .875rem; /* 14px */
+    --edu-breadcrumb-font-size: 1rem; /* 16px */
+    --edu-breadcrumb-font-size-lg: 1.125rem; /* 18px */
+
+    /* Spacing */
+    --edu-breadcrumb-gap: 10px;
+
+    /* Collapsible ellipsis */
+    --edu-breadcrumb-ellipsis-color: var(--edu-breadcrumb-link-color);
+    --edu-breadcrumb-ellipsis-hover-bg: rgba(0, 0, 0, .08);
+    --edu-breadcrumb-ellipsis-radius: 4px;
+    --edu-breadcrumb-ellipsis-size: 4px;
+}
+
+/* -----------
+   Base Styles
+   ----------- */
+.edu-breadcrumb {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--edu-breadcrumb-gap);
+    font-size: var(--edu-breadcrumb-font-size);
+}
+.edu-breadcrumb-item {
+    display: inline-flex;
+    align-items: center;
+}
+.edu-breadcrumb-link {
+    color: var(--edu-breadcrumb-link-color);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+.edu-breadcrumb-link:hover { text-decoration: underline; }
+
+.edu-breadcrumb-current { color: var(--edu-breadcrumb-color); }
+
+.edu-breadcrumb-separator {
+    font-size: .813rem;
+    color: var(--edu-breadcrumb-separator-color);
+    user-select: none;
+}
+
+/* -------------
+   Size Variants
+   ------------- */
+.edu-breadcrumb-sm { font-size: var(--edu-breadcrumb-font-size-sm); }
+
+.edu-breadcrumb-lg { font-size: var(--edu-breadcrumb-font-size-lg); }
+
+/* ------------------
+   Collapsible State
+   ------------------ */
+
+/* !important: debe ganar sobre cualquier media query o contexto */
+.edu-breadcrumb-hidden,
+.edu-breadcrumb-separator-hidden { display: none !important; }
+
+/* Contenedor del boton ellipsis + dropdown */
+.edu-breadcrumb-ellipsis {
+    position: relative;
+    display: none;
+    align-items: center;
+    flex-shrink: 0;
+}
+.edu-breadcrumb-ellipsis.edu-breadcrumb-ellipsis-visible {
+    display: inline-flex;
+}
+
+/* Boton de tres puntos */
+.edu-breadcrumb-ellipsis-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--edu-breadcrumb-ellipsis-size);
+    padding: 4px 8px;
+    line-height: 1;
+    border: 1px solid transparent;
+    border-radius: var(--edu-breadcrumb-ellipsis-radius);
+    background: none;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s;
+}
+.edu-breadcrumb-ellipsis-btn:hover {
+    background: var(--edu-breadcrumb-ellipsis-hover-bg);
+}
+.edu-breadcrumb-ellipsis-btn:focus-visible {
+    outline: 2px solid var(--edu-breadcrumb-link-color);
+    outline-offset: 2px;
+}
+
+/* Los tres puntos (dots) */
+.edu-breadcrumb-dot {
+    display: block;
+    width: var(--edu-breadcrumb-ellipsis-size);
+    height: var(--edu-breadcrumb-ellipsis-size);
+    border-radius: 50%;
+    background: var(--edu-breadcrumb-ellipsis-color);
+}

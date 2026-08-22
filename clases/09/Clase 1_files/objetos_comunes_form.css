@@ -1,0 +1,293 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*  Utilizada para dar estilos a los formularios dibujados por javascript */
+/* -----------------------
+   @objeto: Foros Frontend
+   ----------------------- */
+.form_frame {
+    padding: 0 15px 10px;
+    border: 1px solid #ffffff;
+    background-color: #eeeeee;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.form_alta {
+    max-width: 620px;
+    margin: 30px auto 0;
+}
+.caption {
+    margin-bottom: 26px;
+    margin-top: 10px;
+    padding: 0 0 10px 20%;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #4f4f4f;
+    border-bottom: solid 1px #c1c1c1;
+}
+.form_tema-line:after,
+.intervencion_modificar-line:after {
+    display: block;
+    clear: both;
+    content: ".";
+    height: 0;
+    visibility: hidden;
+}
+.form_tema-line,
+.intervencion_modificar-line {
+    position: relative;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 18px;
+}
+/* Checkbox en el front al agregar tema debate foros */
+.form_tema-line.row_foros .check_front_foros {
+    width: 18px;
+    height: 18px;
+    margin: 0 6px 0 0;
+}
+/* Input radio en el front al agregar tema debate foros */
+.abierto_radio input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    vertical-align: middle;
+}
+
+.form_tema-line.invalid > label,
+.intervencion_modificar-line.invalid > label { color: #C73333; }
+
+.form_tema-line.invalid input,
+.form_tema-line.invalid select,
+.invalid .mce-tinymce { border-bottom: 1px solid red; }
+
+.intervencion_modificar-line.invalid .line_error {
+    margin-left: 20%;
+    padding: 5px 0 6px;
+    color: #c73333;
+    border-top: none;
+    font-size: .8em;
+}
+.form_tema-Text {
+    display: block;
+    float: left;
+    height: 28px;
+    width: 80%;
+    margin: 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: solid 1px #cccccc;
+}
+.control_select_categorias_foros {
+    display: inline-block;
+    width: 80%;
+}
+.control_select_categorias_foros select {
+    height: 28px;
+    width: auto;
+    max-width: 100%;
+    padding: 0 6px;
+    box-sizing: border-box;
+    border: solid 1px #cccccc;
+    background-color: #ffffff;
+}
+#form_tema_categoria {
+    display: inline-block;
+    width: 100%;
+    border: none;
+}
+.form_tema-Label-text,
+.form_tema-Label-combo,
+.form_tema-Label-richtext,
+.form_tema-Label-custom,
+.form_tema-Label-check,
+.form_tema-Label-label,
+.form_tema-Label-file,
+.form_tema-Label-file_change,
+.intervencion_modificar-Label-label,
+.intervencion_modificar-Label-text,
+.intervencion_modificar-Label-combo,
+.intervencion_modificar-Label-richtext,
+.intervencion_modificar-Label-custom,
+.intervencion_modificar-Label-file,
+.intervencion_modificar-Label-file_change {
+    position: relative;
+    display: block;
+    float: left;
+    width: 18%;
+    padding: 1px 2% 5px 0;
+    font-size: .813rem;
+    text-align: right;
+    text-transform: capitalize;
+    vertical-align: top;
+}
+/* Solo en front .uploader */
+#form_tema_archivo_wrap.uploader,
+#form_tema_imagen_wrap.uploader,
+#form_intervencion_archivo_wrap.uploader,
+#form_intervencion_imagen_wrap.uploader {
+    display: flex;
+    flex-direction: column;
+}
+.form_tema-Label,
+.intervencion_modificar-Label,
+.label-check-right {
+    display: inline-block;
+    float: none;
+    width: auto;
+    font-size: .8em;
+    text-align: left;
+}
+label.invalid { color: #c73333; }
+
+.form_tema-line .mce-tinymce,
+.intervencion_modificar-line .mce-tinymce {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 80% !important;
+}
+.intervenir_para_ver_leyend {
+    width: 100%;
+    margin-left: 20%;
+    padding: 0px 0 0 24px;
+    font-size: .688rem;
+    white-space: pre-line;
+    color: #717171;
+}
+.file_change_radiogroup {
+    margin: 0;
+    padding: 0;
+    list-style: none outside none;
+}
+.file_change_radiogroup > li { padding-bottom: 3px; }
+
+.file_change_radiogroup_container label,
+.abierto_radio label {
+    display: inline-block;
+    width: auto;
+    padding: 0 4px;
+    font-size: .875rem;
+    text-align: left;
+}
+.abierto_radio .inputDate {
+    box-sizing: border-box;
+    width: 150px !important;
+    padding: 4px 24px 4px 8px;
+    font-size: 14px;
+    border: 1px solid #d5d5d5;
+}
+
+.file_change_radiogroup_container,
+.abierto_radio {
+    float: left;
+    width: 80%;
+}
+.file_change_radiogroup li span.file_name,
+.file_change_radiogroup li span.no_file {
+    padding-left: 5px;
+    font-size: .8rem;
+    font-weight: bold;
+}
+.file_change_radiogroup li img.file_ico {
+    width: 16px;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+form label.form_tema-requerido,
+form label.intervencion_modificar-requerido { font-weight: bold; }
+
+form label.form_tema_Label-check.right,
+form label.intervencion_modificar_Label-check.right {
+    width: 400px;
+    text-align: left;
+}
+input#form_tema_mensaje,
+input#intervencion_modificar_mensaje { width: 500px; }
+
+input.form_tema-check { margin-top: 4px !important; }
+
+.form_tema-tooltip-button,
+.intervencion_modificar-tooltip-button {
+    position: absolute;
+    right: -5px;
+    top: -1px;
+    width: 16px;
+    height: 16px;
+    margin: 2px 4px 0 0;
+    padding: 0;
+    vertical-align: top;
+    background: url(../img/comunes/button-help.gif) 50% 50% no-repeat ;
+    cursor: help;
+}
+.form_tema-tooltip-button-over,
+.intervencion_modificar-tooltip-button-over,
+.tooltip-button-over {
+    top: -1px !important;
+    background: url(../img/comunes/button-help-h.gif) 50% 50% no-repeat ;
+}
+.TableView-select,
+.TableView-select-itemDesactivo,
+.TableView-fecha_alta,
+.TableView-fecha_alta-itemDesactivo { text-align: center; }
+
+.TableView-select { width: 10em; }
+
+.oculto { display: none; }
+
+.form_tema-line .line_error {
+    clear: left;
+    margin: 0 0 10px 20%;
+    padding: 5px 0 6px;
+    border-top: none;
+    font-size: .8em;
+    color: #c73333;
+}
+
+li .uploader { margin-left: 24px; }
+
+#form_tema_fecha_desde,
+#form_tema_fecha_hasta,
+#tema_modi_fecha_desde,
+#tema_modi_fecha_hasta,
+#tema_configurar_fecha_desde,
+#tema_configurar_fecha_hasta {
+    width: 110px;
+    font-size: .8em;
+}
+
+.SubmitBar { text-align: right; }
+
+
+@media only screen and (max-width : 650px) {
+    .caption { padding: 8px 0 8px 0; }
+
+    .form_tema-line,
+    .intervencion_modificar-line {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    .form_tema-line > *,
+    .intervencion_modificar-line > * {
+        width: 100%;
+        text-align: left;
+    }
+    .form_tema-line .mce-tinymce,
+    .intervencion_modificar-line .mce-tinymce { width: 100% !important; }
+
+    .form_tema-line .form_tema-Label-richtext,
+    .form_tema-line .form_tema-Label-check { display: none; } /* labels fantasma */
+
+    .form_tema-line > input[type="checkbox"] { width: auto; }
+
+    .form_tema-line > .label-check-right {
+        width: calc(100% - 25px );
+        margin-left: 5px;
+    }
+    .form_tema-line .intervenir_para_ver_leyend {
+        margin-top: 5px;
+        margin-left: 0;
+    }
+}

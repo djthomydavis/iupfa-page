@@ -1,0 +1,2122 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+
+/**
+ * Manejo de los terminos de diccionario
+ * Reemplaza a Educativa.Dict de Base.js
+ *
+ * @class Dict
+ */
+const Dict = {
+    /**
+     * @lends Dict
+     *
+     * @param {Object} args             Object que contiene los terminos y sus traducciones
+     * @param {String} args[termino]    Traduccion del termino
+     */
+    set_dicc: function (args) {
+        this.terms = args;
+    },
+
+    /**
+     * Retorna la traduccion del termino que se pasa como parametro
+     *
+     * @method term
+     *
+     * @param  {String} t  Id del termino de diccionario
+     *
+     * @return {String}  El termino traducido
+     */
+    term: function (t) {
+        return Dict.terms[t] ? Dict.terms[t] : '*' + t + '*';
+    },
+
+    /**
+     * Retorna la traduccion del termino capitalizada
+     *
+     * @method termcap
+     *
+     * @param  {String} t  Id del termino de diccionario
+     *
+     * @return {String}  El termino traducido capitalizado
+     */
+    termcap: function (t) {
+        return this.term(t).charAt(0).toUpperCase() + this.term(t).slice(1).toLowerCase();
+    },
+
+    /**
+     * Retorna la traduccion del termino en minusculas
+     *
+     * @method termlc
+     *
+     * @param  {String} t  Id del termino de diccionario
+     *
+     * @return {String}  El termino traducido en lower case
+     */
+    termlc: function (t) {
+        return this.term(t).toLowerCase();
+    },
+
+    /**
+     * Retorna la traduccion del termino en mayusculas
+     *
+     * @method termuc
+     *
+     * @param  {String} t  Id del termino de diccionario
+     *
+     * @return {String}  El termino traducido en upper case
+     */
+    termuc: function (t) {
+        return this.term(t).toUpperCase();
+    },
+
+    /**
+     * Retornar el string original reemplazando los placeholders por los valores correspondientes
+     *
+     * @method interpolate
+     *
+     * @param {string}  term                    String con placeholders a reemplazar
+     * @param {Object}  placeholders            Object con los valores de los placeholders
+     * @param {string}  placeholders[nombre]    Texto que reemplaza el placeholder
+     *
+     * @returns {string}  El string original luego de los reemplazos
+     */
+    interpolate: function (term, placeholders) {
+        Object.keys(placeholders).forEach(ph => {
+            var substr = new RegExp("#\{" + ph + "\}", "g");
+            term = term.replace(substr, placeholders[ph]);
+        });
+        return term;
+    }
+
+};
+
+/**
+ * Objeto que permite descargar archivos desde javascript
+ *
+ * @class Downloader
+ */
+const Downloader = {
+
+    /**
+     * Descarga el archivo indicado a traves de downloader.cgi
+     *
+     * @param {string} tipo         Tipo de descarga, de acuerdo a esto se arma la url
+     * @param {string} filename     Nombre del archivo a descargar
+     */
+    download: function (tipo, filename) {
+        var a = document.createElement('a');
+        var urls = {
+            conversacion_chat: 'comunes/downloader.cgi?tipo=conversacion_chat&filename=' + filename,
+        }
+        var url = urls[tipo];
+        a.href = url;
+        document.body.append(a);
+        a.click();
+        a.remove();
+    }
+
+};
+
+/*
+ * Objeto que permite mostrar el preview de una imagen en distintos tipos de elementos
+ * No se verifica si el archivo que llega es o no valido ya que esto depende del lugar en que se este utilizando
+ * por lo tanto dicha validacion se debe realizar antes de llamar a la funcion preview que es la encargada seleccionar
+ * la funcion correspondiente en base al tipo de elemento en donde se va a mostrar la imagen
+ *
+ */
+const ImagePreview = {
+
+    /**
+     * @public
+     * @method preview()
+     *
+     * @param {string}   type   Tipo de elemento en el que se va a mostrar la imagen
+     * @param {string}   id     Id del elemento
+     * @param {File}     file   Archivo proveniente de un input file
+     *
+     */
+    preview: function ({ type, id, file }) {
+        const img = URL.createObjectURL(file);
+        const elements = {
+            span: (id, img) => this.span(id, img),
+        };
+
+        elements[type](id, img);
+    },
+
+    /**
+     * Muestra el preview de la imagen en un <span>
+     *
+     * @private
+     * @method span()
+     *
+     * @param {string} id   Id del span
+     * @param {string} img  Imagen en base64
+     *
+     */
+    span: function (id, img) {
+        document.getElementById(id).setAttribute('style', `background-image: url(${img});`);
+    }
+}
+
+// Muestra de contenido en una ventana Modal.
+class Modal {
+
+    /**
+     * @typedef ConstructorModal
+     * @type {Object}
+     *
+     * @prop {string} id                      Id que se usara para diferenciar el Modal de otros
+     *
+     * @prop {object} header                  Configuracion del header:
+     *     @prop {boolean} show               Determina si renderizar el header o no
+     *     @prop {string} title               Titulo de la ventana Modal (no se usa en caso de utilizar un header personalizado con updateHeader)
+     *     @prop {HTMLElement} titleIcon      Icono que se mostrara junto al titulo de la ventana Modal (no se usa en caso de utilizar un header personalizado con updateHeader)
+     *     @prop {boolean} hideExitButton     Determina si mostrar o no el boton de salida (no se usa en caso de utilizar un header personalizado con updateHeader)
+     *
+     * @prop {HTMLElement} content            Contenido para renderizar en el cuerpo del Modal.
+     *
+     * @prop {object} footer                  Configuracion del footer:
+     *     @prop {boolean} show               Determina si renderizar el footer o no
+     *     @prop {boolean} onAcceptClick      Funcion que se ejecuta al presionar el boton 'Aceptar'
+     *                                        del footer por defecto (no se usa en caso de utilizar un footer personalizado con updateFooter)
+
+     * @prop {array} classes                  Clases css aplicadas al wrapper del Modal. Default classes en objetos_comunes_modal.css
+
+     * @prop {function} callbackOnExit        Funcion que se ejecuta al salir del Modal (incluye el boton 'Cancelar' del footer POR DEFECTO)
+     *
+     * @prop {boolean} preventExit            En true, evita que se pueda ocultar el Modal
+     *
+     * @prop {boolean} exitButtonOnly         En true, solo se puede ocultar el Modal con el boton de cerrado
+     *
+     * @param {ConstructorModal} args
+     *
+    */
+    constructor(args = { id, header, content, footer, classes, callbackOnExit, preventExit, exitButtonOnly }) {
+
+        Object.assign(this, { args });
+
+        this.modal = document.createElement('div');
+        this.modal.classList.add('modal_window');
+
+        // Definir el id para el Modal en caso de pasarlo como argumento
+        if (this.args.id) this.modal.id = this.args.id;
+            // Manejar cierre de Modal al clickear el backdrop
+            this.modal.addEventListener('mousedown', () => {
+                if (!this.args.preventExit && !this.args.exitButtonOnly ) {
+                    this.hide();
+                    if (this.args.callbackOnExit) this.args.callbackOnExit(this);
+                }
+        });
+
+        this.modalWrapper = document.createElement('div');
+        this.modalWrapper.classList.add('modal_wrapper');
+        if(this.args.classes) this.modalWrapper.classList.add(...this.args.classes);
+
+        // Evita que se cierre todo el Modal al clickear el wrapper
+        this.modalWrapper.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        if (this.args.header) this._renderHeader();
+
+        // Renderizar cuerpo (contenido) del Modal
+        this.modalContent = document.createElement('div');
+        this.modalContent.classList.add('modal_content');
+        if(this.args.content) this.modalContent.appendChild(this.args.content);
+
+        this.modalWrapper.appendChild(this.modalContent);
+
+        if (this.args.footer) this._renderFooter();
+
+        this.modal.appendChild(this.modalWrapper);
+
+    }
+
+    /**
+     * Renderizar y posteriormente abrir ventana Modal
+     *
+     * @method  show
+     *
+     * @return {undefined}
+     *
+     */
+    show() {
+        this.add();
+        this._disableBodyScroll();
+        if (!this.args.preventExit && !this.args.exitButtonOnly) {
+            // Manejar el cierre del Modal al apretar la tecla 'Escape'
+            // Guardar bound function una sola vez para poder removerla correctamente
+            if ( !this._boundEscapeExit ) {
+                this._boundEscapeExit = this._onEscapeExit.bind(this);
+            }
+            document.addEventListener('keydown', this._boundEscapeExit);
+        }
+
+        // Si el boton primario de aceptacion esta renderizado, focusearlo para poder tener el acceso rapido a la accion principal, por ejemplo, al apretar 'Enter'
+        if( this.acceptButton ) this.acceptButton.focus();
+
+        // Se guarda la instancia actual, para casos donde, por ejemplo, se necesita cerrar el modal desde otro lugar.
+        // Tambien se puede utilizar para conocer si hay ya abierta una instancia del modal en pantalla (para evitar solapamientos)
+
+        // Importante: si ya se tenia una instancia previamente guardada, esta sera pisada
+        window.currentModal = this;
+    }
+
+    /**
+     * Cerrar ventana Modal
+     *
+     * @method  hide
+     *
+     * @return {undefined}
+     *
+     */
+    hide() {
+        this.remove();
+        this._enableBodyScroll();
+        // Evitar ejecutar acciones enlazadas al evento de apretar la tecla 'Escaoe' al tener el Modal cerrado
+        document.removeEventListener('keydown', this._boundEscapeExit);
+
+        window.currentModal = undefined;
+    }
+
+    /**
+     * Minimiza el Modal: lo oculta sin destruirlo.
+     * Guarda la referencia en window.minimizedModal.
+     *
+     * @method minimize
+     */
+    minimize() {
+        this.modal.style.display = 'none';
+        this._enableBodyScroll();
+        document.removeEventListener( 'keydown', this._boundEscapeExit );
+        window.currentModal = undefined;
+        window.minimizedModal = this;
+    }
+
+    /**
+     * Restaura un Modal previamente minimizado.
+     *
+     * @method restore
+     */
+    restore() {
+        this.modal.style.display = '';
+        this._disableBodyScroll();
+        if ( !this.args.preventExit && !this.args.exitButtonOnly ) {
+            document.addEventListener( 'keydown', this._boundEscapeExit );
+        }
+        window.currentModal = this;
+        window.minimizedModal = undefined;
+    }
+
+    /**
+     * Obtener el elemento relacionado al elemento base del Modal
+     *
+     * @method  getRoot
+     *
+     * @return {HTMLElement}
+     *
+     */
+    getRoot() {
+        return this.modal;
+    }
+
+    /**
+     * Obtener el elemento relacionado al wrapper del Modal
+     *
+     * @method  getWrapper
+     *
+     * @return {HTMLElement}
+     *
+     */
+    getWrapper() {
+        return this.modalWrapper;
+    }
+
+    /**
+     * Obtener el elemento relacionado al 'header' del Modal
+     *
+     * @method  getHeader
+     *
+     * @return {HTMLElement}
+     *
+     */
+    getHeader() {
+        return this.modalHeader;
+    }
+
+    /**
+     * Obtener el elemento relacionado al 'content' del Modal
+     *
+     * @method  getContent
+     *
+     * @return {HTMLElement}
+     *
+     */
+    getContent() {
+        return this.modalContent;
+    }
+
+    /**
+     * Obtener el elemento relacionado al 'footer' del Modal
+     *
+     * @method  getFooter
+     *
+     * @return {HTMLElement}
+     *
+     */
+    getFooter() {
+        return this.modalFooter;
+    }
+
+    /**
+     * Actualiza el contenido del header del Modal dado un 'element'
+     *
+     * @method  updateHeader
+     *
+     * @param   {HTMLElement}   element    Elemento con el que se va actualizar el contenido del header del Modal. Si se pone en null, quedara vacio
+     *
+     * @return {undefined}
+     *
+     */
+    updateHeader(element) {
+        this.getHeader().innerHTML = '';
+        this.getHeader().appendChild(element);
+    }
+
+    /**
+     * Actualiza el contenido del 'content' del Modal dado un 'element'
+     *
+     * @method  updateContent
+     *
+     * @param   {HTMLElement}   element    Elemento con el que se va actualizar el 'content' del Modal. Si se pone en null, el 'content' quedara vacio
+     *
+     * @return {undefined}
+     *
+     */
+    updateContent(element) {
+        this.getContent().innerHTML = '';
+        this.getContent().appendChild(element);
+    }
+
+    /**
+     * Actualiza el contenido del footer del Modal dado un 'element'
+     *
+     * @method  updateFooter
+     *
+     * @param   {HTMLElement}   element    Elemento con el que se va actualizar el contenido del footer del Modal. Si se pone en null, quedara vacio
+     *
+     * @return {undefined}
+     *
+     */
+    updateFooter(element) {
+        this.getFooter().innerHTML = '';
+        this.getFooter().appendChild(element);
+    }
+
+    /**
+     * Actualiza el texto del titulo del Modal
+     *
+     * @method  updateModalTitleText
+     *
+     * @param   {string}    newTitle    Nuevo texto para el titulo del Modal
+     *
+     * @return {undefined}
+     *
+     */
+    updateModalTitleText(newTitle) {
+        if (this.modalTitleText) this.modalTitleText.textContent = newTitle;
+    }
+
+    /**
+     * IMPORTANTE: PREFERENTEMENTE UTILIZAR METODOS show Y hide PARA MANEJAR APERTURA Y CIERRE DEL MODAL
+     * Agrega el elemento raiz del Modal al DOM
+     *
+     * @method  add
+     *
+     * @return {undefined}
+     *
+     */
+    add() {
+        document.body.appendChild(this.modal);
+    }
+
+    /**
+     * IMPORTANTE: PREFERENTEMENTE UTILIZAR METODOS show Y hide PARA MANEJAR APERTURA Y CIERRE DEL MODAL
+     * Quita el elemento raiz del Modal del DOM
+     *
+     * @method  remove
+     *
+     * @return {undefined}
+     *
+     */
+    remove() {
+        document.body.removeChild(this.modal);
+    }
+
+    /**
+     * Renderiza encabezado del Modal
+     *
+     * @method  _renderHeader
+     *
+     * @return {undefined}
+     *
+     */
+    _renderHeader() {
+        if (this.args.header.hasOwnProperty('show') ? this.args.header.show : true) {
+
+            this.modalHeader = document.createElement('header');
+            this.modalHeader.classList.add('modal_header');
+
+            this.modalTitle = document.createElement('div');
+            this.modalTitle.classList.add('modal_header_title');
+
+            // Renderizar el icono al lado del texto del titulo en caso que aplique
+            if( this.args.header.titleIcon ) {
+                this.modalTitleIcon = this.args.header.titleIcon;
+                this.modalTitleIcon.classList.add('modal_header_title_icon')
+                this.modalTitle.appendChild(this.modalTitleIcon);
+            }
+
+            this.modalTitleText = document.createElement('h5');
+            this.modalTitleText.classList.add('modal_header_title_text');
+            this.modalTitleText.textContent = this.args.header.title ?? '';
+            this.modalTitleText.title = this.args.header.title ?? null;
+
+            // Renderizar el texto del titulo
+            this.modalTitle.appendChild(this.modalTitleText);
+
+            this.modalHeader.appendChild(this.modalTitle);
+
+            if (!this.args.header.hideExitButton && !this.args.preventExit) {
+                // Boton del header para cerrar modal
+                this.exitButton = document.createElement('button');
+                this.exitButton.classList.add('modal_exit_button');
+                this.exitButton.innerHTML = `<i title="${Dict.termcap('CERRAR')}" class="fal fa-times" style="color:inherit"></i>`;
+
+                this.exitButton.onclick = () => {
+                    this.hide();
+                    if (this.args.callbackOnExit) this.args.callbackOnExit(this);
+                }
+
+                this.modalHeader.appendChild(this.exitButton);
+            }
+
+            this.modalWrapper.appendChild(this.modalHeader);
+        }
+    }
+
+    /**
+     * Renderiza el footer del Modal
+     * IMPORTANTE: Los botones 'Cancelar' y 'Aceptar' estan diccionarizados, por lo que, se deben importar los mismos para poder utilizarlos
+     *
+     * @method  _renderFooter
+     *
+     * @return {undefined}
+     *
+     */
+    _renderFooter() {
+        if (this.args.footer.hasOwnProperty('show') ? this.args.footer.show : true) {
+            this.modalFooter = document.createElement('footer');
+            this.modalFooter.classList.add('modal_footer');
+
+            this.modalActionButtons = document.createElement('div');
+            this.modalActionButtons.classList.add('modal_action_buttons');
+
+            if (!this.args.preventExit ) {
+
+                // Boton para cancelar (cierra el modal)
+                this.cancelButton = document.createElement('button');
+                this.cancelButton.classList.add('modal_action_btn', 'modal_action_btn_cancel');
+                this.cancelButton.textContent = Dict.termcap('CANCELAR');
+
+                this.cancelButton.onclick = () => {
+                    this.hide();
+                    if (this.args.callbackOnExit) { this.args.callbackOnExit(this) }
+                }
+
+                this.modalActionButtons.appendChild(this.cancelButton);
+            }
+
+            // Boton de aceptacion para realizar una accion pasada por argumento
+            this.acceptButton = document.createElement('button');
+            this.acceptButton.classList.add('modal_action_btn', 'modal_action_btn_primary');
+            this.acceptButton.textContent = Dict.termcap('ACEPTAR');
+
+            this.acceptButton.onclick = () => {
+                if (this.args.footer.onAcceptClick) { this.args.footer.onAcceptClick(this) }
+            }
+
+            this.modalActionButtons.appendChild(this.acceptButton);
+
+            this.modalFooter.appendChild(this.modalActionButtons);
+
+            this.modalWrapper.appendChild(this.modalFooter);
+
+
+        }
+    }
+
+    /**
+     * Cierra el modal al apretar la tecla 'Escape', ejecutando, en caso de estar definido, un callback dado
+     *
+     * @method  _onEscapeExit
+     *
+     * @param  {Event}  event  Evento derivado de los listeners al apretar tecla 'Escape'
+     *
+     * @return {undefined}
+     *
+     */
+    _onEscapeExit(event) {
+        if (event.key === 'Escape') {
+            this.hide();
+            if (this.args.callbackOnExit) this.args.callbackOnExit(this);
+
+        }
+    }
+
+
+    /**
+     * Activa el scroll, generalmente usado una vez cerrado el Modal
+     *
+     * @method  _enableBodyScroll
+     *
+     * @return {undefined}
+     *
+     */
+    _enableBodyScroll() {
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = "0";
+
+    }
+
+    /**
+     * Desactiva el scroll, generalmente usado al abrir el Modal
+     *
+     * @method  _disableBodyScroll
+     *
+     * @return {undefined}
+     *
+     */
+    _disableBodyScroll() {
+        document.body.style.overflow = 'hidden';
+        document.body.style.paddingRight = "15px";
+    }
+}
+
+/**
+ * @function EduAlert
+ *
+ * Emula el comportamiento del componente nativo "alert" de los navegadores.
+ * Cuenta con un boton de aceptacion y SOLO es posible cerrarlo apretando la tecla 'Escape'.
+ * Puede usarse de manera sincronica (la mas recomendable) como asi tambien de forma asincronica en caso de ser necesario
+ *
+ * @param {Object} args
+ * @param {string | HTML} args.text      - Es el texto que se va a mostrar en el contenido del alert. (puede ser html)
+ * @param {string} args.title            - Opcional. Setea el titulo del encabezado del alert (por defecto toma el valor de dicc ALERTAR).
+ * @param {function} args.onAcceptClick  - Opcional. Callback que se dispara al clickear el boton "Aceptar". Recibe un param con el modal asociado.
+ *                                         Util si es necesario utilizar el alert de manera ASINCRONICA.
+ * @param {function} args.callbackOnExit - Opcional. Callback que se dispara al cerrar el alert (apretar 'Escape'). Recibe un param con el modal asociado.
+ *                                         Util si es necesario utilizar el alert de manera ASINCRONICA.
+ * @param {string} args.type             - Opcional. Tipo de alerta a renderizar. Puede ser 'info', 'success', 'warning' o 'danger'.
+ *
+ * @return {Promise}                     Una promesa que se resuelve al cerrar el alert o al clickear el boton de "Aceptar".
+ *                                       Esta promesa puede ser utilizada si se quiere utilizar el alert de manera SINCRONICA.
+ *
+ * @example
+ *
+ * USO DE MANERA SINCRONICA (RECOMENDADA SIEMPRE QUE SEA POSIBLE)
+ * ------------------------
+ * (El console.log sera ejecutado luego de cerrar o clickear el boton 'Aceptar' del EduAlert)
+ *
+ * async function validar() {
+ *     ...
+ *     if(!valido) await EduAlert({text: 'Los datos ingresados son invalidos'});
+ *     console.log('test');
+ * }
+ *
+ * USO DE MANERA ASINCRONICA
+ * -------------------------
+ ** (La apertura del EduAlert se ejecuta en paralelo con el console.log)
+ *
+ * EduAlert({
+    * text: 'Esta es una alerta',
+    * onAcceptClick: (alert_modal) => {
+    *     // Realizar una accion al clickear el boton de 'Aceptar'
+    * },
+ * })
+ *
+ * console.log('test');
+ *
+ */
+function EduAlert(args = { text, title, onAcceptClick, callbackOnExit, type }) {
+
+    // Evitar la apertura del alert en caso de que haya otra instancia de tipo Modal abierta actualmente
+    if (window.currentModal) return;
+
+    return new Promise((res, rej) => {
+
+        // Funcion de cerrado al apretar 'Escape'
+        const onEscapePress = (ev) => {
+            if(ev.key === 'Escape') {
+                alert_modal.hide();
+
+                if (args.callbackOnExit) args.callbackOnExit(alert_modal);
+
+                document.removeEventListener('keydown', onEscapePress);
+                // Resolver promesa para emular la sincronia al apretar 'Escape'
+                res();
+            };
+        };
+
+        const alert_text = document.createElement('p');
+        alert_text.classList.add('alert_text');
+        alert_text.innerHTML = args.text;
+
+        const icons = {
+            info: Object.assign(document.createElement('i'), { className: 'fal fa-info-circle', style: "color: #a6dff8; font-size: 1.125rem" }),
+            success: Object.assign(document.createElement('i'), { className: 'far fa-check-circle', style: "color: #88f6b7; font-size: 1.125rem" }),
+            warning: Object.assign(document.createElement('i'), { className: 'fal fa-exclamation-circle', style: "color: #f9ee8c; font-size: 1.125rem" }),
+            danger: Object.assign(document.createElement('i'), { className: 'fal fa-exclamation-triangle', style: "color: #ffbcbc; font-size: 1.125rem" }),
+        };
+
+        const alert_modal = new Modal({
+            header: { title: args.title ?? Dict.termcap('ALERTAR'), titleIcon: icons[args.type] ?? null },
+            classes: ['wrapper_pos_top'],
+            preventExit: true,
+            content: alert_text,
+            footer: {
+                onAcceptClick: async (e) => {
+                    e.hide();
+
+                    if (args.callbackOnExit) args.callbackOnExit(e);
+                    if (args.onAcceptClick) args.onAcceptClick(e);
+
+                    // Remover listener al apretar 'Escape'
+                    document.removeEventListener('keydown', onEscapePress);
+                    // Resolver promesa para emular la sincronia al apretar 'Aceptar'
+                    res();
+                }
+            }
+        });
+
+        // Agregar la clase 'alert_comunes' al modal
+        alert_modal.modal.classList.add('alert_comunes');
+
+        // Agregar clase de tipo de alerta en caso que este definida
+        if( args.type ) alert_modal.modal.classList.add( `alert_${args.type}` );
+
+        // Mostrar alerta. Al clickear 'Aceptar' el modal se removera automaticamente del DOM
+        alert_modal.show();
+
+        // Listener para cerrar el alert luego de apretar 'Escape'
+        document.addEventListener('keydown', onEscapePress);
+
+    });
+
+};
+
+/**
+ * @function EduConfirm
+ *
+ * Emula el comportamiento del componente nativo "confirm" de los navegadores.
+ * Cuenta con un boton de aceptacion y otro de cancelacion. SOLO es posible cerrarlo apretando la tecla 'Escape' o el boton de cancelacion.
+ * Puede usarse de manera sincronica (la mas recomendable) como asi tambien de forma asincronica en caso de ser necesario
+ *
+ * @param {Object} args
+ * @param {string | HTML} args.text     - Es el texto que se va a mostrar en el contenido del confirm. (puede ser html)
+ * @param {string} args.title           - Opcional. Setea el titulo del encabezado del confirm (por defecto toma el valor de dicc CONFIRMAR).
+ * @param {function} args.onCancelClick - Opcional. Callback que se dispara al clickear el boton "Cancelar". Recibe un param con el modal asociado.
+ *                                        Util si es necesario utilizar el confirm de manera ASINCRONICA.
+ * @param {function} args.onAcceptClick - Opcional. Callback que se dispara al clickear el boton "Aceptar". Recibe un param con el modal asociado.
+ *                                        Util si es necesario utilizar el confirm de manera ASINCRONICA.
+ * @param {function} args.callbackOnExit - Opcional. Callback que se dispara al cerrar el confirm (apretar 'Escape'). Recibe un param con el modal asociado.
+ *                                       Util si es necesario utilizar el confirm de manera ASINCRONICA.
+ * @param {number}  args.mantenerOtroModal - Ante la necesidad de que haya 2 modal a la vez, si llega con 1 abre otro modal (mensajeria)
+ *
+ * @return {Promise} Una promesa que se resuelve al cerrar el confirm o al clickear el boton de "Aceptar" o "Cancelar".
+ *                   Esta promesa puede ser utilizada si se quiere utilizar el confirm de manera SINCRONICA.
+ *
+ * @example
+ *
+ * USO DE MANERA SINCRONICA (RECOMENDADA SIEMPRE QUE SEA POSIBLE)
+ * --------------------------------------------------------------
+ * (El console.log sera ejecutado luego de cerrar o clickear los botones de 'Aceptar' o 'Cancelar' del EduConfirm)
+ *
+ * async function validar() {
+ *     ...
+ *     const continuar = await EduConfirm({text: 'Esta seguro que desea continuar?'});
+ *
+ *     if(continuar){
+ *         console.log('test');
+ *     }
+ * }
+ *
+ * USO DE MANERA ASINCRONICA
+ * -------------------------
+ ** (La apertura del EduConfirm se ejecuta en paralelo con el console.log)
+ *
+ * EduConfirm({
+    * text: 'Esta es una alerta',
+    * onAcceptClick: (alert_modal) => {
+    *     // Realizar una accion al clickear el boton de 'Aceptar'
+    * },
+    * onCancelClick: (alert_modal) => {
+    *     // Realizar una accion al clickear el boton de 'Cancelar'
+    * }
+ * })
+ *
+ * console.log('test');
+ *
+ */
+function EduConfirm(args = { text, title, onCancelClick, onAcceptClick, callbackOnExit, mantenerOtroModal }) {
+
+    // Evitar la apertura del confirm en caso de que haya otra instancia de tipo Modal abierta actualmente, salvo que venga en 1
+     if (window.currentModal && args.mantenerOtroModal !== 1) return;
+
+    return new Promise((res, rej) => {
+
+        // Funcion de cerrado al apretar 'Escape'
+        const onEscapePress = (ev) => {
+            if(ev.key === 'Escape') {
+                confirm_modal.hide();
+
+                if (args.callbackOnExit) args.callbackOnExit(confirm_modal);
+
+                document.removeEventListener('keydown', onEscapePress);
+                // Resolver promesa para emular la sincronia al apretar 'Escape'
+                res(false);
+            };
+        };
+
+        const confirm_text = document.createElement('p');
+        confirm_text.classList.add('confirm_text');
+        confirm_text.innerHTML = args.text;
+
+        const confirm_modal = new Modal({
+            header: { title: args.title ?? Dict.termcap('CONFIRMAR') },
+            classes: ['wrapper_pos_top'],
+            preventExit: true,
+            content: confirm_text,
+            footer: {
+                show: true,
+            }
+        });
+
+        // Agregar la clase 'confirm_comunes' al modal
+        confirm_modal.modal.classList.add('confirm_comunes');
+
+        // El uso en true de preventExit en la instanciacion del Modal, imposibilita usar la botonera por defecto, por eso se debe crearla de manera manual
+
+        // Contenedor de ambos botones ('Cancelar' y 'Aceptar')
+        const confirmActionButtons = document.createElement('div');
+        confirmActionButtons.classList.add('modal_action_buttons');
+
+        // Boton para cancelar (cierra el confirm)
+        const cancelButton = document.createElement('button');
+        cancelButton.classList.add('modal_action_btn', 'modal_action_btn_cancel');
+        cancelButton.textContent = Dict.termcap('CANCELAR');
+
+        cancelButton.onclick = () => {
+            confirm_modal.hide();
+
+            if (args.callbackOnExit) args.callbackOnExit(confirm_modal);
+            if (args.onCancelClick) args.onCancelClick(confirm_modal);
+
+            // Remover listener al apretar 'Escape'
+            document.removeEventListener('keydown', onEscapePress);
+            // Resolver promesa para emular la sincronia al apretar 'Cancelar'
+            res(false);
+        }
+
+        confirmActionButtons.appendChild(cancelButton);
+
+        // Boton de aceptacion para realizar una accion pasada por argumento
+        this.acceptButton = document.createElement('button');
+        this.acceptButton.classList.add('modal_action_btn', 'modal_action_btn_primary');
+        this.acceptButton.textContent = Dict.termcap('ACEPTAR');
+
+        this.acceptButton.onclick = () => {
+            confirm_modal.hide();
+
+            if (args.callbackOnExit) args.callbackOnExit(confirm_modal);
+            if (args.onAcceptClick) args.onAcceptClick(confirm_modal);
+
+            // Remover listener al apretar 'Escape'
+            document.removeEventListener('keydown', onEscapePress);
+            // Resolver promesa para emular la sincronia al apretar 'Aceptar'
+            res(true);
+
+        }
+
+        confirmActionButtons.appendChild(this.acceptButton);
+
+        // Actualizar footer con los botones de 'Cancelar' y 'Aceptar'
+        confirm_modal.updateFooter(confirmActionButtons);
+
+        // Mostrar confirm. Al clickear 'Cancelar' o 'Aceptar' el modal se removera automaticamente del DOM
+        confirm_modal.show();
+
+        // Focusear boton primario de aceptacion para poder tener el acceso rapido a la accion principal, por ejemplo, al apretar 'Enter'
+        this.acceptButton.focus();
+
+        // Listener para cerrar el confirm luego de apretar 'Escape'
+        document.addEventListener('keydown', onEscapePress);
+
+    });
+
+};
+
+/**
+ * @function EduOpen
+ *
+ * Emula el comportamiento del componente nativo "open" de los navegadores.
+ * Abre una ventana Modal con el contenido que se desea renderizar embebido en un iframe.
+ * Se puede setear el ancho y el alto de la ventana a las necesidades. Util cuando se requiere cargar un .cgi en una ventana Modal
+ * sin necesidad de tener que redirigir al usuario a esa vista.
+ *
+ * @param {Object} args
+ * @param {string} args.url - Es el contenido que se va a embeber y mostrar posteriormente en el iframe de la ventana Modal (es el src del iframe).
+ * @param {string} args.hideHeader - Opcional. Si recibe true, permite ocultar el encabezado de la ventana Modal (se mostraria solo el contenido del iframe).
+ * @param {string} args.title - Opcional. Setea el titulo del encabezado de la ventana open (por defecto el encabezado no tendra titulo).
+ * @param {number} args.height - Opcional. Establece la altura de la ventana. Por defecto es 400 (px);
+ * @param {number} args.width - Opcional. Establece la anchura de la ventana. Por defecto es 400 (px);
+ * @param {string} args.id - Opcional. Id que se usara para diferenciar el Modal de otros
+ * @param {boolean} args.exitButtonOnly - Opcional. Si recibe true, solo podra cerrar la ventana desde la cruz o segun funcionamiento del formulario
+ * @param {string} args.classname - Opcional. Clase definida en objetos_comunes_modal.css para agregar al wrapper del Modal. Reemplaza los argumentos height y width que quedan obsoletos
+ *
+ * @return {undef}
+ *
+ * @examples
+ *
+ * EduOpen(
+ *     {
+ *         url: 'https://campus-14.e-ducativa.x/aula/webmail.cgi?id_curso=73',
+ *         height: 560,
+ *         width: 480,
+ *     }
+ * );
+ *
+ * EduOpen(
+ *    {
+ *      url: `${this.url_dir}mensajeria.cgi?id_curso=${idCursoActual}&mail_to_admin=1`,
+ *      id:'comunes_mensajeria',
+ *      exitButtonOnly: true,
+ *      classname: 'comunes_mensajeria',
+ *    }
+ * );
+ *
+ */
+function EduOpen( args = { url, hideHeader, title, height, width, id, exitButtonOnly, classname } ) {
+
+    // Si hay un modal minimizado de mensajeria y venimos del chip de draft, restaurarlo.
+    // Si viene de otro entry point (ej: Contactar admin), dejar pasar al guard de draft
+    // que pedira confirmacion antes de descartar.
+    if ( args.id === 'comunes_mensajeria' && window.minimizedModal && args._skipDraftCheck ) {
+        window.minimizedModal.restore();
+        var indicator = EducativaDraftIndicator.getInstance();
+        indicator.hide();
+        return;
+    }
+
+    // Evitar la apertura del open en caso de que haya otra instancia de tipo Modal abierta actualmente
+    if ( window.currentModal && args.id !== 'comunes_mensajeria' ) return;
+
+    // Si hay un chip de draft visible y no venimos del flujo de restore, pedir confirmacion
+    // antes de descartar el borrador actual.
+    if ( args.id === 'comunes_mensajeria'
+        && !args._skipDraftCheck
+        && EducativaDraftIndicator.getInstance().isVisible() ) {
+
+        // Normalizar \n a <br> (patron defensivo compartido con DESEA_GUARDAR_BORRADOR)
+        var confirmText = Dict.terms.AVISO_DRAFT_EN_PROGRESO
+            ? Dict.term( 'AVISO_DRAFT_EN_PROGRESO' ).replace( /\n/g, '<br>' )
+            : 'Ya ten\u00e9s un mensaje en progreso. Si continu\u00e1s, '
+                + 'se perder\u00e1n los datos del borrador actual. '
+                + '\u00bfDese\u00e1s continuar?';
+
+        EduConfirm( { text: confirmText } )?.then( function( confirmed ) {
+            if ( !confirmed ) return;
+            EducativaDraftManager.clear();
+            EducativaDraftIndicator.getInstance().hide();
+            // Si hay un modal minimizado en la misma pagina, cerrarlo
+            if ( window.minimizedModal ) {
+                window.minimizedModal.hide();
+                window.minimizedModal = null;
+            }
+            args._skipDraftCheck = true;
+            EduOpen( args );
+        } );
+        return;
+    }
+
+    // Al abrir mensajeria, cerrar cualquier modal existente para evitar solapamiento
+    // preventExit=true indica EduAlert/EduConfirm con Promise pendiente; no cerrarlos
+    if ( args.id === 'comunes_mensajeria' && window.currentModal && !window.currentModal.args?.preventExit ) {
+        window.currentModal.hide();
+    }
+
+    // Crear iframe donde se va a embeber el url
+    var iframe = document.createElement( 'iframe' );
+    iframe.classList.add( 'modal_iframe' );
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 0;
+    iframe.setAttribute( 'src', args.url );
+
+    // Crear modal donde se insertara el iframe
+    var window_modal = new Modal( {
+        id: args.id ?? 'comunes',
+        header: { title: args.title ?? '', show: args.hideHeader ? false : true },
+        content: iframe,
+        classes: [ 'wrapper_pos_top', args.classname ].filter( Boolean ),
+        exitButtonOnly: args.exitButtonOnly ?? false,
+    } );
+
+    var wrapper = window_modal.getWrapper();
+    wrapper.style.width = args.classname ? '' : `${args.width ?? 400}px`;
+    wrapper.style.height = args.classname ? '' : `${args.height ?? 400}px`;
+
+    var content = window_modal.getContent();
+    content.classList.add( 'iframe' );
+
+    // Boton minimizar y override del boton X solo para mensajeria
+    if ( args.id === 'comunes_mensajeria' ) {
+        var header = window_modal.getHeader();
+        var exitButton = header.querySelector( '.modal_exit_button' );
+
+        // Crear boton de minimizar al lado del X de cerrar
+        var minimizeButton = document.createElement( 'button' );
+        minimizeButton.classList.add( 'modal_minimize_button' );
+        minimizeButton.title = Dict.terms.MINIMIZAR ? Dict.termcap( 'MINIMIZAR' ) : 'Minimizar';
+        minimizeButton.innerHTML = '<i class="fal fa-minus" style="color:inherit"></i>';
+
+        minimizeButton.onclick = function() {
+            EducativaDraftManager.save( iframe );
+            window_modal.minimize();
+            EducativaDraftIndicator.getInstance( { onClick: _onDraftIndicatorClick } ).show();
+        };
+
+        // Crear boton de maximizar/restaurar entre minimizar y cerrar
+        var maximizeButton = document.createElement( 'button' );
+        maximizeButton.classList.add( 'modal_maximize_button' );
+        var titleMaximizar = Dict.terms.MAXIMIZAR ? Dict.termcap( 'MAXIMIZAR' ) : 'Maximizar';
+        var titleRestaurar = Dict.terms.RESTAURAR ? Dict.termcap( 'RESTAURAR' ) : 'Restaurar';
+        maximizeButton.title = titleMaximizar;
+        maximizeButton.innerHTML = '<i class="fal fa-expand" style="color:inherit"></i>';
+        var isMaximized = false;
+
+        maximizeButton.onclick = function() {
+            isMaximized = !isMaximized;
+            window_modal.modal.classList.toggle( 'modal_maximized', isMaximized );
+            maximizeButton.innerHTML = isMaximized
+                ? '<i class="fal fa-compress" style="color:inherit"></i>'
+                : '<i class="fal fa-expand" style="color:inherit"></i>';
+            maximizeButton.title = isMaximized ? titleRestaurar : titleMaximizar;
+        };
+
+        // Agrupar minimizar + maximizar + cerrar en un wrapper para que queden juntos a la derecha
+        var btnGroup = document.createElement( 'div' );
+        btnGroup.classList.add( 'modal_header_buttons' );
+        exitButton.before( btnGroup );
+        btnGroup.appendChild( minimizeButton );
+        btnGroup.appendChild( maximizeButton );
+        btnGroup.appendChild( exitButton );
+
+        // Override del boton X para preguntar si guardar borrador
+        exitButton.onclick = async function() {
+            var hasContent = false;
+
+            try {
+                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                var form = iframeDoc.forms['form'];
+                if ( form ) {
+                    var asunto = ( form.wAsunto?.value || '' ).trim();
+                    var cuerpo = '';
+                    var iframeWin = iframe.contentWindow;
+                    if ( iframeWin.tinyMCE && iframeWin.tinyMCE.editors.length > 0 ) {
+                        cuerpo = iframeWin.tinyMCE.editors[0].getContent();
+                    } else {
+                        cuerpo = ( form.wMensaje?.value || '' ).trim();
+                    }
+                    var adjuntos = parseInt( form.wAdjunto_cant?.value || '0', 10 ) > 0;
+                    hasContent = !EducativaDraftManager.isEmpty( asunto ) || !EducativaDraftManager.isEmpty( cuerpo ) || adjuntos;
+                }
+            } catch ( e ) {
+                // iframe no accesible, cerrar directamente
+            }
+
+            if ( hasContent ) {
+                // Educativa::Display::js_require_dict convierte <br> a \n al pasar el termino a JS,
+                // por eso lo volvemos a <br> para que innerHTML en EduConfirm renderice el salto de linea.
+                var confirmText = Dict.terms.DESEA_GUARDAR_BORRADOR
+                    ? Dict.term( 'DESEA_GUARDAR_BORRADOR' ).replace( /\n/g, '<br>' )
+                    : '\u00bfDese\u00e1s guardar el mensaje como borrador antes de cerrar?<br>Tu mensaje expira en 24hs o al cerrar la sesi\u00f3n';
+                var confirmed = await EduConfirm( { text: confirmText, mantenerOtroModal: 1 } );
+                if ( confirmed ) {
+                    EducativaDraftManager.save( iframe );
+                    window_modal.minimize();
+                    EducativaDraftIndicator.getInstance( { onClick: _onDraftIndicatorClick } ).show();
+                } else {
+                    EducativaDraftManager.clear();
+                    window_modal.hide();
+                }
+            } else {
+                EducativaDraftManager.clear();
+                window_modal.hide();
+            }
+        };
+    }
+
+    // Spinner de carga de iframe
+    var spinner = new Spinner( { element: window_modal.getContent() } );
+    spinner.add();
+
+    // Quitar spinner al terminar la carga del iframe
+    iframe.addEventListener( 'load', function() {
+        spinner.hide();
+
+    } );
+
+    // Agregar la clase 'open_comunes' al modal
+    window_modal.modal.classList.add( 'open_comunes' );
+
+    spinner.show();
+
+    window_modal.show();
+}
+
+/**
+ * Maneja el click en el chip flotante de draft.
+ */
+function _onDraftIndicatorClick() {
+    var indicator = EducativaDraftIndicator.getInstance();
+
+    if ( window.minimizedModal ) {
+        window.minimizedModal.restore();
+        indicator.hide();
+        return;
+    }
+
+    // No hay modal minimizado (navego). Reabrir desde localStorage.
+    var cursoActual = typeof id_grupo !== 'undefined'
+        ? String( id_grupo )
+        : new URLSearchParams( window.location.search ).get( 'wid_cursoActual' );
+    var draft = EducativaDraftManager.load( cursoActual );
+    if ( !draft ) {
+        indicator.hide();
+        return;
+    }
+
+    // Usar url_dir global para soportar standalone con subpath distinto a /aula/
+    var url = draft.mail_to_admin
+        ? `${url_dir}mensajeria.cgi?mail_to_admin=1`
+        : `${url_dir}mensajeria.cgi?wAsunto=Redactar_MAIL`;
+    if ( draft.id_curso ) url += '&id_curso=' + draft.id_curso;
+
+    indicator.hide();
+
+    EduOpen( {
+        url: url,
+        id: 'comunes_mensajeria',
+        exitButtonOnly: true,
+        classname: 'comunes_mensajeria',
+        _skipDraftCheck: true,
+    } );
+
+    // Restaurar draft desde el parent despues de que el iframe cargue
+    _restoreDraftOnIframeLoad( draft );
+}
+
+/**
+ * Espera a que el iframe de mensajeria cargue y restaura el draft desde el parent.
+ * El iframe no puede acceder a las clases del parent, asi que la restauracion
+ * se hace desde aca.
+ *
+ * @param {Object} draft - Datos del draft
+ */
+function _restoreDraftOnIframeLoad( draft ) {
+    var elapsed = 0;
+    var interval = 500;
+    var timeout = 15000;
+
+    var tryRestore = function() {
+        try {
+            var iframe = document.querySelector( '.modal_iframe' );
+            if ( !iframe ) return;
+
+            var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            var form = iframeDoc.forms['form'];
+            var iframeWin = iframe.contentWindow;
+
+            // Esperar a que el form y TinyMCE esten listos
+            if ( !form || !iframeWin.tinyMCE || iframeWin.tinyMCE.editors.length === 0 ) {
+                elapsed += interval;
+                if ( elapsed < timeout ) setTimeout( tryRestore, interval );
+                return;
+            }
+
+            // Restaurar asunto
+            if ( draft.asunto && form.wAsunto ) {
+                form.wAsunto.value = draft.asunto;
+            }
+
+            // Restaurar destinatarios
+            if ( draft.destinatarios ) {
+                if ( form.wDestinatarios ) {
+                    form.wDestinatarios.value = draft.destinatarios;
+                } else if ( form.wIdDestino ) {
+                    form.wIdDestino.value = draft.destinatarios;
+                }
+            }
+            if ( draft.destinatarios_nombres ) {
+                var destEl = iframeDoc.getElementById( 'select_multiple_one_value' );
+                if ( destEl ) destEl.textContent = draft.destinatarios_nombres;
+            }
+
+            // Restaurar cuerpo en TinyMCE
+            if ( draft.cuerpo ) {
+                iframeWin.tinyMCE.editors[0].setContent( draft.cuerpo );
+            }
+
+            // Aviso de adjuntos perdidos
+            if ( draft.tiene_adjuntos ) {
+                var aviso = iframeDoc.createElement( 'div' );
+                aviso.className = 'edu-system-message edu-system-message-info line';
+                var avisoText = iframeDoc.createElement( 'span' );
+                avisoText.textContent = 'Los archivos adjuntos del borrador anterior no se pudieron conservar';
+                aviso.appendChild( avisoText );
+                var firstLine = form.querySelector( '.line' );
+                if ( firstLine ) form.insertBefore( aviso, firstLine );
+            }
+
+            // Limpiar draft del storage (ya fue restaurado)
+            EducativaDraftManager.clear();
+
+        } catch ( e ) {
+            elapsed += interval;
+            if ( elapsed < timeout ) setTimeout( tryRestore, interval );
+        }
+    };
+
+    setTimeout( tryRestore, interval );
+}
+
+/**
+ * Objeto para mostrar un spinner sobre un elemento contenedor.
+ *
+ * No se ejecuta ningun metodo al instanciar.
+ *
+ * Funciona sobre elementos con position absolute o fixed si se mantiene el position (keepPosition)
+ *
+ * @typedef ConstructorArgs
+ * @type {Object}
+ * @prop {HTMLElement} element         - Elemento a cubrir con el spinner.
+ * @prop {Array}       classes         - Array con las clases que se quieran agregar
+ * @prop {String}      size            - Tamanio del spinner. Default 'xs'
+ * @prop {Boolean}     keepPosition    - Mantener el style.position del contenedor 'element' al mostrar (add o show)
+ *
+ * @param {ConstructorArgs}
+ *
+*/
+class Spinner {
+
+    constructor({element, classes, size = 'xs', keepPosition = false}) {
+
+        const sizes = {
+            xs: '',
+            sm: 'fa-2x',
+            md: 'fa-3x',
+            lg: 'fa-4x'
+        };
+
+        this.container = element;
+        this.originalPosition = this.container.style.position;
+        this.keepPosition = keepPosition;
+
+        this.spinner = document.createElement('div');
+        this.spinner.classList.add('center_spinner');
+
+        this.spinner.innerHTML = `<i class="fal fa-spinner-third fa-spin fast-spin ${sizes[size]}"></i>`;
+
+        if (classes) this.spinner.classList.add(...classes);
+    }
+
+    add() {
+        this.setContainer();
+        this.container.appendChild(this.spinner);
+    }
+
+    remove() {
+        this.resetContainer();
+        this.container.removeChild(this.spinner);
+    }
+
+    show() {
+        this.setContainer();
+        this.spinner.style.display = '';
+    }
+
+    hide() {
+        this.resetContainer();
+        this.spinner.style.display = 'none';
+    }
+
+    setContainer() {
+        const position = this.keepPosition ? this.originalPosition : 'relative';
+        this.container.style.position = position;
+    }
+
+    resetContainer() {
+        this.container.style.position = this.originalPosition;
+    }
+}
+
+class Dropper {
+
+    /**
+     * Arma un contenedor dropeable para poder arrastrar y soltar archivos
+     *
+     * @method     constructor
+     *
+     * @param      {Element}   options.elementContainerDropArea     Contenedor donde se va a renderizar los
+     *                                                              divs armados - listado de items y contenedor dropeable
+     * @param      {Object}    options.classes                      Cada key es un array. Keys: onDragEnter, onDragLeave,
+     *                                                              onDrop y extrasForContainer
+     * @param      {Object}    options.events                       Cada key debe ser una referencia a una funcion. Funciones permitidas:
+     *                                                              onDragEnter, onDragLeave, onDrop y onInputFileChange
+     * @param      {Element}   options.inputFile                    Elemento input type="file" que se relaciona con este contenedor
+     * @param      {Object}    options.data                         Datos para el manejo de los comportamientos
+     *
+     * @param      {Integer}   options.data.limitItems              Limite de items que se pueden soltar en el contenedor dropeable. Default: 0 (sin limite).
+     * @param      {Integer}   options.data.throwErrorOnLimitPass   Decide si debe llamarse o no a _throwErrorOnLimitPass si hay mas archivos cargados que el maximo permitido. Default: 1 (se debe llama a _throwErrorOnLimitPass)
+     * @param      {Array}     options.data.items                   Cada elemento es un objeto.
+     *
+     * @return     {Dropper}    Esta clase
+     */
+    constructor({ elementContainerDropArea, classes, events, inputFile, data }) {
+        this.elements = { containerDropArea: elementContainerDropArea };
+
+        // Clases defaults
+        this.classes = {
+            _onDragEnter: ['is_dragenter'],
+            _onDragOver: ['is_dragenter'],
+            _onDragLeave: [],
+            _onDrop: []
+        };
+        this.classes.onDragEnter = [...this.classes._onDragEnter];
+        this.classes.onDragOver = [...this.classes._onDragOver];
+        this.classes.onDragLeave = [...this.classes._onDragLeave];
+        this.classes.onDrop = [...this.classes._onDrop];
+
+        this.getContainerDropArea().classList.add('container_drop_area');
+
+        // Si llegan clases por parametros, se agregan
+        if (classes) {
+            if (classes['onDragEnter']) { this.classes.onDragEnter.push(...classes['onDragEnter']); }
+
+            if (classes['onDragLeave']) { this.classes.onDragLeave.push(...classes['onDragLeave']); }
+
+            if (classes['onDrop']) { this.classes.onDrop.push(...classes['onDrop']); }
+
+            if (classes['extrasForContainer']) {
+                this.getContainerDropArea().classList.add(...classes['extrasForContainer']);
+            }
+        }
+
+        this.events = { ...events };
+        this.elements.inputFile = inputFile;
+        this.data = {
+            limitItems: 0,
+            items: [],
+            itemsCount: 0,
+            throwErrorOnLimitPass: 1,
+            ...data
+        };
+
+        if (inputFile) {
+            this.getElementInputFile().addEventListener('change', this._onInputFileChange.bind(this));
+        }
+    }
+
+    getContainerDropArea() {
+        return this.elements.containerDropArea;
+    }
+
+    getElementDropArea() {
+        return this.elements.dropArea;
+    }
+
+    getElementListItems() {
+        return this.elements.listItems;
+    }
+
+    getElementInputFile() {
+        return this.elements.inputFile;
+    }
+
+    /**
+     * Arma la estructura de un contenedor dropper.
+     *
+     * @method     render
+     *
+     * @note Estructura:
+     * <div class="container_drop_area">
+     *     <div class="list_items">
+     *         Ver this.renderItem()
+     *     </div>
+     *     <div class="drop_area">
+     *         <div class="upload_bt">
+     *             <i class="fas fa-arrow-alt-up upload_icon"></i>
+     *         </div>
+     *         <div class="info_drop">
+     *             [TEXTO_INFO] <a class="link_search">[TEXTO_BUSQUELO]</a>
+     *         </div>
+     *     </div>
+     * </div>
+     */
+    render() {
+        const divIcon = document.createElement('div');
+        const spanInfo = document.createElement('span');
+        const linkSearch = document.createElement('a');
+        const icon = document.createElement('i');
+
+        const self = this;
+
+        // Datos div icon
+        icon.classList.add('fas', 'fa-arrow-alt-up', 'upload_icon');
+
+        divIcon.classList.add('upload_bt');
+        divIcon.title = Dict.termcap('DROPPER_BUSQUELO');
+        divIcon.appendChild(icon);
+        divIcon.addEventListener('click', (event) => {
+            self.getElementInputFile().click();
+        });
+
+        // Datos div info_drop
+        spanInfo.innerHTML = `${Dict.termcap('DROPPER_ARRASTRE_Y_SUELTE_AQUI_O')} `;
+
+        linkSearch.classList.add('link_search');
+        linkSearch.innerHTML = Dict.termlc('DROPPER_BUSQUELO');
+        linkSearch.addEventListener('click', () => { self.getElementInputFile().click(); });
+
+        spanInfo.classList.add('info_drop');
+        spanInfo.appendChild(linkSearch);
+
+        const divListItems = document.createElement('div');
+        divListItems.classList.add('list_items');
+
+        const divDropArea = document.createElement('div');
+        divDropArea.classList.add('drop_area');
+
+        // Agregamos los dos divs al drop area
+        divDropArea.appendChild(divIcon);
+        divDropArea.appendChild(spanInfo);
+
+        // Agregamos los divs al container drop area (list items y drop area)
+        this.getContainerDropArea().appendChild(divDropArea);
+        this.getContainerDropArea().appendChild(divListItems);
+
+        this.elements.dropArea = divDropArea;
+        this.elements.listItems = divListItems;
+
+
+        // Determinar si armamos la lista de items y la mostramos
+        this.hideListItems();
+        if (this.data.items.length) {
+            this.data.items.map((dataItem, index) => {
+                this.renderItem({
+                    item: {
+                        ...dataItem,
+                        index,
+                        description: this._formatDescriptionFile({ ...dataItem })
+                    }
+                });
+            });
+            this.showListItems();
+        }
+
+        // Determinar si ocultamos el drop area
+        if (!this.isAllowAddItems()) { this.hideDropArea(); }
+
+        // Deshabilitamos el comportamiento por default de los eventos, para poder tener un mejor control.
+        ['drag', 'dragenter', 'dragover', 'dragleave', 'drop', 'dragstart'].map((e) => {
+            self.getElementDropArea().addEventListener(e, (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            });
+        }, this);
+
+        this.getElementDropArea().addEventListener('dragenter', this._onDragEnter.bind(this));
+        this.getElementDropArea().addEventListener('dragover', this._onDragOver.bind(this));
+        this.getElementDropArea().addEventListener('dragleave', this._onDragLeave.bind(this));
+        this.getElementDropArea().addEventListener('drop', this._onDrop.bind(this));
+    }
+
+    /**
+     * Arma la estructura de un item para el contenedor this.getElementListItems();
+     *
+     * @method     renderItem
+     *
+     * @note Estructura que iria dentro del div <div class="list_items"></div>:
+     * <div class="item">
+     *     <i class="[CLASES_ICONO]"></i> o bien <img></img>
+     *     <div class="file_description">[DESCRIPCION_ITEM (HTML)]</div>
+     *     <button class="btn_delete" title="[TEXTO_ELIMINAR]"><i class="fas fa-"></i></button>
+     * </div>
+     *
+     *
+     * @param      {Object}       options.item              Objeto con los datos para el item
+     *
+     * @param      {String}       options.item.urlLink      Si llega, el archivo se puede abrir en otra ventana
+     * @param      {HTML}         options.item.description  Puede ser string o elementos html. Por lo general nombre del item
+     * @param      {String}       options.item.imgSrc       Si llega, en vez de armarse un icono default, se agrega un <img>
+     * @param      {Integer}      options.item.index        Indice para los datasets (Necesario para boton eliminar)
+     */
+    renderItem({ item }) {
+        const divItem = document.createElement('div');
+        const divDescription = document.createElement('div');
+        const icon = document.createElement('i');
+        const img = document.createElement('img');
+        const iconDelete = document.createElement('i');
+        const buttonDelete = document.createElement('button');
+
+        divItem.classList.add('item');
+        divItem.dataset.index = item.index;
+        if (item.urlLink) {
+            divItem.classList.add('link');
+            divItem.title = Dict.termcap('DROPPER_VER_ARCHIVO');
+            divItem.addEventListener('click', () => { window.open(item.urlLink, '_blank'); })
+        }
+
+        divDescription.classList.add('file_description');
+        divDescription.innerHTML = item.description;
+
+        iconDelete.title = Dict.termcap('DROPPER_BTN_DELETE');
+        iconDelete.classList.add('far', 'fa-trash-alt');
+
+        buttonDelete.type = 'button';
+        buttonDelete.dataset.index = item.index;
+        buttonDelete.addEventListener('click', this._onClickDeleteItem.bind(this));
+        buttonDelete.classList.add('btn_delete');
+        buttonDelete.appendChild(iconDelete);
+
+        if (item.imgSrc) {
+            img.src = item.imgSrc;
+            img.classList.add('icon_item');
+            divItem.appendChild(img);
+        } else {
+            // icon.classList.add(...item.classesIcon)
+            icon.classList.add('icon_item', 'far', 'fa-file');
+            divItem.appendChild(icon);
+        }
+        divItem.appendChild(divDescription);
+        if (!item.withoutDelete) {
+            divItem.appendChild(buttonDelete);
+        }
+
+
+        this.getElementListItems().appendChild(divItem);
+
+        this.data.itemsCount = this.data.itemsCount + 1;
+    }
+
+    /**
+     * Formatea la descripcion para mostrar el item
+     *
+     * @method     _formatDescriptionFile
+     *
+     * @param      {Object}     options.file     'name': nombre del archivo y 'size': tamanio en bytes
+     *
+     * @return     {Stirng}     Descipcion HTML formateada
+     */
+    _formatDescriptionFile({ file }) {
+        let size = (file.size > 0 && file.size < 1024)
+            ? 1
+            : file.size / 1024;
+        return `
+            <div class="file_name">${file.name}</div>
+            <div class="file_size">${Math.round(size)}kb</div>
+        `;
+    }
+
+    isAllowAddItems() {
+        if (!this.data.limitItems) {
+            // No hay limite establecido
+            return true;
+        } else if (this.data.limitItems > this.data.itemsCount) {
+            // Hay limite establecido y es mayor que los items agregados
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    hide() {
+        this.getContainerDropArea().style.display = 'none';
+    }
+
+    show() {
+        this.getContainerDropArea().style.display = '';
+    }
+
+    hideDropArea() {
+        this.getElementDropArea().style.display = 'none';
+    }
+
+    showDropArea() {
+        this.getElementDropArea().style.display = '';
+    }
+
+    showListItems() {
+        this.getElementListItems().style.display = '';
+    }
+
+    hideListItems() {
+        this.getElementListItems().style.display = 'none';
+    }
+
+    _onDragEnter(event) {
+        this._cleanClasses();
+        this.getElementDropArea().classList.add(...this.classes.onDragEnter)
+
+        // Ejecutamos evento si llego al instanciar la clase
+        if (this.events.onDragEnter) { this.events.onDragEnter(event) }
+    }
+
+    _onDragOver(event) {
+        this._cleanClasses();
+        this.getElementDropArea().classList.add(...this.classes.onDragOver)
+
+        // Ejecutamos evento si llego al instanciar la clase
+        if (this.events.onDragOver) { this.events.onDragOver(event) }
+    }
+
+    _onDragLeave(event) {
+        this._cleanClasses();
+        this.getElementDropArea().classList.add(...this.classes.onDragLeave)
+
+        // Ejecutamos evento si llego al instanciar la clase
+        if (this.events.onDragLeave) { this.events.onDragLeave(event) }
+    }
+
+    _onDrop(event) {
+        this._cleanClasses();
+        this.getElementDropArea().classList.add(...this.classes.onDrop)
+
+        this.getElementInputFile().files = event.dataTransfer.files;
+        // Disparamos evento this._onInputFileChange();
+        this.getElementInputFile().dispatchEvent(new Event('change'));
+
+        // Ejecutamos evento si llego al instanciar la clase
+        if (this.events.onDrop) { this.events.onDrop(event, this) }
+
+    }
+
+    /**
+     * Si llegan archivos, ya sea mediante el arrastre al area dropeable, mediante la busqueda
+     * en el explorador de archivos o al borrar un item, se lo analiza y muestra el listado
+     * de items y el area dropeable la muestra/oculta dependiendo del limite que se le marco
+     *
+     * @method     _onInputFileChange
+     *
+     * @param      {EventChange}               event     Evento change asociado al input this.getElementInputFile()
+     */
+    _onInputFileChange(event) {
+        const files = this.getElementInputFile().files;
+        this.data.itemsCount = 0;
+        this.getElementListItems().innerHTML = null;
+        this.hideListItems();
+
+        if (files.length) {
+
+            if (files.length > this.data.limitItems && this.data.throwErrorOnLimitPass) {
+                this._throwErrorOnLimitPass();
+                this.reset();
+            } else {
+                let arrayFiles = [];
+
+                if (!this.data.limitItems || this.data.limitItems == 1) {
+                    arrayFiles.push(files[0]);
+                } else {
+                    // TODO: Al tener esto para archivos simples, se deja asi
+                    arrayFiles.push(files[0]);
+                }
+
+                arrayFiles.map((file, index) => this.renderItem({
+                    item: {
+                        index,
+                        description: this._formatDescriptionFile({ file })
+                    }
+                }));
+                this.showListItems();
+            }
+        }
+
+        if (!this.isAllowAddItems()) { this.hideDropArea(); } else { this.showDropArea() }
+
+        // Ejecutamos evento si llego al instanciar la clase
+        if (this.events.onInputFileChange) { this.events.onInputFileChange(event, this) }
+    }
+
+    _throwErrorOnLimitPass() {
+        EduAlert( {text: Dict.interpolate(Dict.termcap('DROPPER_MAXIMO_ARCHIVOS'), { limit: this.data.limitItems })} );
+    }
+
+    _onClickDeleteItem(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        // Solo se acepta el click sobre el icono (tags: svg o path)
+        if (event.target.tagName.toLowerCase() == 'button') { return; }
+
+        const indexItem = event.currentTarget.dataset.index;
+        const item = this.getElementListItems().querySelector('.item[data-index="' + indexItem + '"]');
+        item.remove();
+
+        this.data.itemsCount = this.data.itemsCount - 1;
+
+        if (!this.data.limitItems || this.data.limitItems == 1) {
+            this.getElementInputFile().value = '';
+        } else {
+            // TODO: Por ahora al tener subida de archivos simple, vaciamos el input file
+            this.getElementInputFile().value = '';
+        }
+        this.getElementInputFile().dispatchEvent(new Event('change'));
+    }
+
+    reset() {
+        this.data.itemsCount = 0;
+        this.getElementInputFile().value = '';
+        this.getElementInputFile().dispatchEvent(new Event('change'));
+    }
+
+    _cleanClasses() {
+        this.getElementDropArea().classList.remove(
+            ...this.classes.onDragEnter, ...this.classes.onDragOver,
+            ...this.classes.onDragLeave, ...this.classes.onDrop
+        );
+    }
+
+}
+
+const Utils = {
+
+    /**
+     * Verifica si un string representa una fecha valida en cierto idioma
+     *
+     * @param {string} date     El string que representa la fecha
+     * @param {string} locale   Idioma de la fecha
+     *
+     * @return {bool}  Si es string es una fecha valida o no
+     */
+    isDate: (date, locale) => {
+        // Detectar separador real del input (slash, dash o punto). El control
+        // de fecha del servidor formatea segun el locale del usuario, asi que
+        // aleman/polaco/danes usan punto, holandes usa guion, latinos usan slash.
+        // Aceptamos cualquiera y validamos largo de componentes.
+        const sepMatch = date.match(/[\/\-.]/);
+        if ( !sepMatch ) {
+
+            return false;
+        }
+        const sep        = sepMatch[0];
+        const escapedSep = sep === '.' ? '\\.' : sep === '-' ? '\\-' : '\\/';
+        // Acepta anio de 2 o 4 digitos. Locales como de_DE, da_DK, nl_NL
+        // usan formato corto con %y (2 digitos). Latinos como es_AR usan %Y.
+        const validRegExp = new RegExp(`^\\d{1,2}${escapedSep}\\d{1,2}${escapedSep}\\d{2}(?:\\d{2})?$`);
+
+        if ( !validRegExp.test(date) ) {
+
+            return false;
+        }
+
+        // Orden de componentes: en-GB usa MDY, el resto DMY (default europeo).
+        let day, month, year;
+        if ( locale == 'en-GB' ) {
+            [month, day, year] = date.split(sep);
+        } else {
+            [day, month, year] = date.split(sep);
+        }
+
+        // Expandir anio 2-digit usando pivote 50: 00-49 -> 2000-2049,
+        // 50-99 -> 1950-1999. Razonable para fechas de nacimiento.
+        if ( year.length === 2 ) {
+            const yy = parseInt(year, 10);
+            year = yy < 50 ? `20${year}` : `19${year}`;
+        }
+
+        const timestamp = Date.parse(`${year}-${month}-${day}`);
+        if (isNaN(timestamp)) {
+
+            return false;
+        }
+
+        //HACK: Implementacion de Date.parse en navegadores basados en Chromium
+        const objDate = new Date(timestamp);
+        if (parseInt(month) != (objDate.getUTCMonth() + 1)) {
+
+            return false;
+        }
+
+        return true;
+    }
+}
+
+/**
+ * @function handleLinkClick
+ *
+ * Funcion utilizada en eventos 'onclick' de etiquetas <a> para determinar si abrir el link en una tab nueva o realizar una redireccion en la actual.
+ * Si NO se esta dentro de un iframe, abrir el link en una tab nueva, de lo contrario, redirigir.
+ *
+ * Debe usarse para links internos, ya que para links externos bastaria con agregar la propiedad target="_blank" al tag <a>.
+ *
+ * IMPORTANTE: Si el tag <a> tiene un target definido, esta funcion no hace NADA (se le da prioridad al target).
+ * -----------
+ *
+ * @param {Event} ev - Evento asociado al elemento clickeado (generalmente un tag <a>).
+ * @param {HTMLElement} el - Elemento HTML asociado al elemento clickeado (generalmente un tag <a>).
+ *
+ * @return {undef}
+ *
+ * @example
+ *
+ * <a class="link" onclick="handleLinkClick(event, this)" href="https://campus-14.e-ducativa.x/aula/contactos.cgi?id_curso=73">Link</a>
+ *
+ */
+function handleLinkClick(ev, el) {
+    // Si esta definido el target del link, no hacer nada
+    if(el.target) return;
+
+    ev.preventDefault();
+
+    const in_iframe = window.self !== window.top;
+
+    // Si estamos en un iframe, redirigir directamente, NO abrir una tab
+    if(in_iframe) {
+        return window.location.href = el.href
+    };
+
+    // Si no estamos en un iframe, abrir el link en una tab nueva
+    window.open(el.href, '_blank').focus();
+}
+
+/**
+ * EducativaDraftManager - Serializacion de borradores de mensajeria en localStorage.
+ *
+ * Permite guardar, restaurar y limpiar borradores del formulario de mensajeria
+ * que vive dentro de un iframe, para persistir datos al minimizar el modal.
+ *
+ * Todos los metodos son estaticos; no requiere instanciacion.
+ */
+class EducativaDraftManager {
+
+    static #STORAGE_PREFIX = 'edu_mail_draft_';
+    static #EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+    static #getKey( idCurso ) {
+        return EducativaDraftManager.#STORAGE_PREFIX + ( idCurso || '0' );
+    }
+
+    static isEmpty( value ) {
+        if ( !value ) return true;
+        var cleaned = value
+            .replace( /<p>\s*(&nbsp;|\u00a0)?\s*<\/p>/gi, '' )
+            .replace( /<br\s*\/?>/gi, '' )
+            .replace( /&nbsp;/gi, '' )
+            .replace( /\s+/g, '' );
+        return cleaned.length === 0;
+    }
+
+    static save( iframe ) {
+        try {
+            var iframeWin = iframe.contentWindow;
+            var doc = iframe.contentDocument || iframeWin.document;
+            var form = doc.forms.form;
+            if ( !form ) return false;
+
+            var asunto = ( form.wAsunto && form.wAsunto.value ) || '';
+            var cuerpo = '';
+
+            try {
+                if ( iframeWin.tinyMCE && iframeWin.tinyMCE.editors.length > 0 ) {
+                    cuerpo = iframeWin.tinyMCE.editors[0].getContent();
+                }
+            } catch ( e ) {
+                // Silencioso - TinyMCE puede no estar disponible
+            }
+
+            if ( !cuerpo && form.wMensaje ) {
+                cuerpo = form.wMensaje.value || '';
+            }
+
+            if ( EducativaDraftManager.isEmpty( asunto ) && EducativaDraftManager.isEmpty( cuerpo ) ) {
+                return false;
+            }
+
+            var destinatarios = '';
+            if ( form.wDestinatarios && form.wDestinatarios.value ) {
+                destinatarios = form.wDestinatarios.value;
+            } else if ( form.wIdDestino && form.wIdDestino.value ) {
+                destinatarios = form.wIdDestino.value;
+            }
+
+            var destNombres = '';
+            var destNombresEl = doc.getElementById( 'select_multiple_one_value' );
+            if ( destNombresEl ) {
+                destNombres = destNombresEl.textContent || '';
+            }
+
+            var adjuntoCant = 0;
+            if ( form.wAdjunto_cant && form.wAdjunto_cant.value ) {
+                adjuntoCant = parseInt( form.wAdjunto_cant.value, 10 ) || 0;
+            }
+
+            var idCurso = ( form.id_curso && form.id_curso.value ) || '';
+            var mailToAdmin = form.msg_to_admin && form.msg_to_admin.value === '1';
+
+            var draft = {
+                destinatarios: destinatarios,
+                destinatarios_nombres: destNombres,
+                asunto: asunto,
+                cuerpo: cuerpo,
+                id_curso: idCurso,
+                tiene_adjuntos: adjuntoCant > 0,
+                mail_to_admin: mailToAdmin ? 1 : 0,
+                id_usuario: typeof id_usuario !== 'undefined' ? id_usuario
+                    : ( window.Educativa && window.Educativa.username ? window.Educativa.username : '' ),
+                timestamp: Date.now()
+            };
+
+            localStorage.setItem(
+                EducativaDraftManager.#getKey( idCurso ),
+                JSON.stringify( draft )
+            );
+            return true;
+        } catch ( e ) {
+            return false;
+        }
+    }
+
+    /**
+     * @param {string} [idCurso] - Si no se pasa, usa id_grupo global
+     */
+    static load( idCurso ) {
+        try {
+            var curso = idCurso || ( typeof id_grupo !== 'undefined' ? String( id_grupo ) : '0' );
+            var raw = localStorage.getItem( EducativaDraftManager.#getKey( curso ) );
+            if ( !raw ) return null;
+
+            var draft = JSON.parse( raw );
+            if ( !draft || !draft.timestamp ) return null;
+
+            var age = Date.now() - draft.timestamp;
+            if ( age > EducativaDraftManager.#EXPIRATION_MS ) {
+                EducativaDraftManager.clear( curso );
+                return null;
+            }
+
+            // Descartar drafts de otro usuario o sin usuario asignado
+            var currentUser = typeof id_usuario !== 'undefined' ? id_usuario
+                : ( window.Educativa && window.Educativa.username ? window.Educativa.username : '' );
+            if ( currentUser && ( !draft.id_usuario || draft.id_usuario !== currentUser ) ) {
+                EducativaDraftManager.clear( curso );
+                return null;
+            }
+
+            return draft;
+        } catch ( e ) {
+            return null;
+        }
+    }
+
+    /**
+     * @param {string} [idCurso] - Si no se pasa, usa id_grupo global
+     */
+    static exists( idCurso ) {
+        return EducativaDraftManager.load( idCurso ) !== null;
+    }
+
+    static existsAny() {
+        return EducativaDraftManager.loadAny() !== null;
+    }
+
+    static loadAny() {
+        try {
+            var prefix = EducativaDraftManager.#STORAGE_PREFIX;
+            for ( var i = 0; i < localStorage.length; i++ ) {
+                var key = localStorage.key( i );
+                if ( key && key.indexOf( prefix ) === 0 ) {
+                    var raw = localStorage.getItem( key );
+                    if ( !raw ) continue;
+                    var draft = JSON.parse( raw );
+                    if ( draft && draft.timestamp ) {
+                        var age = Date.now() - draft.timestamp;
+                        if ( age <= EducativaDraftManager.#EXPIRATION_MS ) return draft;
+                    }
+                }
+            }
+        } catch ( e ) {}
+        return null;
+    }
+
+    /**
+     * @param {string} [idCurso] - Si no se pasa, usa id_grupo global
+     */
+    static clear( idCurso ) {
+        try {
+            var curso = idCurso || ( typeof id_grupo !== 'undefined' ? String( id_grupo ) : '0' );
+            localStorage.removeItem( EducativaDraftManager.#getKey( curso ) );
+        } catch ( e ) {
+            // Silencioso
+        }
+    }
+
+    static clearAll() {
+        try {
+            var prefix = EducativaDraftManager.#STORAGE_PREFIX;
+            for ( var i = localStorage.length - 1; i >= 0; i-- ) {
+                var key = localStorage.key( i );
+                if ( key && key.indexOf( prefix ) === 0 ) {
+                    localStorage.removeItem( key );
+                }
+            }
+        } catch ( e ) {
+            // Silencioso
+        }
+    }
+
+}
+
+/**
+ * EducativaDraftIndicator - Chip flotante que indica un borrador en progreso.
+ *
+ * Singleton que renderiza un boton tipo "chip" en la esquina inferior derecha.
+ * Al hacer clic, ejecuta un callback para restaurar el borrador minimizado.
+ */
+class EducativaDraftIndicator {
+
+    static #instance = null;
+
+    #elements;
+    #state;
+    #onClickCallback;
+    #hideTimeout;
+
+    static getInstance( options ) {
+        if ( !EducativaDraftIndicator.#instance ) {
+            EducativaDraftIndicator.#instance = new EducativaDraftIndicator( options );
+        } else if ( options && options.onClick ) {
+            EducativaDraftIndicator.#instance.setOnClick( options.onClick );
+        }
+        return EducativaDraftIndicator.#instance;
+    }
+
+    constructor( options ) {
+        var opts = options || {};
+        this.#elements = {};
+        this.#state = { visible: false };
+        this.#onClickCallback = opts.onClick || null;
+        this.#buildDOM();
+    }
+
+    #buildDOM() {
+        var label = Dict.terms.MENSAJE_EN_PROGRESO
+            ? Dict.termcap( 'MENSAJE_EN_PROGRESO' )
+            : 'Mensaje en progreso';
+
+        var chip = document.createElement( 'div' );
+        chip.className = 'edu_draft_indicator';
+        chip.setAttribute( 'role', 'button' );
+        chip.setAttribute( 'tabindex', '0' );
+        chip.setAttribute( 'aria-label', label );
+
+        var icon = document.createElement( 'i' );
+        icon.className = 'fas fa-envelope';
+
+        var text = document.createElement( 'span' );
+        text.className = 'edu_draft_indicator_text';
+        text.textContent = label;
+
+        chip.appendChild( icon );
+        chip.appendChild( text );
+
+        chip.addEventListener( 'click', () => {
+            if ( this.#onClickCallback ) {
+                this.#onClickCallback();
+            }
+        } );
+
+        chip.addEventListener( 'keydown', ( e ) => {
+            if ( e.key === 'Enter' || e.key === ' ' ) {
+                e.preventDefault();
+                if ( this.#onClickCallback ) {
+                    this.#onClickCallback();
+                }
+            }
+        } );
+
+        this.#elements = { chip: chip, icon: icon, text: text };
+    }
+
+    show() {
+        if ( this.#state.visible ) return;
+        clearTimeout( this.#hideTimeout );
+
+        if ( !this.#elements.chip ) {
+            this.#buildDOM();
+        }
+
+        document.body.appendChild( this.#elements.chip );
+        this.#elements.chip.offsetHeight;
+        this.#elements.chip.classList.add( 'edu_draft_indicator_visible' );
+
+        this.#state.visible = true;
+    }
+
+    hide() {
+        if ( !this.#state.visible ) return;
+
+        this.#elements.chip.classList.remove( 'edu_draft_indicator_visible' );
+        this.#state.visible = false;
+
+        this.#hideTimeout = setTimeout( () => {
+            if ( this.#elements.chip && this.#elements.chip.parentNode && !this.#state.visible ) {
+                this.#elements.chip.parentNode.removeChild( this.#elements.chip );
+            }
+        }, 250 );
+    }
+
+    setOnClick( callback ) {
+        this.#onClickCallback = callback;
+    }
+
+    isVisible() {
+        return this.#state.visible;
+    }
+}
+
+/**
+ * Inicializacion global: si hay un borrador de mensajeria en localStorage,
+ * mostrar el chip flotante para que el usuario pueda restaurarlo.
+ */
+document.addEventListener( 'DOMContentLoaded', function() {
+    // Solo ejecutar en la ventana principal, no dentro de iframes
+    if ( window.parent !== window ) return;
+
+    // Determinar id de curso actual: id_grupo en aula, wid_cursoActual en admin
+    var cursoActual = typeof id_grupo !== 'undefined'
+        ? String( id_grupo )
+        : new URLSearchParams( window.location.search ).get( 'wid_cursoActual' );
+
+    if ( cursoActual && EducativaDraftManager.exists( cursoActual ) ) {
+        var indicator = EducativaDraftIndicator.getInstance( { onClick: _onDraftIndicatorClick } );
+        indicator.show();
+    }
+});
+

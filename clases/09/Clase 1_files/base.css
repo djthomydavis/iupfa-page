@@ -1,0 +1,224 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* Reset general */
+body {
+    position: static;
+    margin: 0;
+    padding: 0;
+    font-size: 1rem;
+    font-weight: normal;
+}
+/* HACK para IE y Edge - Elimina la X en los inputs */
+::-ms-clear { display: none; }
+
+input[type="text"]:focus,
+textarea:focus { outline: none; }
+
+address { font-style: normal; }
+
+/* ------
+   Layout
+   ------ */
+html,
+body {
+    height: 100%;
+    font-family: 'Roboto', sans-serif;
+}
+body {
+    color: #000000;
+    background-color: #f3f3f3;
+    min-height: 100vh;
+}
+button,
+input,
+select { font-family: 'Roboto', sans-serif; }
+
+.alinear_derecha { text-align: right; }
+
+.centrado {
+    position: relative;
+    max-width: 1300px;
+    margin: 0 auto;
+}
+
+.menu_secciones {
+    position: relative;
+    float: left;
+    box-sizing: border-box;
+    width: 20%;
+    margin-top: var(--edu-front-section-margin);
+    padding-left: 10px;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    z-index: 3;
+}
+#section {
+    float: left;
+    width: 78%;
+    margin-top: var(--edu-front-section-margin);
+    margin-left: 2%;
+    box-sizing: border-box;
+}
+#main > .offset {
+    display: flex;
+    flex-flow: row wrap;
+    row-gap: 12px;
+}
+#main > .offset > * {
+    width: 100%;
+    box-sizing: border-box;
+}
+#actions {
+    order: -1;
+}
+.edu-system-message {
+    order: -2;
+}
+#main > .offset > .edu-system-message {
+    margin: 0;
+}
+.contenido {
+    order: 1;
+    min-height: 286px;
+    margin: 0 0 22px;
+    padding: 20px 20px 32px;
+    border: 1px solid #d2d2d2;
+    border-top: none;
+    background-color: #ffffff;
+    box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.10);
+    transition-duration: .2s;
+}
+/* ------
+   Footer
+   ------ */
+.wrapper_floating_components {
+    position: fixed;
+    bottom: 137px;
+    display: flex;
+    right: 26px;
+    flex-direction: column;
+    align-items: flex-end;
+    z-index: var(--floating-components-z-index);
+    gap: 14px;
+}
+.wrapper_floating_components.in_proctorizer {
+    bottom: 167px;
+}
+
+@media screen and (max-width: 430px) {
+    .wrapper_floating_components {
+        position: fixed;
+        bottom: 137px;
+        display: flex;
+        right: 5px;
+        flex-direction: column;
+        align-items: center;
+        z-index: var(--floating-components-z-index);
+    }
+}
+.backend .wrapper_floating_components {
+    right: auto;
+    left: 26px;
+    bottom: 50vh;
+    align-items: flex-start;
+}
+.footer_wrapper {
+    display: inline-block;
+    width: 100%;
+}
+
+#footer .powered_by {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px 4px;
+    background-color: #303030;
+}
+
+#footer .powered_by .footer_text {
+    flex: 1;
+    text-align: center;
+    font-weight: 300;
+    font-size: .875rem;
+    color: #ffffff;
+}
+
+#footer .revision {
+    font-size: .9rem;
+    color: #cccccc;
+}
+
+#footer .powered_by > a {
+    display: inline-block;
+    vertical-align: middle;
+    text-decoration: none;
+    opacity: .7;
+    transition-duration: .4s;
+}
+
+#footer .powered_by > a:hover {
+    opacity: 1;
+}
+/*--------------------------------------------------------------------*/
+
+/* Secciones sin menu */
+#section.sin_menu_secciones_aula {
+    float: none;
+    margin: var(--edu-front-section-margin) auto 0;
+}
+#section.sin_menu_secciones_aula #main {
+    float: none;
+    width: auto;
+}
+#section.sin_menu_secciones_aula #main > .offset {
+    display: block;
+    width: auto;
+    padding: 0 10px;
+}
+#section.sin_menu_secciones_aula #actions > .offset {
+    padding: 0;
+    transition: all .2s;
+}
+#section.sin_menu_secciones_aula .menu_variable + .contenido { margin-top: 12px; }
+
+/* Hack para IE11 */
+@media screen and (min-width:0\0) {
+    .menu_secciones,
+    #section,
+    .contenido { transition-duration: 0; }
+}
+
+.fade-out {
+    animation: fade-out 0.2s forwards;
+}
+
+.fade-in {
+    animation: fade-in 0.2s forwards;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fade-out {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}

@@ -1,0 +1,184 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+.uploader {
+    display: flex;
+    flex-direction: column;
+}
+.multi_control .uploader {
+    padding: 8px 0 0 22px;
+    box-sizing: border-box;
+}
+.uploaded_error { position:relative; }
+
+.uploader .warning {
+    width: auto;
+    margin: 6px 0;
+    padding: 6px 14px;
+}
+/* Usado para mostrar un error de subida de un archivo
+particular (ej: al subir archivo excedido de tamanio) */
+.uploader .warning.uploaded_error {
+    width: auto;
+    margin-left: 0;
+}
+
+/* ---------------------
+   Drag and drop - files
+   --------------------- */
+/* Contenedor dropeable para archivos */
+.container_file_simple { width: 80%; }
+
+.container_drop_area { gap: 8px; }
+
+.container_drop_area .drop_area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    min-width: 100%;
+    padding: 34px;
+    box-sizing: border-box;
+    border: 2px dashed #b2b2b2;
+    border-radius: 6px;
+    color: #4b4b4b;
+    background-color: #edf2f5;
+}
+.container_drop_area .drop_area:hover {
+    border: 2px dashed #5c97cb;
+    background-color: #e3f0f6;
+}
+.container_drop_area .drop_area .upload_bt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border: 2px solid #6c7b91;
+    border-radius: 45px;
+    color: #7d8faa;
+    background-color: #ffffff;
+}
+.container_drop_area .drop_area .upload_bt:hover {
+    color: #6c7b91;
+    border: 2px solid #6c7b91;
+    cursor: pointer;
+}
+.container_drop_area .drop_area .upload_icon { font-size: 1.813rem; }
+
+.container_drop_area .drop_area .info_drop {
+    font-size: 1.063rem;
+    font-weight: normal;
+}
+.container_drop_area .drop_area .info_drop .link_search {
+    font-size: 1.063rem;
+    font-weight: normal;
+    text-decoration: underline;
+    color: #1f5fb9;
+}
+.container_drop_area .drop_area .info_drop .link_search:hover {
+    text-decoration: none;
+    color: #1065dd;
+    cursor: pointer;
+}
+/* Arrastrando archivo sobre drop_area */
+.container_drop_area .drop_area.is_dragenter {
+    border: 2px dashed #5c97cb;
+    background-color: #e3f0f6;
+    cursor: pointer;
+}
+.container_drop_area .drop_area.is_dragenter .upload_bt {
+    transform: rotate(180deg);
+    color: #3375d2;
+    border-color: #3375d2;
+    transition: transform .2s;
+}
+
+/* Informacion sobre tamanio maximo de archivo (icono + texto) */
+.container_drop_area .additional_info_container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+/* Icono info tamanio maximo */
+.container_drop_area .additional_info_container svg { font-size: 1rem; }
+
+/* List items (drag n drop) */
+.container_drop_area .list_items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    margin-top: 5px;
+}
+.container_drop_area .only.list_items {
+    margin-top: 0;
+}
+
+/* Item (drag n drop) */
+.container_drop_area .item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid #dfdfdf;
+    border-radius: 4px;
+    color: #4d4d4d;
+    background-color: #F2F2F2;
+}
+.container_drop_area .item:hover { border: 1px solid #c7c7c7; }
+
+.container_drop_area .item .icon_item {
+    font-size: 2.188rem;
+    color: #5d5d5d;
+}
+.container_drop_area .item .file_description {
+    flex: 1;
+    overflow: hidden;
+}
+.container_drop_area .item .file_name {
+    font-size: 1rem;
+    line-height: 19px;
+    font-weight: normal;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    padding-left: 0;
+    padding-right: 0;
+    color: inherit;
+}
+.container_drop_area .item .file_size {
+    margin-top: 3px;
+    font-size: 0.813rem;
+    line-height: 13px;
+    font-weight: bold;
+    color: inherit;
+}
+.container_drop_area .item .btn_delete {
+    height: fit-content;
+    margin: 0;
+    padding: 0;
+    line-height: 0;
+    border: none;
+    color: #4D4D4D;
+    background-color: transparent;
+    cursor: pointer;
+}
+.container_drop_area .item .btn_delete:hover { color: #131313; }
+
+.container_drop_area .item .btn_delete svg { font-size: 1.438rem; }
+
+.container_drop_area .item.link:hover {
+    background-color: #d0d0d0ba;
+    cursor: pointer;
+}
+
+@media only screen and (max-width : 650px) {
+    .uploader .warning {
+        margin-left: 0;
+    }
+}

@@ -1,0 +1,370 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+:root{
+    --programa-color-curso: var(--variable-color-curso);
+}
+
+/* **********
+* Generales *
+*********** */
+html,
+body { scroll-behavior: smooth; }
+
+/* *****************
+* barras de avance *
+* ******************/
+.avance,
+.avance .porc_avance { box-sizing: border-box; }
+
+.avance {
+    position: relative;
+    height: 22px;
+    min-width: 100px;
+    border: 1px solid #b9b9b9;
+    background-color: #ffffff;
+    transition-duration: .2s;
+}
+.avance .texto_porc_avance {
+    position: absolute;
+    top: 2px;
+    left: 6px;
+    font-size: .8rem;
+    color: #6e6e6e;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+}
+
+.avance .porc_avance {height: 100%; display: inline-block; position: relative; z-index: 1; vertical-align: top; overflow: hidden; background: #adadad; }
+
+.avance .porc_avance .texto_porc_avance { color: #fff; top: 2px; left: 5px; white-space: nowrap; font-weight: 700; }
+
+
+/* **************************
+* Informacion sobre un item *
+*************************** */
+.informacion_item {
+    margin: 0 0 24px;
+    background-color: #ffffff;
+    background-repeat: no-repeat;
+    background-position: left 16px;
+}
+
+/* contenedor icono, avatar y titulo */
+.informacion_item .cont_row_title {
+    align-items: flex-start;
+    flex-direction: column;
+    border-bottom: 2px solid #ebebeb;
+    padding-bottom: 14px;
+}
+
+.align-center { display: flex; align-items: center; }
+
+.informacion_item .avatar_container { display: inline-block; position: relative; margin-right: 12px; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 1px solid white; }
+.informacion_item .avatar_container img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+
+.formulario .con_alcance .svg-inline--fa.fa-chart-network { margin-left: 3px; color: #8a2be2; font-size: 1rem; } /* icono alcance selectivo */
+.informacion_item .titulo   {
+    margin-bottom: 4px;
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: normal;
+    white-space: normal;
+    line-height: 1.9rem;
+    color: #555555;
+    border-color: var(--programa-color-curso);
+}
+
+/* icono con alcance */
+.informacion_item h1 span.con_alcance { color: #969696; font-size: 1rem; margin-left: 3px; }
+.listado_usuarios .con_alcance {
+    margin: 0 8px;
+    font-size: .688rem;
+    color: #969696;
+}
+
+span.publicado_por { line-height: 1.4rem; }
+
+.informacion_item .box_porc_avance {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 12px;
+    border: 1px solid #e8e8e8;
+    border-top: none !important;
+    -webkit-box-shadow: 2px 2px 4px 0px rgba(0,0,0,0.1);
+    -moz-box-shadow: 2px 2px 4px 0px rgba(0,0,0,0.1);
+    box-shadow: 2px 2px 4px 0px rgba(0,0,0,0.1);
+}
+
+.avance.obligatorio .porc_avance     { background-color: var(--theme-item-aprobado-color); }
+.avance.opcional .porc_avance        { background-color: var( --theme-item-opcional-color ); }
+.informacion_item .avance {
+    display: inline-block;
+    width: 126px;
+    background-color: #f0f0f0;
+}
+.informacion_item .avance .texto_porc_avance { left: 10px; }
+.informacion_item .desc_avance {
+    margin-right: 10px;
+    font-size: .8rem;
+    color: #757575;
+}
+.informacion_item.list_realiz_item_doc { padding-left: 50px }
+
+.informacion_item.con_icono { background-position: inherit; }
+
+.informacion_item .icono {
+    color: var(--theme-item-obligatorio-color);
+    margin-right: 3px;
+}
+
+.informacion_item .leyenda_fechas {
+    font-size: .8rem;
+    color: #6e6e6e;
+    margin-top: 2px;
+}
+/* ----------------
+   Listado de Items
+   ---------------- */
+.titulo_items {
+    margin-bottom: 5px;
+    padding: 2px 0 2px;
+    font-size: 1.125rem;
+    font-weight: 300;
+    line-height: 1.2rem;
+    color: #8a8a8a;
+    border-bottom: 1px solid #cecece;
+}
+.listado_items {
+    margin: 0;
+    padding: 0;
+    list-style: none
+}
+.listado_items .item {
+    margin-bottom: 1px;
+    background-color: #f5f5f5;
+    transition: background .5s;
+}
+.item .datos {
+    display: flex;
+    align-items: center;
+    width: 66%;
+    margin-right: auto;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.item .metadatos {
+    display: flex;
+    gap: 12px;
+}
+.item .cont_flags_revisar {
+    display: flex;
+    gap: 8px;
+}
+.item .metadatos .condicion {  }
+
+.item .fecha {
+    font-style: italic;
+    color: #757575;
+}
+.item .cont_fecha_estado {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+.item .metadatos .estado {  }
+
+.item .metadatos .nombre_gt {
+    margin-right: 10px;
+    font-size: .9rem;
+    color: #8b8b8b;
+}
+
+@media only screen and (max-width : 720px) {
+    .item .metadatos .nombre_gt {
+        display:block;
+        margin-right: 0;
+        font-size: .875rem;
+        color: #8b8b8b;
+    }
+}
+
+.item .titulo {
+    text-decoration: none;
+    color: #000000;
+    border-color: var(--programa-color-curso);
+}
+.item .titulo:hover { color: #2766be; }
+
+.item .condicion {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 12px;
+    text-decoration: none;
+    border-right: 1px dotted #c0a8a8;
+    color: #b6bbb9;
+    white-space: nowrap;
+    background-position: right 1px;
+    background-repeat: no-repeat;
+}
+.item a.condicion { transition-duration: .4s; }
+
+.item a.condicion.obligatorio:hover { color: #c44135; }
+.item .condicion.obligatorio { color: var(--theme-item-obligatorio-color); }
+
+.item a.condicion.opcional:hover { color: #528bc8; }
+.item .condicion.opcional { color: var( --theme-item-opcional-color ); }
+
+.item .avance { display: inline-block; vertical-align: middle; text-align: left; }
+
+.item .icono { line-height: 0; }
+
+.item .link_icono { text-decoration: none }
+
+/* -------------------
+   Listado de usuarios
+   ------------------- */
+.listado_usuarios {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+/* en el listado de usuarios el nombre, apellido va alineado con la foto */
+.listado_usuarios .item {
+    display: flex;
+    align-items: center;
+    min-height: 39px;
+    padding: 10px 14px 10px 10px;
+    font-size: .875rem;
+    border-bottom: 1px dotted #aaaaaa;
+    background-color: #ffffff;
+    transition: none;
+}
+.listado_usuarios .item:hover { background-color: var(--theme-list-bg-color_hover); }
+
+.listado_usuarios .item:hover .avance {
+    transform: scale(1.08);
+    opacity: 1;
+    background-color: #ffffff;
+}
+.listado_usuarios .item .icono {
+    height: 28px;
+    width: 28px;
+    border-radius: 50%;
+    vertical-align: middle;
+    object-fit: cover;
+}
+.listado_usuarios .item .titulo {
+    display: block;
+    margin-left: 10px;
+    font-weight: normal;
+    color: #313131;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+.listado_usuarios .item .titulo:hover {
+    text-decoration: underline;
+    color: #2766be;
+}
+.listado_usuarios .item .user_desactivado { color: #999999; }
+
+.listado_usuarios .item.user_desactivado { background-color: var(--theme-desactivas); }
+
+.listado_usuarios .avance .porc_avance { background-color: #27be7f; }
+
+.informacion_item.con_icono .avance .porc_avance { background-color: #27be7f; }
+
+/* Mensaje cuando no hay resultados que satisfagan la busqueda */
+.msg_busqueda_sin_resultados {
+    margin: 10px 0;
+    padding: 40px 20px;
+    font-size: .875rem;
+    text-align: center;
+    border: dashed 1px #b2b2b2;
+}
+
+/* ***********************************************
+* comunes entre listados y cartel de referencias *
+************************************************ */
+.listado_items .item { padding: 8px 12px; }
+
+
+/* *************************
+* Listado de realizaciones *
+************************** */
+#listado_realizaciones { margin-top: 15px }
+
+.previsualizacion_item          { margin: 20px 5px 10px; }
+.previsualizacion_item a        { color: #2766be; text-decoration: none; }
+.previsualizacion_item a:hover  { text-decoration: underline; }
+
+
+/*------------------------ */
+
+
+/* **********
+* Paginador *
+*********** */
+
+/* spinner */
+.listado_usuarios-spinner { background: #ddd url(../img/comunes/spinner.gif) no-repeat center; }
+
+ /* *****************
+  * Navegador items *
+ ****************** */
+.nav_items {
+    order: 3;
+    display: flex;
+    align-items: center;
+    width: auto;
+    margin: -6px 0 80px;
+    transition-duration: .2s;
+}
+.contenido .nav_items  { margin: 50px 15px; }
+
+.nav_items .nombre_item {
+    flex-grow: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    color: #6f6f6f;
+    position: relative;
+    overflow: visible;
+}
+.nav_items .nombre_item > div       { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); padding: 0 10px; font-size: .9em; }
+.nav_items .nombre_item .siguiente  { text-align: right; }
+
+.nav_items .inaccesible          { opacity: .25; cursor: default; pointer-events: none; }
+
+
+.search_input_container .clear_search_icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    text-decoration: none;
+    padding: 4px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.search_input_container .clear_search_icon:hover {
+    color: #666;
+}
+
+.search_input_container .clear_search_icon i {
+    font-size: 14px;
+}

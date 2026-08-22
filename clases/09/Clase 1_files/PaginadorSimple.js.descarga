@@ -1,0 +1,933 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+
+/**
+ * Evento disparado antes antes de actualizar una pagina (antes de realizar el request de ajax)
+ * @name #beforeUpdate
+ * @event
+*/
+
+/**
+ * Evento disparado casa vez que se carga una nueva pagina
+ * @name #update
+ * @event
+*/
+
+/**
+  Objeto utilizado para definir un header la clase {@link Educativa.Paginador}.
+  @name PaginadorHeader
+  @class
+  @param {String} id Id del header.
+  @param {String} tipo Tipo de dato del header: integer|date|string|select.
+  @param {Bool} sort  Es un campo ordenable
+  @param {Bool} search Es un campo por el cual nos interese buscar
+  @param {String} nombre Nombre con el cual se mostrara el header.
+
+ */
+
+/**
+    Implementa un paginador de datos. Se encarga solo de la gestion de los datos paginados.
+    Esta pensado para que pueda asociarse a cuantos tipos de vistas sean necesarias.
+
+    @param options Parametros del constructor.
+    @param {String} options.id Utililizado junto al modulo {@link Educativa.AjaxHistory}
+    @param {String} options.source_url Url para actualizar los datos de la pagina mediante Ajax.
+    @param {Object} [options.source_params] Parametros a agregar cada vez que se llama a source_url.
+    @param {Number} options.page_size Cantidad de registros por pagina.
+    @param {Number} options.total_registros Total de registros.
+    @param {String} options.orden Columna por la cual se ordenara por defecto.
+    @param {PaginadorHeader[]} [options.headers]: Encabezados del paginador. ver Educativa.Paginador.addHeader().
+
+    @borrows #event:beforeUpdate as this.event:beforeUpdate
+    @borrows #event:update as this.event:update
+
+    @example
+ var pg = new Educativa.Paginador({
+     id: 'pg_foo',
+     source_url: '?',
+     source_params: { wAccion : 'listado_eventos_ajax', wPartial: 1 },
+     page_size: 20,
+     total_registros : 20,
+     orden: this.orden || 'id',
+     headers: [
+         { id    : 'id',
+           tipo  : 'integer',
+           sort  : 0,
+           search : 1,
+           nombre : 'Identificador' },
+         { id    : 'nombre',
+           tipo  : 'string',
+           sort  : 0,
+           search : 1,
+           nombre : 'Nombre' }
+    ]
+ });
+
+ pg.observe('beforeUpdate', function (){ alert('cargando pagina...' });
+ pg.observe('update', function (){ alert('PAGINA CARGADA!!!' });
+
+  @extends Educativa.Observable
+  @class
+*/
+Educativa.Paginador = Class.create(Educativa.Observable,
+/** @lends Educativa.Paginador# */
+{
+    /** @private */
+    initialize : function(args) {
+
+        this.options = {
+            url_json : '',
+            total_registros : 0,
+            page_size : 20,
+            ajax: true, //determina si carga las paginas mediante ajax
+            elements: null, // array con los elementos
+            id: 'paginador',
+            gotoCallback: null
+        };
+
+        Object.extend( this.options, args);
+        Object.extend( this.options.source_params, {
+            page_size: this.options.page_size
+        });
+
+        this.headers = new Array();
+        this.data = new Array();
+        this.ajax_data = null;
+
+        var self = this;
+        this.options.headers.each(function(h){ self.addHeader(h) });
+
+        this.paginaInicial = {
+            page : (this.options.page || 1),
+            total_registros : this.options.total_registros,
+            order : (this.options.order || this.headers[0].id),
+            order_asc : this.options.hasOwnProperty('order_asc') ? this.options.order_asc : true,
+            filter : (this.options.filter || ''),
+            keywords : (this.options.keywords || ''),
+            filter2 : (this.options.filter2 || ''),
+            keywords2 : (this.options.keywords2 || '')
+        };
+
+        this.paginaActual = Object.clone(this.paginaInicial);
+
+    },
+
+    /**
+    Carga mediante ajax la pagina indicada
+    @example
+     pg.loadPagina({
+          page : 3,           // (integer). Nro de pagina
+          order : 'nombre',   // (headerID). Columna de orden
+          order_asc : 1,      // (1 | 0). Orden ascendente?
+          filter : 'nombre',  // (headerID | ''). Columna de filtrado.
+          keywords : 'john'   // (string). Palabras de filtrado.
+     });
+    */
+    loadPagina : function (pagina, no_action) {
+        var self = this;
+
+        if( ! pagina ) return ; //retornamos en caso de que no se especifique una pagina, caso onHistoryChange
+
+        var params = this.options.source_params;
+        Object.extend( params, pagina );
+
+        this.fire('beforeUpdate');
+
+        new Ajax.Request( this.options.source_url, {
+            parameters : params,
+            onSuccess: function(response) {
+                try { var json = response.responseText.evalJSON(); }
+                catch(e){
+                    console.log('Error: '+e);
+                }
+                // actualizar info de pagina:
+                self.ajax_data = json.data;
+                pagina.total_registros = json.data.total_registros;
+                self.setPagina( pagina, json.data.rows, no_action);
+
+            },
+            onFailure : function(response) {
+                var mssg_alerta = Educativa.Dict.NO_SE_PUDO_CARGAR_LA_PAGINA
+                  ? 'NO_SE_PUDO_CARGAR_LA_PAGINA'.term()
+                  : '\u00A1No se pudo cargar la p\u00E1gina!' ;
+
+                alert(mssg_alerta);
+            }
+        });
+    },
+
+    /**
+     Configura el paginador en la pagina 'pagina' con los datos 'rows'.
+     @example
+     pg.setPagina({
+          page : 3,           // (integer). Nro de pagina
+          order : 'nombre',   // (headerID). Columna de orden
+          order_asc : 1,      // (1 | 0). Orden ascendente?
+          filter : 'nombre',  // (headerID | ''). Columna de filtrado.
+          keywords : 'john'   // (string). Palabras de filtrado.
+          page_size : 20      // (integer). Opcional. cantidad de registros por pagina.
+          total_registros : 90// (integer). Opcional. cantidad total de registros en todas las paginas.
+     }, [ { "come rows datas" } ] );
+    */
+    setPagina : function (pagina, rows, no_add ) {
+
+        var self = this;
+        this._validatePagina(pagina); // debug
+        if( rows.length == 0 && pagina.page > 1){
+            this.gotoPagina( pagina.page - 1, true );
+            return;
+        }
+
+        Object.extend(this.paginaActual, pagina);
+
+        this._clearData();
+        rows.each(function(e) { self._addData(e); } );
+        this.fire('update');
+    },
+
+    /**
+     Agrega un encabezado al paginador.
+     @example
+     pg.addHeader({
+          id    : 'id',      // (string). Identificador del encabezado.
+          tipo  : 'integer', // (integer|date|string|select). Tipo de datos del encabezado.
+          sort  : 0,         // (1 | 0). Se puede ordenar por esta columna?
+          search : 1,        // (1 | 0). Se puede buscar por esta columna?
+          nombre => 'Ident.' // (string). Nombre descriptivo.
+     });
+    */
+    addHeader : function (header) {
+        this.headers.push(header);
+        this.cachedHeaders = null;
+    },
+
+    /**  obtiene array de encabezados */
+    getHeaders : function () { return this.headers },
+
+    /** obtiene los datos de la pagina */
+    getData : function () { return this.data },
+
+    /** Obtiene el headerID del encabezado por el cual esta ordenada la pagina actual */
+    getOrden : function() { return this.paginaActual.order },
+
+    /** la pagina actual esta ordenada de manera ascendente? */
+    getOrdenAsc : function() { return this.paginaActual.order_asc },
+
+    /** Obtiene el NUMERO de la pagina actual */
+    getPaginaActual : function () { return this.paginaActual.page || 1 },
+
+    /** Calcula la cantidad de paginas */
+    getCantidadPaginas : function() {
+        var p = this.paginaActual;
+        return parseInt(p.total_registros / this.options.page_size)
+               + (p.total_registros % this.options.page_size?1:0);
+    },
+
+    getTotalRegistros: function(){ return this.paginaActual.total_registros },
+
+    getFilter: function() { return this.paginaActual.filter},
+
+    getFilter2: function() { return this.paginaActual.filter2},
+
+    getKeywords : function() { return this.paginaActual.keywords},
+
+    getKeywords2 : function() { return this.paginaActual.keywords2},
+
+    /** Devuelve el JSON parseado crudo de los datos que haya obtenido en la ultima llamada ajax. */
+    getAjaxData : function() { return this.ajax_data   },
+
+    /**  limpia los datos del paginador (no dispara eventos)
+     * @private   */
+    _clearData : function () { this.data = new Array(); },
+
+    /** agrega una fila de datos
+     * @private */
+    _addData : function (datarow) { this.data.push(datarow); },
+
+    /*
+    Va a la pagina 'numero' si existe e intenta cargarla.
+    Mantiene el orden y filtros actuales. */
+    gotoPagina : function (nro, force){
+        if( this.options.gotoCallback ) {
+            var r = this.options.gotoCallback(nro);
+            nro = r[0];
+            force = r[1] || force;
+        }
+        if (nro <= 0) nro = 1;
+        if (nro > this.getCantidadPaginas() ) nro = this.getCantidadPaginas();
+        if (nro == this.paginaActual.page && ! force) return;
+        var p = this.paginaActual;
+        this.loadPagina({
+            page : nro,
+            order : p.order,
+            order_asc : p.order_asc,
+            filter : p.filter,
+            keywords : p.keywords,
+            filter2 : p.filter2,
+            keywords2 : p.keywords2
+        });
+    },
+
+    /** Agrega source_params. Los mismos se envian en cada mensaje al server */
+    setSourceParam: function(k,v){
+        this.options.source_params[k] = v;
+    },
+
+    /** Cambia el tamanio de pagina y recarga desde pagina 1 */
+    setPageSize : function( newSize ) {
+        this.options.page_size = newSize;
+        this.options.source_params.page_size = newSize;
+        this.gotoPagina( 1, true );
+    },
+
+    /** Ordena por el encabezado 'idHeader' de manera ascendente si 'asc' == 1.
+        Va a la primer pagina y mantiene filtros actuales. */
+    setOrden : function (idHeader, asc) {
+        var p = this.paginaActual;
+        if (p.order == idHeader && p.order_asc == asc) return false;
+        this.loadPagina({
+            page : 1,
+            order : idHeader,
+            order_asc : (asc?1:0),
+            filter : p.filter,
+            keywords : p.keywords,
+            filter2 : p.filter2,
+            keywords2 : p.keywords2
+        });
+        return true;
+    },
+
+    /** Filtra por el encabezado 'idHeader', utilizando las palabras 'keywords'.<br/>
+        extras se usa para pasar informacion adicional desde el buscador<br/>
+        Va a la primer pagina y mantiene el orden actual. */
+    setFiltro : function (idHeader, keywords, extras) {
+        var p = this.paginaActual;
+        this.loadPagina({
+            page : 1,
+            order : p.order,
+            order_asc : p.order_asc,
+            filter : idHeader,
+            'keywords' : keywords,
+            'extras' : extras,
+            filter2 : p.filter2,
+            keywords2 : p.keywords2
+        });
+        return true;
+    },
+
+    /** En caso de que se quiera un filtro extra */
+    setFiltro2 : function( name, value){
+        var p = this.paginaActual;
+        this.loadPagina({
+            page : 1,
+            order : p.order,
+            order_asc : p.order_asc,
+            filter : p.filter,
+            keywords : p.keywords,
+            filter2 : name,
+            keywords2 : value
+        });
+        return true;
+    },
+
+    getHeader : function (idHeader) {
+        // creo un objeto de la forma { idHeader1 : header1info, idHeader2 : header2info }
+        // para acceder mas rapidamente a la info de un encabezado.
+        if (!this.cachedHeaders){
+            var self = this;
+            this.cachedHeaders = new Object();
+            this.headers.each( function(h){
+                self.cachedHeaders[h.id] = h;
+            });
+        }
+        return this.cachedHeaders[idHeader];
+    },
+
+    /** @private */
+    _validatePagina : function (pagina) {
+        try {
+            if (typeof pagina.page === 'undefined') throw "no page number";
+            if (typeof pagina.order === 'undefined') throw "no page order";
+            if (typeof pagina.order_asc === 'undefined') throw "no page order direction";
+            if (typeof pagina.filter === 'undefined') throw "no page filter";
+            if (typeof pagina.keywords === 'undefined') throw "no page keywords";
+        } catch (e) {
+            //console.log('ERROR:: ' + e);
+        }
+    },
+
+    addItem: function(item){ //
+        this.paginaActual.total_registros++;
+    },
+
+    removeItem: function(item){
+        this.paginaActual.total_registros--;
+    }
+});
+
+
+
+Educativa.Paginador.Vista = Class.create(
+/** @lends Educativa.Paginador.Vista# */
+{
+    id: 'paginadorSimpleVista',
+
+    /**#@+
+     @private
+    */
+    initialize : function(args) {
+        // args.paginador
+        // args.target : pseudo id
+        Object.extend( this, args);
+        this.paginador.observe('update', this.onUpdatePaginado.bind(this));
+    },
+
+    setBuscador : function( buscador ) {
+        this.buscador = buscador;
+    },
+
+    // eventos de paginador
+    onUpdatePaginado : function (paginador) {
+        this.renderPageButtons();
+        if( this.buscador ){
+            var filter = this.paginador.getFilter();
+            if( filter ) this.buscador.combo.value = filter;
+            this.buscador.renderInputText( this.paginador.getKeywords() );
+        }
+
+    },
+
+    //actualiza el paginador (info, select de paginas, nav buttons)
+    renderPageButtons : function () {
+        var pg = this.paginador;
+        var cantPags = pg.getCantidadPaginas();
+        var pagActual = pg.getPaginaActual();
+        var totalReg = pg.getTotalRegistros();
+        var pageSize = pg.options.page_size;
+
+        // Sync size select (top y bottom comparten paginador)
+        if ( this.pageControl.sizeSelect
+             && parseInt( this.pageControl.sizeSelect.value, 10 ) !== pageSize ) {
+            this.pageControl.sizeSelect.value = pageSize;
+        }
+
+        // Info: "Mostrando: <strong>X - Y</strong> / Z"
+        // Prototype.update() acepta HTML. Valores enteros calculados -> seguro.
+        if ( totalReg > 0 ) {
+            var desde = ( ( pagActual - 1 ) * pageSize ) + 1;
+            var hasta = Math.min( pagActual * pageSize, totalReg );
+            var mostrando = 'TABLA_INTERACTIVA_MOSTRANDO'.termcap();
+            this.pageControl.info.update(
+                mostrando + ': <strong class="paginador_info_rango">' + desde + ' - ' + hasta + '</strong> / ' + totalReg
+            );
+        } else {
+            var registros = 'PAGINADOR_ITEMS'.termcap().toLowerCase();
+            this.pageControl.info.update( '0 ' + registros );
+        }
+
+        // Select de paginas
+        var pageSelect = this.pageControl.pageSelect;
+        pageSelect.update();
+        for ( var i = 1; i <= cantPags; i++ ) {
+            var option = new Element( 'option', { value: i } ).update( i );
+            if ( i === pagActual ) option.selected = true;
+            pageSelect.insert( option );
+        }
+
+        // "de N"
+        var deTxt = 'DE'.termcap().toLowerCase();
+        this.pageControl.paginasTotal.update( deTxt + ' ' + cantPags );
+
+        // Nav buttons disabled state
+        if ( pagActual <= 1 ) {
+            this.pageControl.btnPrev.addClassName( 'is_disabled' );
+        } else {
+            this.pageControl.btnPrev.removeClassName( 'is_disabled' );
+        }
+        if ( pagActual >= cantPags ) {
+            this.pageControl.btnNext.addClassName( 'is_disabled' );
+        } else {
+            this.pageControl.btnNext.removeClassName( 'is_disabled' );
+        }
+
+        // Render condicional segun cantidad de registros y paginas.
+        // 0 reg -> widget completo oculto (#18418); 1 pag -> tamanio + info;
+        // 2+ pag -> tamanio + info + paginas + nav.
+        // Idempotente tras AJAX. Prototype.remove() pide guarda de parentNode.
+        var pc = this.pageControl;
+        if ( totalReg === 0 ) {
+            pc.container.addClassName( 'hidden' );
+        } else {
+            pc.container.removeClassName( 'hidden' );
+            if ( !pc.tamanio.parentNode ) {
+                pc.content.insertBefore( pc.tamanio, pc.info );
+            }
+        }
+        if ( cantPags <= 1 ) {
+            if ( pc.paginas.parentNode ) pc.paginas.remove();
+            if ( pc.nav.parentNode )     pc.nav.remove();
+        } else {
+            if ( !pc.paginas.parentNode ) pc.content.insert( pc.paginas );
+            if ( !pc.nav.parentNode )     pc.container.insert( pc.nav );
+        }
+    },
+
+    onBtnPageClick : function (e, pagenro) {
+        this.paginador.gotoPagina(pagenro);
+    },
+    onBtnNextClick : function (e) {
+        this.paginador.gotoPagina(this.paginador.getPaginaActual()+1);
+    },
+    onBtnPrevClick : function (e) {
+        this.paginador.gotoPagina(this.paginador.getPaginaActual()-1);
+    },
+    onBtnFirstClick : function (e) {
+        this.paginador.gotoPagina(1);
+    },
+    onBtnLastClick : function (e) {
+        this.paginador.gotoPagina(this.paginador.getCantidadPaginas());
+    },
+    getHeader: function(id){
+        return this.paginador.getHeaders().find( function(e){ return e.id == id} );
+    },
+
+    /**#@-*/
+
+    /**
+     Dibuja un control de paginas vinculado con el paginador.<br/>
+     [FIRST][PREV][i-3][i-2][i-1][i][i+1][i+2][i+3][NEXT][LAST]
+     ... donde i es el numero de pagina actual. <br/>
+     Si se pasa 'reducido' en el parametro modo, no renderiza la leyenda y los botones [FIRST] y [LAST]
+     @return {Element} Elemento que contiene los controles para paginar.
+    */
+    renderPageControl : function(modo) {
+
+        var self = this;
+        this.pageControl = new Object();
+
+        // Container principal
+        this.pageControl.container = new Element('div', { 'class' : 'paginador' });
+
+        // Contenedor del contenido (tamanio + info + paginas) con lineas
+        // grises horizontales. Los botones nav van como hermano, afuera.
+        var content = new Element('div', { 'class' : 'paginador_content' });
+        this.pageControl.content = content;
+        this.pageControl.container.insert( content );
+
+        // Tamanio de pagina: "Mostrar [20 v] registros"
+        var tamanio = new Element('div', { 'class' : 'paginador_tamanio' });
+        tamanio.insert( 'MOSTRAR'.termcap() + ': ' );
+
+        var eduSelectSize = new Element('div', {
+            'class' : 'edu-select edu-select-sm edu-select-secondary'
+        });
+        var eduSelectSizeWrapper = new Element('div', { 'class': 'edu-select-wrapper' });
+        var sizeSelect = new Element('select', { 'class' : 'paginador_select_tamanio' });
+
+        var currentSize = this.paginador.options.page_size;
+        var sizes = ( this.paginador.options.page_sizes || [ 20, 50, 100 ] ).slice();
+        if ( sizes.indexOf( currentSize ) === -1 ) sizes.push( currentSize );
+        sizes.sort(function( a, b ){ return a - b; });
+        sizes.each(function( size ){
+            var opt = new Element('option', { value: size }).update( size );
+            if ( size === currentSize ) opt.selected = true;
+            sizeSelect.insert( opt );
+        });
+
+        Event.observe( sizeSelect, 'change', function() {
+            var newSize = parseInt( sizeSelect.value, 10 );
+            if ( newSize ) self.paginador.setPageSize( newSize );
+        });
+
+        eduSelectSizeWrapper.insert( sizeSelect );
+        eduSelectSize.insert( eduSelectSizeWrapper );
+        tamanio.insert( eduSelectSize );
+        tamanio.insert( ' ' + 'PAGINADOR_ITEMS'.termcap().toLowerCase() );
+
+        this.pageControl.sizeSelect = sizeSelect;
+        this.pageControl.tamanio = tamanio;
+        content.insert( tamanio );
+
+        // Info: "Mostrando: X - Y de Z"
+        var info = new Element('div', { 'class' : 'paginador_info' });
+        this.pageControl.info = info;
+        content.insert( info );
+
+        // Paginas: "Pagina: [select] de N"
+        var paginas = new Element('div', { 'class' : 'paginador_paginas' });
+
+        var paginasLabel = new Element('span', { 'class' : 'paginador_pagina_label' });
+        paginasLabel.update( 'PAGINA'.termcap() + ':' );
+        paginas.insert( paginasLabel );
+
+        var eduSelect = new Element('div', {
+            'class' : 'edu-select edu-select-sm edu-select-secondary'
+        });
+        var eduSelectWrapper = new Element('div', { 'class': 'edu-select-wrapper' });
+        var pageSelect = new Element('select', { 'class' : 'paginador_select_pagina' });
+
+        Event.observe( pageSelect, 'change', function() {
+            var nro = parseInt( pageSelect.value, 10 );
+            if ( nro ) self.paginador.gotoPagina( nro, true );
+        });
+
+        eduSelectWrapper.insert( pageSelect );
+        eduSelect.insert( eduSelectWrapper );
+        paginas.insert( eduSelect );
+
+        var paginasTotal = new Element('span', { 'class' : 'paginador_paginas_total' });
+        paginas.insert( paginasTotal );
+
+        this.pageControl.pageSelect = pageSelect;
+        this.pageControl.eduSelect = eduSelect;
+        this.pageControl.paginasTotal = paginasTotal;
+        this.pageControl.paginas = paginas;
+
+        // Nav: prev / next
+        var nav = new Element('div', { 'class' : 'paginador_nav' });
+
+        var btnPrev = new Element('a', { 'class' : 'paginador_nav_btn' });
+        btnPrev.title = 'PAGINA_ANTERIOR'.termcap();
+        btnPrev.update('<i class="fas fa-chevron-left"></i>');
+        Event.observe( btnPrev, 'click', this.onBtnPrevClick.bindAsEventListener( this ) );
+        this.pageControl.btnPrev = btnPrev;
+        nav.insert( btnPrev );
+
+        var btnNext = new Element('a', { 'class' : 'paginador_nav_btn' });
+        btnNext.title = 'PAGINA_SIGUIENTE'.termcap();
+        btnNext.update('<i class="fas fa-chevron-right"></i>');
+        Event.observe( btnNext, 'click', this.onBtnNextClick.bindAsEventListener( this ) );
+        this.pageControl.btnNext = btnNext;
+        nav.insert( btnNext );
+
+        this.pageControl.nav = nav;
+
+        this.renderPageButtons();
+
+        return this.pageControl.container;
+    },
+
+    /**
+      Dibuja un buscador vinculado con el paginador.
+      @return {Element} Elemento que contiene al buscador.
+    */
+    renderBuscador : function () {
+
+        // Usar Educativa.Paginador.Buscador como buscador por defecto
+        if ( !this.buscador ) this.buscador = new Educativa.Paginador.Buscador({ paginador: this.paginador });
+
+        this.buscador.setCombo();
+        return this.buscador.renderBuscador();
+    }
+
+
+});
+
+/**
+ Dibuja un buscador asociado al paginador. No suele utilizarse directamente.
+ Ver {@link Educativa.Paginador.Vista#renderBuscador}
+ @class
+*/
+Educativa.Paginador.Buscador = Class.create({
+
+    initialize : function(args) {
+        // Combo campos
+        this.paginador = args.paginador;
+
+    },
+
+    // Combo de campos de busqueda
+    setCombo : function(args) {
+        this.combo = new Element('select', { });
+
+        var filter_default = this.paginador.options.filter_default;
+        var self = this;
+        var setted = false;
+        this.paginador.getHeaders().each( function(h) {
+            if (h.search){
+                var attr = { value : h.id };
+
+                if ( ( !filter_default && !setted ) || filter_default === h.id ) {
+                    setted = h.id;
+                    attr.selected = true;
+                }
+                self.combo.insert(new Element('option', attr ).update(h.nombre) );
+            }
+        });
+        this.combo.value = setted;
+        Event.observe(this.combo, 'change', this.onComboChange.bindAsEventListener(this));
+    },
+
+    // renderBuscador()
+    // Dibuja un buscador vinculado con el paginador
+    // [texto        ] [BUSCAR][LIMPIAR]
+    renderBuscador : function () {
+        // Input Search
+        this.input_wrapper = new Element('span',{ className: 'inputWrapper' });
+
+        this.btn_group = new Element('span',{ className: 'edu-btn-group edu-btn-group-margin' });
+        this.btnSearch = new Element('input', {
+            'class' : 'edu-btn edu-btn-secondary',
+            type : 'button',
+            value : 'BUSCAR'.termcap()
+        });
+        Event.observe(this.btnSearch, 'click', this.onBtnSearchClick.bindAsEventListener(this));
+
+        // Boton todos
+        this.btnClear = new Element('input', {
+            'class' : 'edu-btn edu-btn-secondary',
+            type : 'button',
+            value : "TODOS".term().capitalize()
+        });
+        Event.observe(this.btnClear, 'click', this.onBtnClearClick.bindAsEventListener(this));
+        this.btn_group
+            .insert( this.btnSearch )
+            .insert( this.btnClear );
+
+        this.container = new Element('div', {'class' : 'paginadorvista-buscador'});
+        this.container.insert( new Element('span', { id: 'label_busqueda' }).update("BUSQUEDA".term().capitalize()) );
+        this.container.insert( this.input_wrapper );
+        this.container.insert( this.combo );
+        this.container.insert( this.btn_group );
+
+        //va despues por el calendario
+        this.renderInputText();
+
+        return this.container;
+    },
+
+    renderInputText: function( value ){ //uso interno
+        var def = this.paginador.getHeader($F(this.combo));   // DEV : Depende del paginador
+
+        if( ! def ) return; //error debug IE7
+        if( ( def.tipo == 'string' || def.tipo == 'integer' ) ){
+            this.input = new Element('input', {
+                'class' : 'text',
+                type : 'text',
+                maxlength : 255,
+                value: value || '',
+                placeholder: 'BUSCAR'.termcap()+'...'
+            });
+            this.input_wrapper.update(this.input);
+        } else if ( def.tipo == 'select' ) {
+             var combo = this.input = new Element('select',{ className: 'inputSelect', style: 'text-align: left' });
+             def.values.each( function(h) {
+                 combo.insert(new Element('option',{ value : h.value }).update(h.label) );
+             });
+             combo.value = value || '';
+             this.input_wrapper.update(this.input);
+             var myself = this;
+             combo.observe( 'change', function() {
+                 myself.paginador.setFiltro(                          // DEV : Depende del paginador
+                     myself.combo.options[myself.combo.selectedIndex].value,
+                     myself.input.value
+                 );
+             });
+        } else if ( def.tipo == 'date' ) {
+            this.input = new Element('input',{
+                id : this.id+'-'+def.id,
+                type:'text',
+                value: value || Educativa.Utils.dateFormatDate( new Date() ),
+                className: 'dateInput',
+                readonly: 'readonly',
+                placeholder: 'BUSCAR'.termcap()+'...'
+            });
+            this.input_wrapper.update(this.input)
+            var myself = this;
+            Calendar.setup({
+                inputField     : this.id+'-'+def.id,
+                ifFormat       : "%d/%m/%Y",
+                step           : 1,
+                showsTime      : false,
+                timeFormat     : '24',
+                onUpdate       : function(cal){
+                    myself.paginador.setFiltro(                          // DEV : Depende del paginador
+                        myself.combo.options[myself.combo.selectedIndex].value,
+                        Educativa.Utils.dateFormatDate(cal.date)
+                    );
+                },
+                date           : new Date()
+            });
+
+        } else {
+            return;
+        }
+
+        Event.observe(this.input, 'keydown', this.onBuscadorKeyDown.bindAsEventListener(this));
+    },
+
+    // Manejadores de eventos
+    onBtnSearchClick : function (e) {
+        this.paginador.setFiltro(
+            this.combo.options[this.combo.selectedIndex].value,
+            this.input.value
+        );
+    },
+
+    onBtnClearClick : function (e) {
+        this.input.value = '';
+        this.paginador.setFiltro(
+            this.combo.options[this.combo.selectedIndex].value,
+            ''
+        );
+    },
+
+    onBuscadorKeyDown : function (e) {
+        if (e.keyCode == Event.KEY_RETURN) {
+            Event.stop(e);
+            this.paginador.setFiltro(
+                this.combo.options[this.combo.selectedIndex].value,
+                this.input.value
+            );
+        }
+    },
+
+    onComboChange: function(e){
+        this.renderInputText();
+    }
+
+});
+
+
+
+/**
+    Dibuja una tabla asociada a los datos del paginador - Ver {@link Educativa.View.Table} para un implementacion
+    mas completa.
+    @deprecated
+    @param options Parametros del constructor
+    @param {Educativa.Paginador} options.paginador Paginador asociado a esta vista.
+    @param {String}  options.target  Id del elemento a dibujar la tabla
+    @class
+*/
+Educativa.Paginador.VistaTabla = Class.create({
+
+    /** @private */
+    initialize : function(args) {
+        // args.paginador
+        // args.target
+        Object.extend( this, args);
+
+        this.vistaPaginador = new Educativa.Paginador.Vista({
+            paginador: this.paginador,
+            target : 'paginadorvista'
+        });
+        this.paginador.observe('update', this.onUpdatePaginado.bind(this));
+        this.paginador.observe('beforeUpdate', this.onBeforeUpdatePaginado.bind(this));
+
+        this.element = $(this.target);
+        this.toHTML();
+    },
+
+    /** Dibuja el buscador, la tabla y los botones de control de paginado
+        @private */
+    toHTML : function () {
+        this.element.update( this.vistaPaginador.renderBuscador() );
+        this.element.insert(
+            new Element('table', { 'class' : 'paginador-table' }).update( this._renderHeaders() )
+            .insert( new Element('tbody', {id : this.target + '-body'})
+                     .insert(this._renderData())
+            )
+        );
+
+        this.element.insert( this.vistaPaginador.renderPageControl() );
+
+        this.element.makePositioned();
+        return this.element;
+    },
+
+    /** dibuja los encabezados
+        @private */
+    _renderHeaders : function () {
+        var headers = this.paginador.getHeaders();
+
+        this.headerElement = new Element('thead', { id : this.target + '-header'});
+        var tr = new Element('tr');
+
+        for (var i = 0; i<headers.length; i++) {
+            if (headers[i].sort) {
+                var a = new Element('a', {
+                    href : 'javascript: void(0)',
+                    title : "ORDENAR".term().capitalize()
+                });
+                Event.observe(a, 'click', this.onHeaderClick.bindAsEventListener(this, headers[i].id));
+                a.update(headers[i].nombre);
+                tr.insert( new Element('th', {id : this.target + '-header-' + headers[i].id}).update(a) )
+            } else {
+                tr.insert( new Element('th', {id : this.target + '-header-' + headers[i].id}).update(headers[i].nombre) )
+            }
+        }
+
+        this.headerElement.update(tr);
+
+        return this.headerElement;
+    },
+
+    /** Redibuja el tbody de la tabla
+        @private */
+    _renderData : function () {
+        var rows = this.paginador.getData();
+
+        var html = '';
+        for (var i = 0; i<rows.length; i++) {
+            html += '<tr class="' + (rows[i].vt_rowclass || '') + '">'
+                    + this._renderDataRow(rows[i], i) + '</th>'
+        }
+
+        if (!html) {
+            html = '<tr><td class="sin-datos" colspan="' + this.paginador.getHeaders().length +'">'
+                   + "NO_HAY_DATOS".term().capitalize() +'</td></tr>';
+        }
+
+        return html;
+    },
+
+    // dibuja una fila de la tabla
+    /** @private  */
+    _renderDataRow : function (data, index) {
+        var headers = this.paginador.getHeaders();
+
+        var html = '';
+        for (var i = 0; i<headers.length; i++) {
+            if (headers[i].render) {
+                html += '<td class="' + headers[i].tipo + '">' + data[headers[i].render] + '</td>'
+            } else {
+                html += '<td class="' + headers[i].tipo + '">' + data[headers[i].id] + '</td>';
+            }
+        }
+
+        return html;
+    },
+
+    /** @private  */
+    onBeforeUpdatePaginado : function () {
+        this.loadImage = new Element('div', { 'class' : 'loading' });
+        this.element.insert({top : this.loadImage});
+    },
+
+    /** @private  */
+    onUpdatePaginado : function () {
+        $(this.target + '-body').update(this._renderData());
+
+        // update headers
+        this.headerElement.select('th').invoke('removeClassName','sorted_asc')
+                                       .invoke('removeClassName','sorted_desc');
+
+        $(this.target + '-header-' + this.paginador.getOrden()).addClassName(
+            this.paginador.getOrdenAsc()?'sorted_asc':'sorted_desc'
+        );
+
+        if (this.loadImage) this.loadImage.remove();
+
+    },
+
+    /** @private  */
+    onHeaderClick : function (ev, idHeader) {
+        var asc = (this.paginador.getOrden() == idHeader)?!this.paginador.getOrdenAsc():true;
+        this.paginador.setOrden(idHeader, asc);
+    }
+});

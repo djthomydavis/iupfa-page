@@ -1,0 +1,266 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/*********************
+  @Objeto: paginador
+**********************/
+
+/* --- #Variables --- */
+:root {
+    --paginador-gap: 16px;
+    --paginador-padding: 8px 12px;
+    --paginador-font-size: .8125rem;
+    --paginador-color: var(--theme-color-texto, #6c6c6c);
+    --paginador-value-color: #515151;
+    --paginador-nav-size: 42px;
+    --paginador-nav-color: var(--theme-txcolor-columnas, #6c6c6c);
+    --paginador-nav-bg: var(--theme-bgcolor-columnas, #f0f0f0);
+    --paginador-nav-hover-bg: var(--theme-bgcolor-columnas-hover, #e0e0e0);
+    --paginador-nav-radius: 0;
+    --paginador-nav-disabled-opacity: .4;
+}
+
+/* --- #Container --- */
+.paginador {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    gap: var(--paginador-gap);
+    margin: 12px 0 4px;
+    font-size: var(--paginador-font-size);
+    font-family: "Roboto", sans-serif, Arial;
+    color: var(--paginador-color);
+}
+
+/* --- #Content --- */
+/* Contenedor de texto+selects (tamanio + info + paginas) con lineas
+ * horizontales grises arriba y abajo. Altura identica a los botones nav
+ * (via min-height) para que las lineas queden al mismo nivel que los
+ * bordes de los botones. Review diseno 2026-04-21. */
+.paginador_content {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    min-height: var(--paginador-nav-size);
+    border-top: 1px solid #e8e8e8;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+/* --- #Page size --- */
+.paginador_tamanio {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.paginador_tamanio .edu-select,
+.paginador_tamanio .edu-select-wrapper {
+    min-width: auto;
+}
+
+.paginador_tamanio select {
+    width: auto;
+    min-width: 0;
+}
+
+/* --- #Info --- */
+.paginador_info {
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.paginador_info_rango { color: var(--paginador-value-color); }
+
+/* --- #Pages --- */
+.paginador_paginas {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.paginador_paginas .edu-select {
+    min-width: auto;
+}
+
+.paginador_paginas .edu-select-wrapper {
+    min-width: auto;
+}
+
+.paginador_paginas select {
+    width: auto;
+    min-width: 0;
+}
+
+.paginador_paginas_total {
+    white-space: nowrap;
+}
+
+
+/* --- #Color de acento --- */
+/* En frontend el paginador usa el color del aula (--variable-color-curso)
+   como acento para selectores y flechas. Este override aplica a traves
+   del Variable Interface Pattern: los componentes internos (edu-select,
+   nav_btn) leen --paginador-accent y --paginador-accent-contrast sin
+   saber de donde vienen los valores.
+   En admin, paginador.css pisa estas variables con --variable-color-plataforma
+   porque admin no tiene contexto de aula individual. */
+.paginador {
+    --edu-select-secondary: var(--variable-color-curso, var(--variable-color-plataforma));
+    --paginador-nav-contrast: var(--variable-color-curso-contraste, var(--variable-color-plataforma-contraste, #ffffff));
+}
+
+/* Contextos sin aula activa (catalogo, listado de planes, listado de aulas
+   de un plan): el paginador toma el color de la INSTALACION en lugar del
+   color de aula. Esos listados no representan a un aula especifica. */
+.catalogo_lista .paginador,
+.planes_wrapper .paginador,
+.escritorio .paginador {
+    --edu-select-secondary: var(--variable-color-plataforma);
+    --paginador-nav-contrast: var(--variable-color-plataforma-contraste, #ffffff);
+}
+
+/* --- #Selects sin recuadro (review diseno 2026-04) --- */
+/* Dentro del paginador, edu-select-secondary pierde el recuadro coloreado
+   y queda como un texto con chevron. El valor se muestra en bold para dar
+   jerarquia, siguiendo el mockup final del disenador. */
+.paginador .edu-select-secondary select {
+    padding-right: 20px;
+    padding-left: 2px;
+    text-align: right;
+    font-size: inherit;
+    font-weight: 600;
+    color: var(--paginador-value-color);
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.paginador .edu-select-secondary select:hover:not(:disabled),
+.paginador .edu-select-secondary select:focus {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    outline: none;
+}
+
+/* Wrapper cubre el area del chevron (pseudo-elemento sin cursor propio). */
+.paginador .edu-select-secondary .edu-select-wrapper {
+    cursor: pointer;
+}
+
+/* L en bottom-right + rotate 45 = V apuntando abajo. */
+.paginador .edu-select-secondary .edu-select-wrapper::after {
+    top: 50%;
+    right: 5px;
+    width: 7px;
+    height: 7px;
+    margin-top: -6px;
+    color: var(--paginador-color);
+    border-top: none;
+    border-left: none;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    pointer-events: none;
+    content: "";
+}
+
+/* rotate(225) = V arriba. margin-top compensa el shift visual (~5px) de la
+ * rotacion. :has(select:open) browsers modernos (Chrome 130+, FF 132+). */
+.paginador .edu-select-secondary .edu-select-wrapper:has(select:open)::after {
+    margin-top: -1px;
+    transform: rotate(225deg);
+}
+
+/* --- #Navigation --- */
+.paginador_nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.paginador_nav_btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--paginador-nav-size);
+    height: var(--paginador-nav-size);
+    border-radius: var(--paginador-nav-radius);
+    color: var(--edu-select-secondary);
+    background-color: transparent;
+    border: 1px solid var(--edu-select-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.paginador_nav_btn:hover {
+    background-color: var(--edu-select-secondary);
+    color: var(--paginador-nav-contrast, #ffffff);
+    text-decoration: none;
+}
+
+/* --- #Superior --- */
+/* Bordes top + bottom los hereda de .paginador. */
+.paginador_top {
+    margin: 0;
+    padding: 0;
+}
+
+/* --- #Paginador fuera del marco blanco (review diseno 2026-04-20) --- */
+/* Cuando .contenido envuelve un .control-paginador, el marco blanco deja de
+ * aplicar a .contenido y se traslada al listado (ul o table). El paginador
+ * queda como sibling afuera del marco. Patron Muro (image-2.png del review). */
+.contenido:has(.control-paginador) {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.control-paginador > ul.lista_items,
+.control-paginador > table {
+    margin: 0;
+    border: 1px solid #d2d2d2;
+    border-radius: 4px;
+    background-color: #ffffff;
+    box-shadow: 1px 2px 4px rgba(0, 0, 0, .1);
+}
+
+.control-paginador > ul.lista_items {
+    padding: 8px 20px;
+}
+
+.control-paginador > .paginador_top {
+    margin-bottom: 8px;
+}
+
+.control-paginador > .paginador:not(.paginador_top) {
+    margin-top: 8px;
+}
+
+/* --- #States --- */
+.paginador_nav_btn.is_disabled {
+    opacity: var(--paginador-nav-disabled-opacity);
+    cursor: default;
+    pointer-events: none;
+}
+
+div.loading {
+    position: absolute;
+    top: 5px;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background: url(../img/comunes/spinner.gif) no-repeat;
+}
+/*-----------------------------------------------------------------------------------------------------*/

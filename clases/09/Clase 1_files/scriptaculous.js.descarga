@@ -1,0 +1,35 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+// mejora de scriptaculous, para levantar las librerias en orden para que no de error de js
+var Scriptaculous = {
+    Version: "1.9.0",
+    scripts: ["builder.js", "effects.js", "dragdrop.js", "controls.js", "slider.js", "sound.js"],
+    index: 0,
+    loadNext: function() {
+       if (this.index < this.scripts.length) {
+           var script = this.scripts[this.index];
+           this.index++;
+           this.require(this.path + script, this.loadNext.bind(this));
+       }
+    },
+    require: function(script, callback) {
+       var a = document.createElement("script");
+       a.type = "text/javascript";
+       a.src = script;
+       a.onload = callback;
+       document.getElementsByTagName("head")[0].appendChild(a);
+    },
+    load: function() {
+       var scripts = document.getElementsByTagName('script');
+       var index = scripts.length - 1;
+       var myScript = scripts[index];
+       this.path = myScript.src.substring(0, myScript.src.lastIndexOf('/') + 1);
+       this.loadNext();
+    }
+};
+Scriptaculous.load();

@@ -1,0 +1,178 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ---------------------------------
+   edu_toast - Notificacion flotante
+   --------------------------------- */
+
+/* ---------
+   Variables
+   --------- */
+:root {
+    --edu-toast-primary: var(--theme-primary);
+    --edu-toast-secondary: var(--theme-secondary);
+    --edu-toast-success: var(--theme-success);
+    --edu-toast-warning: var(--theme-warning);
+    --edu-toast-danger: var(--theme-danger);
+    --edu-toast-info: var(--theme-info);
+
+    --edu-toast-border-radius: var(--theme-component-border-radius-lg);
+    --edu-toast-z-index: 10002;
+}
+
+/* ----------
+   Contenedor
+   ---------- */
+/* pointer-events:none en el contenedor para que el espacio vacio
+   entre toasts no bloquee clicks; cada toast lo resetea a auto. */
+.edu_toast_container {
+    position: fixed;
+    right: 26px;
+    bottom: 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    z-index: var(--edu-toast-z-index);
+    pointer-events: none;
+}
+
+/* -----
+   Toast
+   ----- */
+/* overflow:hidden recorta la barra de progreso con el border-radius
+   en las esquinas inferiores del card. */
+.edu_toast {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow: hidden;
+    font-size: .875rem;
+    line-height: 1.4;
+    color: #333333;
+    border: 1px solid color-mix(in srgb, var(--edu-toast-variant-color, #aaaaaa) 43%, #ffffff);
+    border-radius: var(--edu-toast-border-radius);
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(10, 14, 26, .29);
+    opacity: 0;
+    transform: translateY(20px) scale(.97);
+    transition: opacity 500ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: auto;
+}
+.edu_toast.is_visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* ------
+   Partes
+   ------ */
+/* position:absolute: fuera del flujo; edu_toast_row reserva el espacio con padding-right. */
+.edu_toast_close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: .875rem;
+    line-height: 1;
+    color: #999999;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+.edu_toast_close:hover {
+    color: #444444;
+    background: #f0f0f0;
+}
+/* Padding aqui y no en .edu_toast para que .edu_toast_progress quede flush al borde. */
+.edu_toast_row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 40px 14px 16px;
+}
+.edu_toast_icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 1.125rem;
+    line-height: 1;
+    color: var(--edu-toast-variant-color, #666666);
+}
+.edu_toast_content {
+    flex: 1;
+    min-width: 0;
+}
+.edu_toast_title {
+    font-weight: 700;
+    line-height: 1.3;
+    color: #222222;
+}
+.edu_toast_body {
+    margin-top: 4px;
+    color: #555555;
+}
+.edu_toast_actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 2px 16px 12px;
+}
+/* Botones de accion compactos dentro del toast */
+.edu_toast_actions .edu-btn {
+    padding: 4px 12px;
+    font-size: .75rem;
+}
+/* color-mix: pista como tinta clara del color de variante */
+.edu_toast_progress {
+    height: 4px;
+    background: color-mix(in srgb, var(--edu-toast-variant-color, #aaaaaa) 18%, #ffffff);
+}
+.edu_toast_progress_bar {
+    width: 0;
+    height: 4px;
+    background: var(--edu-toast-variant-color, #aaaaaa);
+}
+
+/* ------------------
+   Variantes de color
+   ------------------ */
+/* Cada variante expone --edu-toast-variant-color; el icono y la
+   barra de progreso lo consumen sin repetir selectores por variante. */
+.edu_toast_primary { --edu-toast-variant-color: var(--edu-toast-primary); }
+
+.edu_toast_secondary { --edu-toast-variant-color: var(--edu-toast-secondary); }
+
+.edu_toast_success { --edu-toast-variant-color: var(--edu-toast-success); }
+
+.edu_toast_warning { --edu-toast-variant-color: var(--edu-toast-warning); }
+
+.edu_toast_danger { --edu-toast-variant-color: var(--edu-toast-danger); }
+
+.edu_toast_info { --edu-toast-variant-color: var(--edu-toast-info); }
+
+/* ----------
+   Responsive
+   ---------- */
+@media all and (max-width: 480px) {
+    .edu_toast_container {
+        right: 12px;
+        bottom: 16px;
+        width: calc(100vw - 24px);
+        max-width: none;
+    }
+}

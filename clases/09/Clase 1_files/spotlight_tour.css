@@ -1,0 +1,359 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* --- #Spotlight tour --- */
+
+.spotlight_tour_overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, .6);
+    z-index: 9998;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .3s ease, visibility .3s ease;
+}
+
+.spotlight_tour_overlay.is_visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.spotlight_tour_overlay.is_hiding {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Neutraliza overlay huerfano (sin callout/panel/active asociado) que
+ * dejaba un cleanup incompleto del SpotlightTour bloqueando clicks. */
+body:not(:has(.spotlight_callout.is_visible, .spotlight_tour_panel.is_visible, .is_spotlight_active)) .spotlight_tour_overlay.is_visible {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Eleva el elemento (o su contenedor fixed) sobre el overlay */
+.is_spotlight_active {
+    z-index: 9999 !important;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, .6), 0 0 24px 8px rgba(255, 255, 255, .3) !important;
+}
+
+/* Fondo opaco para elementos con fondo transparente (ej: tablas) */
+.tabla_interactiva_wrapper.is_spotlight_active {
+    background-color: #ffffff !important;
+}
+
+/* Paginador (#18293): los containers internos heredan transparent
+   del wrapper, asi que sin background propio el overlay oscuro se
+   cuela y el target se ve atenuado. Pintar fondo blanco al destacarse. */
+.paginador.is_spotlight_active,
+.paginador_tamanio.is_spotlight_active,
+.paginador_info.is_spotlight_active,
+.paginador_paginas.is_spotlight_active,
+.paginador_nav.is_spotlight_active {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: #ffffff !important;
+}
+
+/* Solo eleva z-index sin efecto visual (para ancestros fixed) */
+.is_spotlight_elevated {
+    z-index: 9999 !important;
+}
+
+.spotlight_tour_panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 420px;
+    width: 90%;
+    background: #ffffff;
+    color: #333333;
+    padding: 24px 28px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .2);
+    z-index: 10000;
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .3s ease, visibility .3s ease;
+}
+
+.spotlight_tour_panel.is_visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.spotlight_tour_title {
+    margin: 0 0 12px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #222222;
+}
+
+.spotlight_tour_image {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    margin: 0 auto 14px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.spotlight_tour_text {
+    margin: 0 0 16px;
+    font-size: .9375rem;
+    font-weight: 400;
+    text-align: left;
+    line-height: 1.5;
+}
+
+.spotlight_tour_text ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.spotlight_tour_text li { margin-bottom: 4px; }
+.spotlight_tour_text li:last-child { margin-bottom: 0; }
+
+/* Un solo item: sin bullet ni sangria */
+.spotlight_tour_text ul:has(li:only-child) { padding-left: 0; }
+.spotlight_tour_text li:only-child { list-style: none; }
+
+.spotlight_tour_dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.spotlight_tour_dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #cccccc;
+    transition: background .2s ease;
+}
+
+.spotlight_tour_dot.is_active {
+    background: var(--theme-primary, #337ab7);
+}
+
+.spotlight_tour_actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Tours de un solo paso: el boton "omitir" se oculta y queda solo el
+   "entendido". Alineamos a la derecha para no dejar el unico boton
+   pegado al borde izquierdo. */
+.spotlight_tour_actions_single {
+    justify-content: flex-end;
+}
+
+.spotlight_tour_btn_skip {
+    background: none;
+    border: none;
+    color: #888888;
+    font-size: .875rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    text-decoration: underline;
+}
+
+.spotlight_tour_btn_skip:hover {
+    color: #555555;
+}
+
+/* Agrupa ambos skip a la izquierda empujando el espacio hacia btnNext */
+.spotlight_tour_btn_skip_all {
+    background: none;
+    border: none;
+    color: #888888;
+    font-size: .875rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    margin-right: auto;
+    text-decoration: underline;
+}
+
+.spotlight_tour_btn_skip_all:hover {
+    color: #555555;
+}
+
+.spotlight_tour_btn_next {
+    min-width: 120px;
+}
+
+/* --- #Spotlight callout (basico) --- */
+
+.spotlight_btn_wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.spotlight_btn_wrapper.is_spotlight_active {
+    z-index: 10000 !important;
+}
+
+.spotlight_callout {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 0;
+    width: max-content;
+    max-width: 280px;
+    background: #ffffff;
+    color: #333333;
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .15);
+    font-size: .875rem;
+    line-height: 1.4;
+    z-index: 10001;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity .3s ease, visibility .3s ease;
+}
+
+.spotlight_callout.spotlight_callout_align_right {
+    left: auto;
+    right: 0;
+}
+
+.spotlight_callout.spotlight_callout_align_right .spotlight_callout_arrow {
+    left: auto;
+    right: 20px;
+}
+
+.spotlight_callout.is_visible {
+    visibility: visible;
+    opacity: 1;
+}
+
+.spotlight_callout_arrow {
+    position: absolute;
+    top: -6px;
+    left: 20px;
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    transform: rotate(45deg);
+    box-shadow: -2px -2px 4px rgba(0, 0, 0, .06);
+}
+
+/* --- #Spotlight tour sizes --- */
+
+.spotlight_tour_panel.spotlight_tour_panel_sm {
+    max-width: 320px;
+    padding: 18px 20px;
+}
+
+.spotlight_tour_panel_sm .spotlight_tour_image {
+    max-height: 120px;
+}
+
+.spotlight_tour_panel.spotlight_tour_panel_lg {
+    max-width: 840px;
+    padding: 28px 32px;
+}
+
+.spotlight_tour_panel_lg .spotlight_tour_image {
+    max-height: 400px;
+}
+
+/* --- #Spotlight tour realce reforzado --- */
+
+/* Remarcado estatico sobre el target del tour de desuscripcion (tab
+   Avisos). El anillo usa el color del header de Perfil y Preferencias
+   para integrarse con la identidad de la pantalla. */
+[data-toggle="avisos"].is_spotlight_active {
+    border-radius: 6px;
+    background-color: #ffffff;
+    outline: 4px solid var(--pp_header_color, #064265);
+    outline-offset: 2px;
+}
+
+/* --- #Spotlight tour responsive --- */
+
+@media all and (max-width: 768px) {
+    .spotlight_tour_panel {
+        padding: 20px 22px;
+    }
+
+    .spotlight_tour_image {
+        max-height: 150px;
+    }
+
+    .spotlight_tour_btn_next {
+        min-width: 100px;
+    }
+}
+
+@media all and (max-width: 480px) {
+    .spotlight_tour_panel {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        width: auto;
+        max-width: none;
+        height: fit-content;
+        max-height: calc(100vh - 16px);
+        overflow-y: auto;
+        transform: none;
+        margin: auto;
+        padding: 14px 12px;
+    }
+
+    .spotlight_tour_title {
+        margin: 0 0 8px;
+        font-size: .9375rem;
+    }
+
+    .spotlight_tour_text {
+        margin: 0 0 10px;
+        font-size: .8125rem;
+    }
+
+    .spotlight_tour_image {
+        max-height: 90px;
+        margin: 0 auto 10px;
+    }
+
+    .spotlight_tour_btn_skip {
+        padding: 4px 6px;
+        font-size: .75rem;
+    }
+
+    .spotlight_tour_btn_skip_all {
+        padding: 4px 6px;
+        font-size: .75rem;
+    }
+
+    .spotlight_tour_btn_next {
+        min-width: 80px;
+        font-size: .75rem;
+    }
+
+    .spotlight_tour_dots {
+        gap: 5px;
+        margin-bottom: 10px;
+    }
+
+    .spotlight_tour_dot {
+        width: 6px;
+        height: 6px;
+    }
+}

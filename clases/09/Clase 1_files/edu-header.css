@@ -1,0 +1,135 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* EDU-HEADER Component - Header Elements (h1-h5)
+   ----------------------------------------------------------------------------------------------------
+   Reglas de uso:
+   * h1 y h2: Usarlos por fuera del contenedor div class=contenido - Titulos a nivel pagina.
+   * h3, h4 y h5: Usarlos dentro del contenedor div class=contenido - Titulos de seccion de contenidos.
+   ---------------------------------------------------------------------------------------------------- */
+:root {
+    /* --- Theme colors --- */
+    --edu-header-light-color: var(--theme-light-base);
+    --edu-header-dark-color: var(--theme-dark-base);
+    --edu-header-primary-color: var(--theme-primary);
+    --edu-header-secondary-color: var(--theme-secondary);
+
+    --edu-header-bg-color-full-opacity: 100%;
+    --edu-header-bg-color-subtle-opacity: 8%;
+    --edu-header-bg-color-soft-opacity: 2%;
+
+    /* --- Typography --- */
+    --edu-header-font-weight: 400;
+    --edu-header-line-height: 1.3;
+
+    /* --- Spacing --- */
+    /* h1 y h2 */
+    --edu-header-page-padding-y: 8px;
+
+    /* h3 al h5 */
+    --edu-header-padding-y: 6px;
+    --edu-header-padding-x: 14px;
+
+    /* --- Visual design --- */
+    /* Page headers (h1, h2) */
+    --edu-header-page-border-width: 2px;
+
+    /* Content headers (h3-h5) */
+    --edu-header-content-border-width: 4px;
+    --edu-header-content-border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------------
+   Encabezados (titulos) de pagina (h1, h2) - FUERA del div class=contenido
+   ------------------------------------------------------------------------ */
+.edu-header-h1,
+.edu-header-h2 {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0 0 var(--edu-header-page-padding-y);
+    font-weight: var(--edu-header-font-weight);
+    line-height: var(--edu-header-line-height);
+    border-bottom: var(--edu-header-page-border-width) solid;
+    color: var(--edu-header-dark-color);
+    background-color: none;
+}
+/* --- font size --- */
+.edu-header-h1 { font-size: 1.75rem; } /* 28 px */
+
+.edu-header-h2 { font-size: 1.5rem; } /* 24px */
+
+/* --- Color Variants (ONLY for h1 y h2) --- */
+/* Primary color */
+.edu-header-h1.edu-header-primary,
+.edu-header-h2.edu-header-primary {
+    border-color:
+        color-mix(in oklch,
+        var(--edu-header-primary-color),
+        var(--edu-header-dark-color) var(--edu-header-bg-color-subtle-opacity)
+    );
+}
+/* Secondary color */
+.edu-header-h1.edu-header-secondary,
+.edu-header-h2.edu-header-secondary {
+    border-color:
+        color-mix(in oklch,
+        var(--edu-header-secondary-color),
+        var(--edu-header-dark-color) var(--edu-header-bg-color-subtle-opacity)
+    );
+}
+
+/* ---------------------------------------------------------------------------------
+   Encabezados (titulos) de contenido (h3, h4 y h5) - DENTRO del div class=contenido
+   --------------------------------------------------------------------------------- */
+.edu-header-h3,
+.edu-header-h4,
+.edu-header-h5 {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: var(--edu-header-padding-y) var(--edu-header-padding-x);
+    font-weight: var(--edu-header-font-weight);
+    line-height: var(--edu-header-line-height);
+    border-left: var(--edu-header-content-border-width) solid;
+    border-radius: 0 var(--edu-header-content-border-radius) 0 0;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+/* --- Font size --- */
+.edu-header-h3 { font-size: 1.25rem; } /* 20px */
+
+.edu-header-h4 { font-size: 1.125rem; } /* 18px */
+
+.edu-header-h5 { font-size: 1rem; } /* 16px */
+
+/* --- Color Variants (ONLY for h3, h4 y h5) --- */
+/* Primary color*/
+.edu-header-h3.edu-header-primary,
+.edu-header-h4.edu-header-primary,
+.edu-header-h5.edu-header-primary {
+    color: var(--edu-header-dark-color);
+    border-left-color: var(--edu-header-primary-color);
+    background-color:
+        color-mix(in oklch,
+        var(--edu-header-primary-color) var(--edu-header-bg-color-subtle-opacity),
+        var(--edu-header-dark-color) var(--edu-header-bg-color-soft-opacity)
+    );
+}
+/* Secondary color */
+.edu-header-h3.edu-header-secondary,
+.edu-header-h4.edu-header-secondary,
+.edu-header-h5.edu-header-secondary {
+    color: var(--edu-header-dark-color);
+    border-left-color: var(--edu-header-secondary-color);
+    background-color:
+        color-mix(in oklch,
+        var(--edu-header-secondary-color) var(--edu-header-bg-color-subtle-opacity),
+        var(--edu-header-dark-color) var(--edu-header-bg-color-soft-opacity)
+    );
+}

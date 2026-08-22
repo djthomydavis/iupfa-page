@@ -1,0 +1,51 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/******************/
+/*** GENERALES ***/
+/****************/
+
+body { background-image: none; background-color: #fff; }
+
+#header, .menu_secciones, #actions, .abm, .edu-system-message, .paginador, #footer,
+.lista_items .descripcion:before, .lista_items .descripcion:after,
+#encabezado {
+    display: none !important;
+}
+
+
+#section    { width: auto; margin: 10pt; padding: 0; border: none; }
+
+#wrapper, #main, .centrado,
+.Contenido-Contenido,
+.lista_calendario,
+.lista_items,
+.previsualizar .LinkCategoria {
+    width: auto !important;
+    max-width: none !important;
+}
+
+/**************/
+/*** evaluaciones ff ***/
+/**************/
+#main > .offset { display : block; width:98%;  }
+
+/**************/
+/*** FOROS ***/
+/**************/
+#form_arbol, #buscador-foros, #intervenir_form_wrapper { display: none }
+#links { border: none !important; } /* controles anterior y siguiente en vista anidada */
+
+/*************/
+/*** WIKI ***/
+/************/
+#boton_cerrar { display: none }
+
+/******************/
+/*** CONTACTOS ***/
+/*****************/
+.col_selector input, .fila input { display: none }

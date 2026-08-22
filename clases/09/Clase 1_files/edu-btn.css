@@ -1,0 +1,369 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-BTN Component - Button System
+   ==================================== */
+
+:root {
+
+    --edu-btn-light: var(--theme-light-base);
+    --edu-btn-dark: var(--theme-dark-base);
+
+    --edu-btn-primary: var(--theme-primary);
+    --edu-btn-primary-hover: var(--theme-primary-hover);
+    --edu-btn-primary-contrast: var(--theme-primary-contrast);
+
+    --edu-btn-secondary: var(--theme-secondary);
+    --edu-btn-secondary-hover: var(--theme-secondary-hover);
+    --edu-btn-secondary-contrast: var(--theme-secondary-contrast);
+
+    --edu-btn-success: var(--theme-success);
+    --edu-btn-success-hover: var(--theme-success-hover);
+    --edu-btn-success-contrast: var(--theme-success-contrast);
+
+    --edu-btn-warning: var(--theme-warning);
+    --edu-btn-warning-hover: var(--theme-warning-hover);
+    --edu-btn-warning-contrast: var(--theme-warning-contrast);
+
+    --edu-btn-danger: var(--theme-danger);
+    --edu-btn-danger-hover: var(--theme-danger-hover);
+    --edu-btn-danger-contrast: var(--theme-danger-contrast);
+
+    --edu-btn-info: var(--theme-info);
+    --edu-btn-info-hover: var(--theme-info-hover);
+    --edu-btn-info-contrast: var(--theme-info-contrast);
+
+    --edu-btn-font-size-sm: 14px;
+    --edu-btn-font-size: 16px;
+    --edu-btn-font-size-lg: 18px;
+
+    --edu-btn-border-width: 1px;
+
+    /* Border radius - map to global theme */
+    --edu-btn-border-radius: var(--theme-component-border-radius);
+
+    /* Height tokens - map to global theme */
+    --edu-btn-height-sm: var(--theme-component-height-sm);
+    --edu-btn-height: var(--theme-component-height);
+    --edu-btn-height-lg: var(--theme-component-height-lg);
+}
+
+/* ====================================
+   Base Button Styles
+   ==================================== */
+
+.edu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px 8px;
+    min-height: var(--edu-btn-height);
+    border: var(--edu-btn-border-width) solid transparent;
+    border-radius: var(--edu-btn-border-radius);
+    box-sizing: border-box;
+    font-size: var(--edu-btn-font-size);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    gap: 6px;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                opacity var(--theme-transition-duration) var(--theme-transition-timing),
+                box-shadow var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+a.edu-btn {
+    text-decoration: none;
+}
+
+/* Base states */
+.edu-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+.edu-btn-sm {
+    padding: 4px 12px;
+    font-size: var(--edu-btn-font-size-sm);
+    min-height: var(--edu-btn-height-sm);
+}
+
+.edu-btn-lg {
+    padding: 12px 24px;
+    font-size: var(--edu-btn-font-size-lg);
+    min-height: var(--edu-btn-height-lg);
+}
+
+/* ====================================
+   Icon Support
+   ==================================== */
+
+.edu-btn-icon-only {
+    padding: 0;
+    width: var(--edu-btn-height);
+}
+
+.edu-btn-icon-right {
+    flex-direction: row-reverse;
+}
+
+.edu-btn-icon-top {
+    flex-direction: column;
+    gap: 4px;
+}
+
+.edu-btn-icon-bottom {
+    flex-direction: column-reverse;
+    gap: 4px;
+}
+
+/* Icon-only size variants */
+.edu-btn-sm.edu-btn-icon-only {
+    padding: 0;
+    width: var(--edu-btn-height-sm);
+}
+
+.edu-btn-lg.edu-btn-icon-only {
+    padding: 0;
+    width: var(--edu-btn-height-lg);
+}
+
+/* ====================================
+   Color Variants - Solid Buttons
+   ==================================== */
+
+/* Primary */
+.edu-btn-primary {
+    border-color: var(--edu-btn-primary);
+    background-color: var(--edu-btn-primary);
+    color: var(--edu-btn-primary-contrast);
+}
+
+.edu-btn-primary:hover:not(:disabled) {
+    border-color: var(--edu-btn-primary-hover);
+    background-color: var(--edu-btn-primary-hover);
+}
+
+.edu-btn-primary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Secondary */
+.edu-btn-secondary {
+    border-color: var(--edu-btn-secondary);
+    background-color: var(--edu-btn-secondary);
+    color: var(--edu-btn-secondary-contrast);
+}
+
+.edu-btn-secondary:hover:not(:disabled) {
+    border-color: var(--edu-btn-secondary-hover);
+    background-color: var(--edu-btn-secondary-hover);
+}
+
+.edu-btn-secondary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Success */
+.edu-btn-success {
+    border-color: var(--edu-btn-success);
+    background-color: var(--edu-btn-success);
+    color: var(--edu-btn-success-contrast);
+}
+
+.edu-btn-success:hover:not(:disabled) {
+    border-color: var(--edu-btn-success-hover);
+    background-color: var(--edu-btn-success-hover);
+}
+
+.edu-btn-success:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-success) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Warning */
+.edu-btn-warning {
+    border-color: var(--edu-btn-warning);
+    background-color: var(--edu-btn-warning);
+    color: var(--edu-btn-warning-contrast);
+}
+
+.edu-btn-warning:hover:not(:disabled) {
+    border-color: var(--edu-btn-warning-hover);
+    background-color: var(--edu-btn-warning-hover);
+}
+
+.edu-btn-warning:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-warning) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Danger */
+.edu-btn-danger {
+    border-color: var(--edu-btn-danger);
+    background-color: var(--edu-btn-danger);
+    color: var(--edu-btn-danger-contrast);
+}
+
+.edu-btn-danger:hover:not(:disabled) {
+    border-color: var(--edu-btn-danger-hover);
+    background-color: var(--edu-btn-danger-hover);
+}
+
+.edu-btn-danger:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-danger) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Info */
+.edu-btn-info {
+    border-color: var(--edu-btn-info);
+    background-color: var(--edu-btn-info);
+    color: var(--edu-btn-info-contrast);
+}
+
+.edu-btn-info:hover:not(:disabled) {
+    border-color: var(--edu-btn-info-hover);
+    background-color: var(--edu-btn-info-hover);
+}
+
+.edu-btn-info:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-info) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* ====================================
+   Color Variants - Outline Buttons
+   ==================================== */
+
+/* Outline Primary */
+.edu-btn-outline-primary {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-primary);
+}
+
+.edu-btn-outline-primary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-primary) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-primary);
+}
+
+.edu-btn-outline-primary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Outline Secondary */
+.edu-btn-outline-secondary {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-secondary);
+}
+
+.edu-btn-outline-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-secondary) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-secondary);
+}
+
+.edu-btn-outline-secondary:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Outline Success */
+.edu-btn-outline-success {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-success);
+}
+
+.edu-btn-outline-success:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-success) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-success);
+}
+
+.edu-btn-outline-success:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-success) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Outline Warning */
+.edu-btn-outline-warning {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-warning);
+}
+
+.edu-btn-outline-warning:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-warning) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-warning);
+}
+
+.edu-btn-outline-warning:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-warning) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Outline Danger */
+.edu-btn-outline-danger {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-danger);
+}
+
+.edu-btn-outline-danger:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-danger) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-danger);
+}
+
+.edu-btn-outline-danger:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-danger) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* Outline Info */
+.edu-btn-outline-info {
+    background-color: var(--edu-btn-light);
+    color: var(--edu-btn-dark);
+    border-color: var(--edu-btn-info);
+}
+
+.edu-btn-outline-info:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--edu-btn-info) var(--theme-hover-mix), var(--edu-btn-light));
+    border-color: var(--edu-btn-info);
+}
+
+.edu-btn-outline-info:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-btn-info) var(--theme-focus-shadow-mix), transparent);
+}
+
+/* ====================================
+   Highlight - Featured action button
+   ==================================== */
+
+.edu-btn-highlight {
+    color: var(--variable-color-plataforma-contraste);
+    background: linear-gradient(135deg, var(--variable-color-plataforma), color-mix(in srgb, var(--variable-color-plataforma) 70%, black));
+    border-color: color-mix(in srgb, var(--variable-color-plataforma) 70%, black);
+    animation: pulse_highlight 2s ease-in-out infinite;
+}
+
+.edu-btn-highlight:hover:not(:disabled) {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--variable-color-plataforma) 85%, black), color-mix(in srgb, var(--variable-color-plataforma) 60%, black));
+}
+
+.edu-btn-highlight:focus {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--variable-color-plataforma) var(--theme-focus-shadow-mix), transparent);
+    animation: none;
+}
+
+@keyframes pulse_highlight {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--variable-color-plataforma) 50%, transparent); }
+    50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+/* Respeta la preferencia del sistema operativo de reducir movimiento
+   (accesibilidad: usuarios con epilepsia, vertigo o sensibilidad al movimiento) */
+@media (prefers-reduced-motion: reduce) {
+    .edu-btn-highlight { animation: none; }
+}

@@ -1,0 +1,305 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ====================================
+   EDU-CHECK Component - Checkbox Element
+   ==================================== */
+
+:root {
+    /* Theme colors */
+    --edu-check-light: var(--theme-light-base);
+    --edu-check-dark: var(--theme-dark-base);
+
+    --edu-check-primary: var(--theme-primary);
+    --edu-check-secondary: var(--theme-secondary);
+
+    /* Sizing */
+    /* Height tokens - map to global theme */
+    --edu-check-height-sm: var(--theme-component-height-sm);
+    --edu-check-height: var(--theme-component-height);
+    --edu-check-height-lg: var(--theme-component-height-lg);
+
+    --edu-check-padding-x-sm: 10px;
+    --edu-check-padding-x: 12px;
+    --edu-check-padding-x-lg: 16px;
+
+    --edu-check-box-size-sm: 16px;
+    --edu-check-box-size: 20px;
+    --edu-check-box-size-lg: 24px;
+
+    /* Visual design */
+    --edu-check-border-width: 1px;
+
+    /* Border radius - map to global theme */
+    --edu-check-border-radius: var(--theme-component-border-radius);
+
+    --edu-check-gap: 8px;
+}
+
+/* ====================================
+   Base Styles - Container
+   ==================================== */
+
+.edu-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: var(--edu-check-height);
+    padding: 0 var(--edu-check-padding-x);
+    border: var(--edu-check-border-width) solid transparent;
+    border-radius: var(--edu-check-border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    position: relative;
+    gap: var(--edu-check-gap);
+    font-size: 16px;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                border-color var(--theme-transition-duration) var(--theme-transition-timing),
+                box-shadow var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* ====================================
+   Checkbox Input
+   ==================================== */
+
+.edu-check input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: var(--edu-check-box-size);
+    height: var(--edu-check-box-size);
+    border: var(--edu-check-border-width) solid;
+    border-radius: var(--edu-check-border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    margin: 0;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                border-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+.edu-check input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+/* Checkmark - using correct centering */
+.edu-check input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    display: none;
+    /* Center the checkmark */
+    left: 50%;
+    top: 50%;
+    width: 20%;
+    height: 40%;
+    border: solid;
+    border-width: 0 2px 2px 0;
+    transform: translate(-50%, -60%) rotate(45deg);
+}
+
+.edu-check input[type="checkbox"]:checked::after {
+    display: block;
+}
+
+/* ====================================
+   Radio Input
+   ==================================== */
+
+.edu-check input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: var(--edu-check-box-size);
+    height: var(--edu-check-box-size);
+    border: var(--edu-check-border-width) solid;
+    border-radius: 50%;
+    box-sizing: border-box;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    margin: 0;
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                border-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+.edu-check input[type="radio"]:disabled {
+    cursor: not-allowed;
+}
+
+/* Radio dot - centered circle */
+.edu-check input[type="radio"]::after {
+    content: '';
+    position: absolute;
+    display: none;
+    left: 50%;
+    top: 50%;
+    width: 50%;
+    height: 50%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.edu-check input[type="radio"]:checked::after {
+    display: block;
+}
+
+/* Label text inside component */
+.edu-check-text {
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* ====================================
+   Size Variants
+   ==================================== */
+
+/* Small */
+.edu-check-sm {
+    height: var(--edu-check-height-sm);
+    padding: 0 var(--edu-check-padding-x-sm);
+    font-size: 14px;
+}
+
+.edu-check-sm input[type="checkbox"],
+.edu-check-sm input[type="radio"] {
+    width: var(--edu-check-box-size-sm);
+    height: var(--edu-check-box-size-sm);
+}
+
+.edu-check-sm input[type="checkbox"]::after {
+    border-width: 0 1.5px 1.5px 0;
+}
+
+/* Large */
+.edu-check-lg {
+    height: var(--edu-check-height-lg);
+    padding: 0 var(--edu-check-padding-x-lg);
+    font-size: 18px;
+}
+
+.edu-check-lg input[type="checkbox"],
+.edu-check-lg input[type="radio"] {
+    width: var(--edu-check-box-size-lg);
+    height: var(--edu-check-box-size-lg);
+}
+
+.edu-check-lg input[type="checkbox"]::after {
+    border-width: 0 2.5px 2.5px 0;
+}
+
+/* ====================================
+   Color Variants - With Border (Default)
+   ==================================== */
+
+/* Primary */
+.edu-check-primary {
+    background-color: color-mix(in srgb, var(--edu-check-primary) var(--theme-bg-mix-subtle), var(--edu-check-light));
+    border-color: var(--edu-check-primary);
+    color: var(--edu-check-dark);
+}
+
+.edu-check-primary input[type="checkbox"],
+.edu-check-primary input[type="radio"] {
+    background-color: var(--edu-check-light);
+    border-color: var(--edu-check-primary);
+}
+
+.edu-check-primary:hover:not(:has(input:disabled)) {
+    background-color: color-mix(in srgb, var(--edu-check-primary) var(--theme-hover-mix), var(--edu-check-light));
+}
+
+.edu-check-primary input[type="checkbox"]:checked,
+.edu-check-primary input[type="radio"]:checked {
+    background-color: var(--edu-check-primary);
+    border-color: var(--edu-check-primary);
+}
+
+.edu-check-primary input[type="checkbox"]:checked::after {
+    border-color: var(--edu-check-light);
+}
+
+.edu-check-primary input[type="radio"]:checked::after {
+    background-color: var(--edu-check-light);
+}
+
+.edu-check-primary:has(input:focus) {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-check-primary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-check-primary input[type="checkbox"]:focus,
+.edu-check-primary input[type="radio"]:focus {
+    outline: none;
+}
+
+/* Secondary */
+.edu-check-secondary {
+    background-color: color-mix(in srgb, var(--edu-check-secondary) var(--theme-bg-mix-subtle), var(--edu-check-light));
+    border-color: var(--edu-check-secondary);
+    color: var(--edu-check-dark);
+}
+
+.edu-check-secondary input[type="checkbox"],
+.edu-check-secondary input[type="radio"] {
+    background-color: var(--edu-check-light);
+    border-color: var(--edu-check-secondary);
+}
+
+.edu-check-secondary:hover:not(:has(input:disabled)) {
+    background-color: color-mix(in srgb, var(--edu-check-secondary) var(--theme-hover-mix), var(--edu-check-light));
+}
+
+.edu-check-secondary input[type="checkbox"]:checked,
+.edu-check-secondary input[type="radio"]:checked {
+    background-color: var(--edu-check-secondary);
+    border-color: var(--edu-check-secondary);
+}
+
+.edu-check-secondary input[type="checkbox"]:checked::after {
+    border-color: var(--edu-check-light);
+}
+
+.edu-check-secondary input[type="radio"]:checked::after {
+    background-color: var(--edu-check-light);
+}
+
+.edu-check-secondary:has(input:focus) {
+    box-shadow: 0 0 0 var(--theme-focus-shadow-width) color-mix(in srgb, var(--edu-check-secondary) var(--theme-focus-shadow-mix), transparent);
+}
+
+.edu-check-secondary input[type="checkbox"]:focus,
+.edu-check-secondary input[type="radio"]:focus {
+    outline: none;
+}
+
+/* ====================================
+   Borderless Variant
+   ==================================== */
+
+/* Borderless removes container border and background */
+.edu-check-borderless {
+    background-color: transparent;
+    border-color: transparent;
+    padding: 0;
+}
+
+.edu-check-borderless:hover:not(:has(input:disabled)) {
+    background-color: transparent;
+}
+
+.edu-check-borderless:has(input:focus) {
+    box-shadow: none;
+}
+
+/* ====================================
+   Disabled State
+   ==================================== */
+
+.edu-check:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

@@ -1,0 +1,181 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* edu_lang_switcher.css
+ * Switcher de idioma en topbar (frontend y admin).
+ * Bug: #18341
+ *
+ * Markup esperado (renderizado server-side desde Display.pm):
+ *   .edu_lang_switcher        - trigger (bandera + caret)
+ *   .edu_lang_switcher_dropdown - lista de idiomas
+ *   .edu_lang_switcher_item   - cada opcion (button)
+ */
+
+/* --- #Variables --- */
+/* Hover/current/tab usan color-mix con --theme-secondary (= color de la
+   plataforma en frontend, igual que el background del topbar) para que el
+   componente adopte la identidad cromatica del campus. El texto se mantiene
+   en color oscuro fijo para garantizar contraste APCA sobre los fondos
+   tintados (no se aplica --theme-secondary como color de texto, no hay
+   garantia de contraste). */
+:root {
+    --edu-lang-switcher-flag-w: 22px;
+    --edu-lang-switcher-flag-h: 16px;
+    --edu-lang-switcher-bg-hover: rgba(255, 255, 255, .18);
+    --edu-lang-switcher-dropdown-bg: #ffffff;
+    --edu-lang-switcher-dropdown-border: #d0d0d0;
+    --edu-lang-switcher-dropdown-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+    --edu-lang-switcher-item-color: #333333;
+    --edu-lang-switcher-item-hover-bg: color-mix(in srgb, var(--theme-secondary) var(--theme-bg-mix-subtle, 8%), #ffffff);
+    --edu-lang-switcher-item-current-bg: color-mix(in srgb, var(--theme-secondary) 14%, #ffffff);
+    --edu-lang-switcher-min-touch: 44px;
+}
+
+/* --- #Wrap --- */
+/* Contenedor positioned para que el dropdown ancle al trigger.
+   Sin esto el dropdown se posiciona contra el viewport / topbar-right. */
+.edu_lang_switcher_wrap {
+    position: relative;
+    display: inline-block;
+}
+
+/* --- #Trigger --- */
+/* min-height + border-box: alinea la altura del trigger con .topbar-user
+   (avatar 32px + padding 4px = 40px) para que ambos elementos del topbar
+   tengan la misma "barra" visual. */
+.edu_lang_switcher {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s ease;
+}
+
+.edu_lang_switcher:hover,
+.edu_lang_switcher.is_open,
+.edu_lang_switcher:focus-visible {
+    background: var(--edu-lang-switcher-bg-hover);
+    outline: none;
+}
+
+.edu_lang_switcher_flag {
+    /* content-box explicito: en admin hay un reset global con border-box
+       que hace que el border de 1px coma 2px del ancho/alto, dejando la
+       bandera mas chica que en el front. Forzando content-box el tamano
+       visible es identico en ambos contextos (axis front vs admin). */
+    box-sizing: content-box;
+    display: block;
+    width: var(--edu-lang-switcher-flag-w);
+    height: var(--edu-lang-switcher-flag-h);
+    border: 1px solid rgba(0, 0, 0, .1);
+    border-radius: 2px;
+    object-fit: cover;
+}
+
+.edu_lang_switcher_caret {
+    font-size: .625rem;
+    opacity: .7;
+    transition: transform .15s ease;
+}
+
+.edu_lang_switcher.is_open .edu_lang_switcher_caret {
+    transform: rotate(180deg);
+}
+
+/* --- #Dropdown --- */
+/* position: fixed para escapar el stacking context del .topbar (z-index:100).
+   Con position: absolute el dropdown queda atrapado dentro del topbar y los
+   botones flotantes (IA, WhatsApp) con z-index:121 lo tapan visualmente.
+   Con position: fixed crea su propio stacking context a nivel root y el
+   z-index:10100 si gana sobre floating components, footer (120) y spotlight.
+   top = altura del topbar; right pequeno offset desde el borde derecho del
+   viewport (el trigger es el ultimo elemento de topbar-right, asi que
+   visualmente queda alineado). */
+.edu_lang_switcher_dropdown {
+    position: fixed;
+    top: var(--topbar-height, 64px);
+    right: 8px;
+    z-index: 10100;
+    min-width: 240px;
+    max-height: 480px;
+    padding: 4px 0;
+    overflow-y: auto;
+    background: var(--edu-lang-switcher-dropdown-bg);
+    border: 1px solid var(--edu-lang-switcher-dropdown-border);
+    border-radius: 6px;
+    box-shadow: var(--edu-lang-switcher-dropdown-shadow);
+}
+
+.edu_lang_switcher_dropdown[hidden] {
+    display: none;
+}
+
+/* --- #Items --- */
+.edu_lang_switcher_item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--edu-lang-switcher-min-touch);
+    padding: 8px 14px;
+    font: inherit;
+    text-align: left;
+    color: var(--edu-lang-switcher-item-color);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.edu_lang_switcher_item:hover,
+.edu_lang_switcher_item:focus-visible {
+    background: var(--edu-lang-switcher-item-hover-bg);
+    outline: none;
+}
+
+.edu_lang_switcher_item.is_current {
+    font-weight: 600;
+    color: var(--edu-lang-switcher-item-color);
+    background: var(--edu-lang-switcher-item-current-bg);
+}
+
+.edu_lang_switcher_item_flag {
+    /* content-box explicito (mismo motivo que .edu_lang_switcher_flag): el
+       reset global de border-box en admin hace la bandera 2px mas chica. */
+    box-sizing: content-box;
+    flex-shrink: 0;
+    width: var(--edu-lang-switcher-flag-w);
+    height: var(--edu-lang-switcher-flag-h);
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    object-fit: cover;
+}
+
+.edu_lang_switcher_item_name {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.edu_lang_switcher_item_check {
+    font-size: .75rem;
+    color: var(--edu-lang-switcher-item-color);
+}
+
+/* --- #Responsive --- */
+@media (max-width: 768px) {
+    .edu_lang_switcher_dropdown {
+        right: -8px;
+        min-width: 220px;
+    }
+}

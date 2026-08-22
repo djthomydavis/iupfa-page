@@ -307,7 +307,7 @@ create table if not exists public.subject_content_items (
   id uuid primary key default gen_random_uuid(),
   unit_id uuid not null references public.subject_units(id) on delete cascade,
   subject_id text not null references public.subjects(id) on delete cascade,
-  type text not null check (type in ('pdf','clase')),
+  type text not null check (type in ('pdf','clase','video')),
   title text not null,
   file_name text,
   url text,
@@ -316,6 +316,16 @@ create table if not exists public.subject_content_items (
   uploaded_by text,
   created_at timestamptz not null default now()
 );
+
+-- Video: se guarda en "body" la URL de preview embebible (ej. Google Drive
+-- .../preview), no hace falta storage_path porque no se sube ningún archivo.
+alter table public.subject_content_items drop constraint if exists subject_content_items_type_check;
+alter table public.subject_content_items add constraint subject_content_items_type_check
+  check (type in ('pdf','clase','video'));
+
+-- Orden manual del contenido dentro de una unidad (lo mueve el admin con las
+-- flechas ↑/↓); arranca en 0 para lo ya cargado y created_at desempata.
+alter table public.subject_content_items add column if not exists position integer not null default 0;
 
 alter table public.subject_content_items enable row level security;
 

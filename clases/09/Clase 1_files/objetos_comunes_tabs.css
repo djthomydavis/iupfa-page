@@ -1,0 +1,40 @@
+/***********************************************************/
+/*                                                         */
+/* Plataforma e-ducativa - Argentina                       */
+/*                                                         */
+/* Copyright (c) 2026 de e-ducativa Educación Virtual S.A. */
+/*                                                         */
+/***********************************************************/
+/* ------------------------------------------
+   Tabs relacionadas a .contenido de base.css
+   ------------------------------------------ */
+/* Usadas en Wiki, Webmail y MS Teams (actualizar si se agrega en otro lugar) */
+.tabs_group {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    margin-bottom: -1px;
+}
+.tabs_group .tab {
+    padding: 8px 10px 7px;
+    font-size: .813rem;
+    font-weight: 400;
+    border: 1px solid #d2d1d1;
+    border-radius: 4px 4px 0 0;
+    color: #616161;
+    background-color: #dcdcdc;
+    user-select: none;
+    cursor: pointer;
+}
+.tabs_group .tab:hover {
+    color: #656565;
+    background-color: #e4e4e5;
+}
+.tabs_group .tab.active_tab {
+    font-weight: 700;
+    border-bottom: 1px solid #ffffff;
+    color: #474747;
+    background-color: #ffffff;
+    box-shadow: 3px -4px 4px rgba(0, 0, 0, .03);
+    z-index: 1;
+}
