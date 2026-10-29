@@ -106,11 +106,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, name, avatar, role)
+  insert into public.profiles (id, email, name, last_name, avatar, role)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    nullif(trim(new.raw_user_meta_data->>'last_name'), ''),
     upper(left(coalesce(new.raw_user_meta_data->>'name', new.email), 1)),
     'student'
   );
@@ -122,6 +123,25 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Nombre y apellido siempre con mayúscula inicial en cada palabra
+-- ("jUAN pablo" → "Juan Pablo"), se carguen desde donde se carguen.
+create or replace function public.normalize_profile_name()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.name := initcap(regexp_replace(btrim(new.name), '\s+', ' ', 'g'));
+  new.last_name := nullif(initcap(regexp_replace(btrim(coalesce(new.last_name, '')), '\s+', ' ', 'g')), '');
+  new.avatar := coalesce(nullif(upper(left(new.name, 1)), ''), new.avatar);
+  return new;
+end;
+$$;
+
+drop trigger if exists normalize_profile_name on public.profiles;
+create trigger normalize_profile_name
+  before insert or update of name, last_name on public.profiles
+  for each row execute procedure public.normalize_profile_name();
 
 -- =========================================================
 -- SUBJECTS (curriculum compartido, solo lo edita un admin)
@@ -978,6 +998,38 @@ create policy "Settings viewable by authenticated users"
 drop policy if exists "Only admins can modify settings" on public.bot_settings;
 create policy "Only admins can modify settings"
   on public.bot_settings for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- =========================================================
+-- EVALUACIONES (simulador de exámenes por materia). Solo los admins
+-- crean/editan/borran; todos los alumnos logueados las pueden leer y rendir.
+-- La configuración de corrección y las preguntas van en JSON (ver
+-- docs/superpowers/specs/2026-10-21-evaluaciones-design.md). Los
+-- resultados de los alumnos no se guardan.
+-- =========================================================
+create table if not exists public.subject_exams (
+  id uuid primary key default gen_random_uuid(),
+  subject_id text not null references public.subjects(id) on delete cascade,
+  title text not null,
+  description text not null default '',
+  duration_minutes integer,
+  config jsonb not null,
+  questions jsonb not null default '[]',
+  created_by_name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.subject_exams enable row level security;
+
+drop policy if exists "Subject exams are viewable by authenticated users" on public.subject_exams;
+create policy "Subject exams are viewable by authenticated users"
+  on public.subject_exams for select to authenticated using (true);
+
+drop policy if exists "Only admins can modify subject exams" on public.subject_exams;
+create policy "Only admins can modify subject exams"
+  on public.subject_exams for all to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 

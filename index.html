@@ -13,6 +13,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js" referrerpolicy="origin"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.10/dist/katex.min.css" integrity="sha384-rdqqrpVNEfmY6hsVFS50HU5L84tWeMdr4XpF+TJPvLR6e8YxPgRyDzzpawPHMQE6" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.10/dist/katex.min.js" integrity="sha384-oeXTyN/gxEn/v98/oDFW+7XVfZrp59R6Tporzsg2uNs9g+G9Xel/Afxdamc4Mags" crossorigin="anonymous"></script>
 </head>
 <body data-page="portal">
   <div id="pageLoader" class="page-loader"><div class="logo-mark"><img src="img/IUPFA Logo Alumnos.png" alt="IUPFA" /></div></div>
@@ -114,9 +116,15 @@
           <p>Registrate como estudiante para acceder al portal.</p>
           <div id="registerNotice" class="notice"></div>
 
-          <div class="field">
-            <input id="registerName" type="text" placeholder=" " required />
-            <label for="registerName">Nombre completo</label>
+          <div class="two-cols">
+            <div class="field">
+              <input id="registerName" type="text" placeholder=" " autocomplete="given-name" required />
+              <label for="registerName">Nombre/s</label>
+            </div>
+            <div class="field">
+              <input id="registerLastName" type="text" placeholder=" " autocomplete="family-name" required />
+              <label for="registerLastName">Apellido/s</label>
+            </div>
           </div>
           <div class="field">
             <input id="registerEmail" type="email" placeholder=" " required />
@@ -224,17 +232,13 @@
         <button class="nav-link active" data-view="inicio"><span class="nav-icon"><span class="icon icon-home"></span></span><span class="nav-label sidebar-text">Inicio</span></button>
         <button class="nav-link" data-view="calendario"><span class="nav-icon"><span class="icon icon-calendar"></span></span><span class="nav-label sidebar-text">Calendario</span></button>
         <button class="nav-link" data-view="planificacion"><span class="nav-icon"><span class="icon icon-folder"></span></span><span class="nav-label sidebar-text">Planificación</span></button>
+        <button type="button" id="materiasNavBtn" class="nav-link year-btn"><span class="nav-icon"><span class="icon icon-book"></span></span><span class="nav-label sidebar-text">Materias</span></button>
         <button class="nav-link" data-view="foro"><span class="nav-icon"><span class="icon icon-chat"></span></span><span class="nav-label sidebar-text">Foro General</span></button>
         <button class="nav-link" data-view="alumnos"><span class="nav-icon"><span class="icon icon-users"></span></span><span class="nav-label sidebar-text">Alumnos</span></button>
         <button class="nav-link" data-view="faq"><span class="nav-icon"><span class="icon icon-help-circle"></span></span><span class="nav-label sidebar-text">Preguntas Frecuentes</span></button>
         <button class="nav-link" data-view="contacto"><span class="nav-icon"><span class="icon icon-phone"></span></span><span class="nav-label sidebar-text">Contacto</span></button>
         <a id="adminShortcut" class="nav-link hidden" href="admin.html"><span class="nav-icon"><span class="icon icon-tool"></span></span><span class="nav-label sidebar-text">Ir a Admin</span></a>
       </nav>
-
-      <div class="sidebar-group">
-        <span class="sidebar-label"><span class="nav-icon"><span class="icon icon-book"></span></span><span class="nav-label sidebar-text">Materias por año</span></span>
-        <div id="yearList" class="year-nav"></div>
-      </div>
 
       <div class="sidebar-footer">
         <button type="button" class="sidebar-user-btn" id="sidebarUserBtn">
@@ -531,35 +535,33 @@
         </section>
 
         <section id="materiasView" class="view-section hidden">
-          <div class="hero card compact">
-            <div>
-              <span id="materiasYearLabel" class="pill blue">Año</span>
-              <h2>Materias</h2>
-              <p>Seleccioná una materia para ver su contenido, fechas, foro y opiniones.</p>
-            </div>
-          </div>
-          <div id="subjectsGrid" class="subjects-grid"></div>
+          <header class="materias-head">
+            <h2>Materias</h2>
+            <p>Elegí un año y tocá una materia para ver su contenido, fechas, foro y opiniones.</p>
+          </header>
+          <div id="yearTabs" class="subject-tabs scroll-tabs" role="tablist" aria-label="Año de la carrera"></div>
+          <div id="subjectsGrid" class="term-groups"></div>
         </section>
 
         <section id="materiaView" class="view-section hidden">
-          <div class="materia-header">
+          <header class="materia-header card">
             <button id="backToMaterias" class="ghost-btn back-to-materias">&larr; Volver</button>
-            <div class="hero card compact">
-              <div>
-                <span id="subjectYear" class="pill blue">Materia</span>
-                <h2 id="subjectTitle">Selecciona una materia</h2>
-                <p id="subjectSummary">Elige una materia para ver su información.</p>
-              </div>
+            <div class="materia-heading">
+              <h2 id="subjectTitle">Seleccioná una materia</h2>
+              <div id="subjectSummary" class="materia-chips"></div>
             </div>
-          </div>
-          <div class="subject-tabs">
-            <button type="button" class="subject-tab active" data-subject-tab="contenido">Contenido</button>
-            <button type="button" class="subject-tab" data-subject-tab="resumenes">Resúmenes</button>
-            <button type="button" class="subject-tab" data-subject-tab="fechas">Fechas</button>
-            <button type="button" class="subject-tab" data-subject-tab="foro">Foro</button>
-            <button type="button" class="subject-tab" data-subject-tab="opiniones">Opiniones</button>
-            <button type="button" class="subject-tab" data-subject-tab="encuestas">Encuestas</button>
-          </div>
+          </header>
+          <button type="button" id="subjectNavToggle" class="ghost-btn subject-nav-toggle" aria-controls="subjectNav" aria-expanded="false"><span class="icon icon-book"></span> Secciones</button>
+          <div id="materiaLayout" class="materia-layout">
+            <div id="subjectNavBackdrop" class="subject-nav-backdrop"></div>
+            <nav id="subjectNav" class="subject-nav" aria-label="Secciones de la materia">
+              <div class="subject-nav-head">
+                <strong id="subjectNavTitle">Materia</strong>
+                <button type="button" id="subjectNavClose" class="ghost-btn icon-btn subject-nav-close" aria-label="Ocultar secciones">✕</button>
+              </div>
+              <div id="unitNavList" class="subject-nav-list"></div>
+            </nav>
+            <div class="materia-main">
 
           <section class="subject-panel" data-subject-panel="contenido">
             <div id="subjectContentAdmin" class="content-admin hidden">
@@ -597,18 +599,11 @@
                 <button type="submit">Agregar contenido</button>
               </form>
             </div>
-            <button type="button" id="unitsNavToggle" class="ghost-btn units-nav-toggle-btn"><span class="icon icon-book"></span> Unidades</button>
-            <div id="contentLayout" class="content-layout">
-              <div id="subjectContent" class="card content-main stack"></div>
-              <div id="unitsNavBackdrop" class="units-nav-backdrop"></div>
-              <aside class="card content-units-nav">
-                <div class="section-head">
-                  <h4>Unidades</h4>
-                  <button type="button" id="unitsNavClose" class="ghost-btn icon-btn tiny-btn units-nav-close-btn" aria-label="Cerrar unidades">✕</button>
-                </div>
-                <div id="unitNavList" class="stack"></div>
-              </aside>
-            </div>
+            <div id="subjectContent" class="card content-main stack"></div>
+          </section>
+
+          <section class="card subject-panel hidden" data-subject-panel="evaluaciones">
+            <div id="subjectExams" class="exam-section"></div>
           </section>
 
           <section class="card subject-panel hidden" data-subject-panel="resumenes">
@@ -623,22 +618,8 @@
             <div id="subjectSummaries" class="stack"></div>
           </section>
 
-          <section class="card subject-panel hidden" data-subject-panel="fechas">
-            <div id="subjectExamAdmin" class="content-admin hidden">
-              <div class="section-head"><h4>Agregar fecha de examen <span class="admin-only-tag">(solo admin)</span></h4></div>
-              <form id="subjectExamForm" class="inline-form">
-                <input id="subjectExamTitle" type="text" placeholder="Título (opcional, ej. Primer parcial)" />
-                <div class="two-cols">
-                  <input id="subjectExamDate" type="date" required />
-                  <input id="subjectExamTime" type="time" />
-                </div>
-                <button type="submit">Agregar fecha</button>
-              </form>
-            </div>
-            <div id="subjectDates" class="stack"></div>
-          </section>
-
           <section class="card subject-panel hidden" data-subject-panel="foro">
+            <div class="section-head"><h3>Foro de la materia</h3></div>
             <form id="subjectForumForm" class="inline-form">
               <textarea id="subjectForumInput" placeholder="Escribí una consulta o comentario sobre la materia" required></textarea>
               <button type="submit">Publicar</button>
@@ -688,9 +669,8 @@
             </form>
 
             <div id="subjectOpinions" class="stack"></div>
-          </section>
 
-          <section class="card subject-panel hidden" data-subject-panel="encuestas">
+            <div class="section-head panel-divider"><h3>Encuestas</h3></div>
             <form id="pollForm" class="inline-form">
               <input id="pollQuestionInput" type="text" placeholder="Pregunta de la encuesta" required />
               <input id="pollOptionsInput" type="text" placeholder="Opciones separadas por coma (ej. Sí, No, Tal vez)" required />
@@ -698,8 +678,21 @@
             </form>
             <div id="subjectPolls" class="stack"></div>
           </section>
+            </div>
+          </div>
         </section>
       </main>
+    </div>
+
+    <div id="pdfModal" class="modal-overlay pdf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfModalTitle">
+      <div class="pdf-modal-card card">
+        <header class="pdf-modal-head">
+          <h3 id="pdfModalTitle">Documento</h3>
+          <a id="pdfModalDownload" class="download-link" href="#" download><span class="icon icon-download"></span> Descargar</a>
+          <button type="button" id="pdfModalClose" class="ghost-btn icon-btn" aria-label="Cerrar visor">✕</button>
+        </header>
+        <iframe id="pdfModalFrame" class="pdf-modal-frame" title="Documento PDF"></iframe>
+      </div>
     </div>
 
     <div id="studentProfileModal" class="modal-overlay hidden">
@@ -732,6 +725,7 @@
     </div>
   </section>
 
+  <script src="exam-core.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

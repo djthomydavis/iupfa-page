@@ -53,7 +53,7 @@ function buildCurriculumSubjects() {
     libre,
     examFinal,
     correlatives: correlatives.map(c => `mat${c}`),
-    units: [], dates: [], forum: [], opinions: [], polls: []
+    units: [], dates: [], forum: [], opinions: [], polls: [], exams: []
   }));
 }
 
@@ -92,6 +92,21 @@ function sanitizeStorageFilename(name) {
   return (cleanBase || 'archivo') + ext;
 }
 
+// Clases grabadas cargadas a mano, por código de materia. Los videos subidos
+// como material de una unidad ya aparecen solos en "Clases grabadas"; acá van
+// las grabaciones que no pertenecen a ninguna unidad.
+//   title: nombre de la clase
+//   date: 'AAAA-MM-DD'
+//   duration: texto libre, opcional (ej. '1 h 45 min')
+//   unit: unidad relacionada, opcional
+//   url: link de compartir de Google Drive ("Cualquiera con el enlace")
+const RECORDED_CLASSES = {
+  // '101': [
+  //   { title: 'Clase 02', date: '2026-08-19', duration: '1 h 45 min', unit: 'Unidad 1', url: 'https://drive.google.com/file/d/ID_DEL_ARCHIVO/view' },
+  //   { title: 'Clase 03', date: '2026-08-26', duration: '', unit: 'Unidad 1', url: 'https://drive.google.com/file/d/ID_DEL_ARCHIVO/view' }
+  // ]
+};
+
 const state = {
   data: {
     calendar: [
@@ -118,8 +133,14 @@ const state = {
   currentSubjectId: null,
   currentUnitId: null,
   currentItemId: null,
+  currentRecordedId: null,
+  currentYear: null,
+  subjectSection: 'contenido',
+  navGroupsOpen: { contenido: true, grabadas: false },
+  examView: { mode: 'list', examId: null },
+  confirmDeleteExamId: null,
+  lastRandomExamId: null,
   confirmDeleteUnitId: null,
-  confirmDeleteItemId: null,
   viewMode: 'admin',
   calendarView: { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: null, holidaysListOpen: false },
   planningSearch: '',
@@ -229,7 +250,7 @@ function mapSubjectRow(row) {
     examFinal: row.exam_final,
     correlatives: row.correlatives || [],
     anySemester: !!row.any_semester,
-    units: [], dates: [], forum: [], opinions: [], polls: []
+    units: [], dates: [], forum: [], opinions: [], polls: [], exams: []
   };
 }
 
@@ -709,7 +730,6 @@ function isAdminView() {
 function applyViewMode() {
   const adminShortcut = document.getElementById('adminShortcut');
   const contentAddCard = document.getElementById('subjectContentAdmin');
-  const examAddCard = document.getElementById('subjectExamAdmin');
   const toggleBtn = document.getElementById('viewModeToggle');
   const addCalendarEventBtn = document.getElementById('addCalendarEventBtn');
   const addRecurringClassBtn = document.getElementById('addRecurringClassBtn');
@@ -720,8 +740,7 @@ function applyViewMode() {
   const isAdminAccount = !!(state.currentUser && state.currentUser.role === 'admin');
 
   if (adminShortcut) adminShortcut.classList.toggle('hidden', !isAdminView());
-  if (contentAddCard && state.currentSubjectId) contentAddCard.classList.toggle('hidden', !isAdminView());
-  if (examAddCard && state.currentSubjectId) examAddCard.classList.toggle('hidden', !isAdminView());
+  if (contentAddCard && state.currentSubjectId) contentAddCard.classList.toggle('hidden', !isAdminView() || state.subjectSection !== 'contenido');
   if (addCalendarEventBtn) addCalendarEventBtn.classList.toggle('hidden', !isAdminView());
   if (addRecurringClassBtn) addRecurringClassBtn.classList.toggle('hidden', !isAdminView());
   if (importHolidaysBtn) importHolidaysBtn.classList.toggle('hidden', !isAdminView());
@@ -740,6 +759,12 @@ function applyViewMode() {
     sidebarToggleBtn.classList.toggle('hidden', !isAdminAccount);
     if (sidebarToggleLabel) sidebarToggleLabel.textContent = state.viewMode === 'user' ? 'Ver como admin' : 'Ver como usuario';
   }
+
+  // Evaluaciones: al pasar a vista alumno se cierra el editor y se ocultan
+  // las acciones de admin.
+  if (state.examView.mode === 'edit' && !isAdminView()) state.examView = { mode: 'list', examId: null };
+  const examSubject = currentSubject();
+  if (examSubject) renderExamsSection(examSubject);
 }
 
 function toggleViewMode() {
@@ -788,7 +813,7 @@ async function loadFaqFromSupabase() {
 }
 
 function mapContentItemRow(row) {
-  const base = { id: row.id, type: row.type, title: row.title, uploadedBy: row.uploaded_by, position: row.position };
+  const base = { id: row.id, type: row.type, title: row.title, uploadedBy: row.uploaded_by, position: row.position, createdAt: row.created_at };
   return row.type === 'pdf'
     ? { ...base, fileName: row.file_name, url: row.url, storagePath: row.storage_path }
     : { ...base, body: row.body };
@@ -967,7 +992,7 @@ async function runClasesImport(fileList, force, logEl, noticeEl) {
 // Carga en bloque (pocas queries en vez de una por materia) todo el
 // contenido propio de cada materia y lo cuelga de state.data.subjects.
 function mapSummaryRow(row) {
-  return { id: row.id, title: row.title, fileName: row.file_name, url: row.url, storagePath: row.storage_path, author: row.author_name, authorId: row.author_id };
+  return { id: row.id, title: row.title, fileName: row.file_name, url: row.url, storagePath: row.storage_path, author: row.author_name, authorId: row.author_id, createdAt: row.created_at };
 }
 
 async function loadSubjectContentFromSupabase() {
@@ -978,10 +1003,11 @@ async function loadSubjectContentFromSupabase() {
     subject.opinions = [];
     subject.polls = [];
     subject.summaries = [];
+    subject.exams = [];
   });
   if (!supabaseClient) return;
 
-  const [unitsRes, itemsRes, forumRes, opinionsRes, pollsRes, optionsRes, votesRes, summariesRes] = await Promise.all([
+  const [unitsRes, itemsRes, forumRes, opinionsRes, pollsRes, optionsRes, votesRes, summariesRes, examsRes] = await Promise.all([
     supabaseClient.from('subject_units').select('*').order('created_at', { ascending: true }),
     supabaseClient.from('subject_content_items').select('*').order('position', { ascending: true }).order('created_at', { ascending: true }),
     supabaseClient.from('subject_forum_posts').select('*').order('created_at', { ascending: false }),
@@ -989,7 +1015,8 @@ async function loadSubjectContentFromSupabase() {
     supabaseClient.from('subject_polls').select('*').order('created_at', { ascending: false }),
     supabaseClient.from('subject_poll_options').select('*').order('position', { ascending: true }),
     supabaseClient.from('subject_poll_votes').select('*'),
-    supabaseClient.from('subject_summaries').select('*').order('created_at', { ascending: false })
+    supabaseClient.from('subject_summaries').select('*').order('created_at', { ascending: false }),
+    supabaseClient.from('subject_exams').select('*').order('created_at', { ascending: true })
   ]);
 
   const subjectsById = {};
@@ -1046,6 +1073,1088 @@ async function loadSubjectContentFromSupabase() {
     const subject = subjectsById[row.subject_id];
     if (subject) subject.summaries.push(mapSummaryRow(row));
   });
+
+  // Si la tabla todavía no existe (no se corrió el SQL), la sección de
+  // evaluaciones queda vacía y el resto de la materia carga igual.
+  if (examsRes.error) console.warn('No se pudieron cargar las evaluaciones:', examsRes.error.message);
+  (examsRes.data || []).forEach(row => {
+    const subject = subjectsById[row.subject_id];
+    if (subject) subject.exams.push(mapExamRow(row));
+  });
+}
+
+function mapExamRow(row) {
+  return {
+    id: row.id,
+    subjectId: row.subject_id,
+    title: row.title,
+    description: row.description || '',
+    durationMinutes: row.duration_minutes || null,
+    config: { ...DEFAULT_EXAM_CONFIG, ...(row.config || {}) },
+    questions: Array.isArray(row.questions) ? row.questions : [],
+    createdBy: row.created_by_name,
+    updatedAt: row.updated_at
+  };
+}
+
+function examToRow(subject, draft) {
+  return {
+    subject_id: subject.id,
+    title: draft.title.trim(),
+    description: (draft.description || '').trim(),
+    duration_minutes: draft.durationMinutes || null,
+    config: draft.config,
+    questions: draft.questions.map(question => {
+      const base = { id: question.id, type: question.type || 'true_false_statements', topic: (question.topic || '').trim(), prompt: question.prompt };
+      return isMultipleChoice(question)
+        ? { ...base, options: question.options.map(option => ({ text: option.text })), correct: question.correct }
+        : { ...base, statements: question.statements.map(statement => ({ text: statement.text, answer: !!statement.answer })) };
+    })
+  };
+}
+
+async function saveExam(subject, draft) {
+  if (!supabaseClient || !isAdminView()) return { ok: false, message: 'Solo un admin puede guardar evaluaciones.' };
+  const row = examToRow(subject, draft);
+  const query = draft.id
+    ? supabaseClient.from('subject_exams').update({ ...row, updated_at: new Date().toISOString() }).eq('id', draft.id)
+    : supabaseClient.from('subject_exams').insert({ ...row, created_by_name: getFullName(state.currentUser) || 'Admin' });
+  const { data, error } = await query.select().single();
+  if (error) return { ok: false, message: `No se pudo guardar la evaluación: ${error.message}` };
+
+  const exam = mapExamRow(data);
+  const index = subject.exams.findIndex(item => item.id === exam.id);
+  if (index === -1) subject.exams.push(exam);
+  else subject.exams[index] = exam;
+  return { ok: true, exam };
+}
+
+async function deleteExam(subject, examId) {
+  if (!supabaseClient || !isAdminView()) return { ok: false, message: 'Solo un admin puede borrar evaluaciones.' };
+  const { error } = await supabaseClient.from('subject_exams').delete().eq('id', examId);
+  if (error) return { ok: false, message: `No se pudo borrar la evaluación: ${error.message}` };
+  subject.exams = subject.exams.filter(item => item.id !== examId);
+  return { ok: true };
+}
+
+// Texto cargado por un admin, con fórmulas opcionales ($...$ / $$...$$), a
+// HTML. Si KaTeX no cargó, la fórmula se muestra como texto entre sus $.
+function renderMathText(text) {
+  return splitMathSegments(text).map(segment => {
+    if (segment.type === 'text') return escapeHtml(segment.value).replace(/\n/g, '<br>');
+    const delimiter = segment.display ? '$$' : '$';
+    const raw = escapeHtml(`${delimiter}${segment.value}${delimiter}`);
+    if (typeof window === 'undefined' || !window.katex) return raw;
+    try {
+      return window.katex.renderToString(segment.value, { displayMode: segment.display, throwOnError: false });
+    } catch (error) {
+      return `<span class="math-error">${raw}</span>`;
+    }
+  }).join('');
+}
+
+// =========================================================
+// Evaluaciones: simulador de exámenes por materia (lista, editor de admin,
+// rendir con reloj y resultado). La corrección vive en exam-core.js. Ver
+// docs/superpowers/specs/2026-10-21-evaluaciones-design.md.
+// =========================================================
+
+function currentSubject() {
+  return state.data.subjects.find(item => item.id === state.currentSubjectId) || null;
+}
+
+function setExamView(next) {
+  state.examView = { ...state.examView, ...next };
+  const subject = currentSubject();
+  if (subject) renderExamsSection(subject);
+}
+
+function renderExamsSection(subject) {
+  const target = document.getElementById('subjectExams');
+  if (!target) return;
+  const view = state.examView;
+  const exam = view.examId ? subject.exams.find(item => item.id === view.examId) : null;
+
+  if (view.mode === 'edit' && isAdminView() && view.draft) {
+    renderExamEditor(target);
+    return;
+  }
+  if (view.mode === 'take' && exam && view.attempt && !view.attempt.submitted) {
+    renderExamAttempt(exam, target);
+    return;
+  }
+  if (view.mode === 'result' && exam && view.result) {
+    renderExamResult(exam, target);
+    return;
+  }
+  stopExamTimer();
+  state.examView = { mode: 'list', examId: null };
+  renderExamList(subject, target);
+}
+
+function formatClock(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${pad2(Math.floor(totalSeconds / 60))}:${pad2(totalSeconds % 60)}`;
+}
+
+function examDurationLabel(exam) {
+  return exam.durationMinutes ? `${exam.durationMinutes} min` : 'Sin límite de tiempo';
+}
+
+function examPassLabel(config) {
+  return config.passMode === 'points'
+    ? `Aprueba con ${formatScore(config.passValue)} ${Number(config.passValue) === 1 ? 'punto' : 'puntos'}`
+    : `Aprueba con ${formatScore(config.passValue)} %`;
+}
+
+function examHasTrueFalse(exam) {
+  return exam.questions.some(question => !isMultipleChoice(question));
+}
+
+function examPenaltyLabel(exam) {
+  const config = exam.config;
+  if (exam.questions.length && !examHasTrueFalse(exam)) return 'Opción múltiple · las respuestas incorrectas no restan';
+  const fp = config.fpPenaltyEnabled ? `falso positivo −${formatScore(config.fpPenalty)}` : '';
+  const fn = config.fnPenaltyEnabled ? `falso negativo −${formatScore(config.fnPenalty)}` : '';
+  if (fp && fn) return `Descuentos: ${fp}, ${fn}`;
+  if (fp || fn) return `Descuento: solo ${fp || fn}`;
+  return 'Sin descuentos (pregunta con error vale 0)';
+}
+
+// ---------- Lista ----------
+
+// Tarjeta "Evaluación de práctica": el alumno no elige cuál rinde, se
+// sortea una de las evaluaciones con preguntas. La descripción y los datos
+// (preguntas, duración, aprobación) se muestran si son iguales en todas.
+function examPracticeCardHtml(exams) {
+  const available = exams.filter(exam => exam.questions.length);
+  if (!available.length) return '';
+  const shared = valueOf => {
+    const values = [...new Set(available.map(valueOf))];
+    return values.length === 1 ? values[0] : '';
+  };
+  const description = shared(exam => exam.description || '');
+  const count = shared(exam => exam.questions.length);
+  const meta = [
+    count ? `${count} ${count === 1 ? 'pregunta' : 'preguntas'}` : '',
+    shared(exam => examDurationLabel(exam)),
+    shared(exam => examPassLabel(exam.config)),
+    shared(exam => examPenaltyLabel(exam))
+  ].filter(Boolean).join(' · ');
+  const timed = available.some(exam => exam.durationMinutes);
+  return `
+    <div class="exam-random card">
+      <div class="exam-random-text">
+        <h3>Evaluación de práctica</h3>
+        ${description ? `<p class="exam-description">${renderMathText(description)}</p>` : ''}
+        ${meta ? `<span>${meta}</span>` : ''}
+      </div>
+      <div class="exam-random-actions">
+        <button type="button" data-exam-random>Iniciar prueba</button>
+        ${timed ? '<button type="button" class="ghost-btn" data-exam-random-practice>Practicar sin límite</button>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+function startRandomExam(subject, practice) {
+  const exam = pickRandomExam(subject.exams, state.lastRandomExamId);
+  if (!exam) return;
+  state.lastRandomExamId = exam.id;
+  startExamAttempt(exam, practice);
+}
+
+function renderExamList(subject, target) {
+  const admin = isAdminView();
+  const exams = subject.exams.filter(exam => admin || exam.questions.length);
+
+  const cards = exams.map(exam => {
+    const count = exam.questions.length;
+    const meta = [
+      `${count} ${count === 1 ? 'pregunta' : 'preguntas'}`,
+      examDurationLabel(exam),
+      examPassLabel(exam.config)
+    ].join(' · ');
+    const adminActions = !admin ? ''
+      : state.confirmDeleteExamId === exam.id
+      ? `<button type="button" class="ghost-btn small-btn danger-btn" data-exam-delete-confirm="${exam.id}">Confirmar eliminación</button>
+         <button type="button" class="ghost-btn small-btn" data-exam-delete-cancel>Cancelar</button>`
+      : `<button type="button" class="ghost-btn small-btn" data-exam-edit="${exam.id}"><span class="icon icon-edit"></span> Editar</button>
+         <button type="button" class="ghost-btn small-btn danger-btn" data-exam-delete="${exam.id}"><span class="icon icon-trash"></span> Eliminar</button>`;
+    const start = !count
+      ? '<span class="materia-chip">Sin preguntas</span>'
+      : exam.durationMinutes
+      ? `<button type="button" class="download-link primary" data-exam-start="${exam.id}">Rendir con tiempo (${exam.durationMinutes} min)</button>
+         <button type="button" class="download-link" data-exam-practice="${exam.id}">Practicar sin límite</button>`
+      : `<button type="button" class="download-link primary" data-exam-start="${exam.id}">Comenzar</button>`;
+    return `
+      <li class="material-card exam-card">
+        <span class="material-icon type-exam"><span class="icon icon-check-circle"></span></span>
+        <div class="material-info">
+          <strong>${escapeHtml(exam.title)}</strong>
+          ${exam.description ? `<span class="exam-description">${renderMathText(exam.description)}</span>` : ''}
+          <span>${meta}</span>
+          <span>${examPenaltyLabel(exam)}</span>
+        </div>
+        <div class="material-actions">${start}${adminActions}</div>
+      </li>
+    `;
+  }).join('');
+
+  if (!admin) {
+    target.innerHTML = `
+      ${examPracticeCardHtml(exams) || createItemCard('Sin evaluaciones', 'Todavía no hay simulacros para esta materia.', '')}
+      <p class="form-hint">Practicá con simulacros corregidos con los mismos criterios del examen. Tu resultado no se guarda.</p>
+    `;
+    return;
+  }
+
+  target.innerHTML = `
+    <div class="section-head unit-list-head">
+      <h3>Evaluaciones</h3>
+      <span class="content-item-meta">${exams.length} ${exams.length === 1 ? 'simulacro' : 'simulacros'}</span>
+      ${admin ? '<div class="unit-admin-actions"><button type="button" class="small-btn" data-exam-new><span class="icon icon-edit"></span> Nueva evaluación</button></div>' : ''}
+    </div>
+    <p class="form-hint">Practicá con simulacros corregidos con los mismos criterios del examen. Tu resultado no se guarda.</p>
+    <div id="examListNotice" class="notice"></div>
+    ${examPracticeCardHtml(exams)}
+    ${exams.length
+      ? `<ul class="material-list">${cards}</ul>`
+      : createItemCard('Sin evaluaciones', 'Todavía no hay simulacros para esta materia.', '')}
+  `;
+}
+
+// ---------- Editor (solo admin) ----------
+
+function newExamQuestion(type = 'true_false_statements') {
+  const question = { id: generateLocalId('q'), type, prompt: '' };
+  return type === MULTIPLE_CHOICE
+    ? { ...question, options: Array.from({ length: 4 }, () => ({ text: '' })), correct: 0 }
+    : { ...question, statements: Array.from({ length: 5 }, () => ({ text: '', answer: true })) };
+}
+
+// Cambia el tipo de una pregunta del editor conservando los textos: las
+// afirmaciones pasan a ser opciones y viceversa.
+function convertExamQuestion(question, type) {
+  if ((question.type || 'true_false_statements') === type) return question;
+  const { statements, options, correct, ...rest } = question;
+  if (type === MULTIPLE_CHOICE) {
+    const texts = (statements || []).map(statement => ({ text: statement.text }));
+    return { ...rest, type, options: texts.length >= 2 ? texts : [{ text: '' }, { text: '' }], correct: 0 };
+  }
+  const texts = (options || []).map((option, index) => ({ text: option.text, answer: index === correct }));
+  return { ...rest, type, statements: texts.length >= 2 ? texts : [{ text: '', answer: true }, { text: '', answer: false }] };
+}
+
+function examChoiceLetter(index) {
+  return String.fromCharCode(97 + index);
+}
+
+function newExamDraft() {
+  return {
+    id: null,
+    title: '',
+    description: '',
+    durationMinutes: null,
+    config: { ...DEFAULT_EXAM_CONFIG },
+    questions: [newExamQuestion()]
+  };
+}
+
+function openExamEditor(exam) {
+  const draft = exam ? JSON.parse(JSON.stringify({ ...exam })) : newExamDraft();
+  setExamView({ mode: 'edit', examId: exam ? exam.id : null, draft, dirty: false, errors: {}, saveError: '', saving: false });
+}
+
+function examFieldError(path) {
+  const message = (state.examView.errors || {})[path];
+  return message ? `<p class="field-error" id="err-${path.replace(/\./g, '-')}">${message}</p>` : '';
+}
+
+function examInvalidAttrs(path) {
+  const message = (state.examView.errors || {})[path];
+  return message ? `aria-invalid="true" aria-describedby="err-${path.replace(/\./g, '-')}"` : '';
+}
+
+function examNumberValue(value) {
+  return value === null || value === undefined || Number.isNaN(value) ? '' : String(value);
+}
+
+function vfGroupHtml(label, value, attrs) {
+  return `
+    <div class="vf-group" role="group" aria-label="${label}">
+      <button type="button" class="vf-btn" aria-pressed="${value === true}" data-vf="true" ${attrs}>V</button>
+      <button type="button" class="vf-btn" aria-pressed="${value === false}" data-vf="false" ${attrs}>F</button>
+    </div>
+  `;
+}
+
+function renderExamEditor(target) {
+  const view = state.examView;
+  const draft = view.draft;
+  const config = draft.config;
+
+  const questions = draft.questions.map((question, qIndex) => {
+    const isChoice = isMultipleChoice(question);
+    const options = !isChoice ? '' : question.options.map((option, oIndex) => `
+      <li class="exam-statement-edit">
+        <div class="exam-statement-row">
+          <input type="text" value="${escapeHtml(option.text)}" placeholder="Opción ${examChoiceLetter(oIndex)}"
+            aria-label="Pregunta ${qIndex + 1}, opción ${examChoiceLetter(oIndex)}" data-q="${qIndex}" data-o="${oIndex}" data-field="option"
+            ${examInvalidAttrs(`questions.${qIndex}.options.${oIndex}.text`)} />
+          <button type="button" class="vf-btn mc-correct-btn" aria-pressed="${question.correct === oIndex}" data-q="${qIndex}" data-correct="${oIndex}"
+            aria-label="Marcar la opción ${examChoiceLetter(oIndex)} como correcta">${question.correct === oIndex ? '✓ Correcta' : 'Correcta'}</button>
+          <button type="button" class="ghost-btn icon-btn exam-icon-btn" data-q="${qIndex}" data-o-remove="${oIndex}"
+            aria-label="Quitar opción ${examChoiceLetter(oIndex)}" ${question.options.length <= 2 ? 'disabled' : ''}>✕</button>
+        </div>
+        <div class="math-preview inline" ${option.text.includes('$') ? '' : 'hidden'}>${renderMathText(option.text)}</div>
+        ${examFieldError(`questions.${qIndex}.options.${oIndex}.text`)}
+      </li>
+    `).join('');
+    const statements = isChoice ? '' : question.statements.map((statement, sIndex) => `
+      <li class="exam-statement-edit">
+        <div class="exam-statement-row">
+          <input type="text" value="${escapeHtml(statement.text).replace(/"/g, '&quot;')}" placeholder="Afirmación ${sIndex + 1}"
+            aria-label="Pregunta ${qIndex + 1}, afirmación ${sIndex + 1}" data-q="${qIndex}" data-s="${sIndex}" data-field="text"
+            ${examInvalidAttrs(`questions.${qIndex}.statements.${sIndex}.text`)} />
+          ${vfGroupHtml(`Respuesta correcta de la afirmación ${sIndex + 1}`, statement.answer, `data-q="${qIndex}" data-s="${sIndex}"`)}
+          <button type="button" class="ghost-btn icon-btn exam-icon-btn" data-q="${qIndex}" data-s-remove="${sIndex}"
+            aria-label="Quitar afirmación ${sIndex + 1}" ${question.statements.length <= 2 ? 'disabled' : ''}>✕</button>
+        </div>
+        <div class="math-preview inline" data-preview="${qIndex}-${sIndex}" ${statement.text.includes('$') ? '' : 'hidden'}>${renderMathText(statement.text)}</div>
+        ${examFieldError(`questions.${qIndex}.statements.${sIndex}.text`)}
+      </li>
+    `).join('');
+
+    return `
+      <li class="exam-q-card">
+        <div class="exam-q-head">
+          <h4>Pregunta ${qIndex + 1}</h4>
+          <button type="button" class="ghost-btn icon-btn exam-icon-btn" data-q-action="up" data-q="${qIndex}" aria-label="Subir pregunta ${qIndex + 1}" ${qIndex === 0 ? 'disabled' : ''}>▲</button>
+          <button type="button" class="ghost-btn icon-btn exam-icon-btn" data-q-action="down" data-q="${qIndex}" aria-label="Bajar pregunta ${qIndex + 1}" ${qIndex === draft.questions.length - 1 ? 'disabled' : ''}>▼</button>
+          <button type="button" class="ghost-btn icon-btn exam-icon-btn danger-btn" data-q-action="delete" data-q="${qIndex}" aria-label="Eliminar pregunta ${qIndex + 1}"><span class="icon icon-trash"></span></button>
+        </div>
+        <label class="exam-field">Tipo de pregunta
+          <select data-q="${qIndex}" data-field="type">
+            <option value="true_false_statements" ${isChoice ? '' : 'selected'}>Afirmaciones verdadero / falso</option>
+            <option value="${MULTIPLE_CHOICE}" ${isChoice ? 'selected' : ''}>Opción múltiple (una correcta)</option>
+          </select>
+        </label>
+        <label class="exam-field">Tema (opcional, para el resumen de fortalezas y debilidades)
+          <input type="text" list="examTopicList" data-q="${qIndex}" data-field="topic" value="${escapeHtml(question.topic || '').replace(/"/g, '&quot;')}" placeholder="Ej.: Unidad 2 · Aritmética modular" />
+        </label>
+        <label class="exam-field">Enunciado
+          <textarea data-q="${qIndex}" data-field="prompt" rows="3" ${examInvalidAttrs(`questions.${qIndex}.prompt`)}>${escapeHtml(question.prompt)}</textarea>
+        </label>
+        <div class="math-preview" data-preview="${qIndex}" ${question.prompt ? '' : 'hidden'}>${renderMathText(question.prompt)}</div>
+        ${examFieldError(`questions.${qIndex}.prompt`)}
+        ${isChoice ? `
+        <p class="exam-sublabel">Opciones (marcá la correcta)</p>
+        <ol class="exam-statements-edit">${options}</ol>
+        ${examFieldError(`questions.${qIndex}.options`)}
+        ${examFieldError(`questions.${qIndex}.correct`)}
+        <button type="button" class="ghost-btn small-btn exam-add-btn" data-q-action="add-option" data-q="${qIndex}">+ Agregar opción</button>` : `
+        <p class="exam-sublabel">Afirmaciones y respuesta correcta</p>
+        <ol class="exam-statements-edit">${statements}</ol>
+        ${examFieldError(`questions.${qIndex}.statements`)}
+        <button type="button" class="ghost-btn small-btn exam-add-btn" data-q-action="add-statement" data-q="${qIndex}">+ Agregar afirmación</button>`}
+      </li>
+    `;
+  }).join('');
+
+  target.innerHTML = `
+    <form class="exam-editor" novalidate>
+      <div class="section-head unit-list-head"><h3>${draft.id ? 'Editar evaluación' : 'Nueva evaluación'}</h3></div>
+      <div class="notice ${view.saveError ? 'error show' : ''}" role="alert">${escapeHtml(view.saveError || '')}</div>
+
+      <fieldset>
+        <legend>Datos</legend>
+        <label class="exam-field">Título
+          <input type="text" data-field="title" value="${escapeHtml(draft.title).replace(/"/g, '&quot;')}" ${examInvalidAttrs('title')} />
+        </label>
+        ${examFieldError('title')}
+        <label class="exam-field">Descripción (opcional)
+          <textarea data-field="description" rows="2">${escapeHtml(draft.description || '')}</textarea>
+        </label>
+        <label class="exam-field">Duración en minutos
+          <input type="number" min="1" step="1" inputmode="numeric" placeholder="Sin límite" data-field="durationMinutes" data-number value="${examNumberValue(draft.durationMinutes)}" ${examInvalidAttrs('durationMinutes')} />
+        </label>
+        ${examFieldError('durationMinutes')}
+      </fieldset>
+
+      <fieldset>
+        <legend>Corrección</legend>
+        <div class="exam-grid">
+          <label class="exam-field">Puntaje por pregunta
+            <input type="number" min="0" step="0.01" inputmode="decimal" data-field="config.pointsPerQuestion" data-number value="${examNumberValue(config.pointsPerQuestion)}" ${examInvalidAttrs('config.pointsPerQuestion')} />
+            ${examFieldError('config.pointsPerQuestion')}
+          </label>
+          <div class="exam-field">
+            <label class="checkbox-row exam-check"><input type="checkbox" data-field="config.fpPenaltyEnabled" ${config.fpPenaltyEnabled ? 'checked' : ''} /> Los falsos positivos restan</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" aria-label="Descuento por falso positivo" data-field="config.fpPenalty" data-number value="${examNumberValue(config.fpPenalty)}" ${config.fpPenaltyEnabled ? '' : 'disabled'} ${examInvalidAttrs('config.fpPenalty')} />
+            ${examFieldError('config.fpPenalty')}
+          </div>
+          <div class="exam-field">
+            <label class="checkbox-row exam-check"><input type="checkbox" data-field="config.fnPenaltyEnabled" ${config.fnPenaltyEnabled ? 'checked' : ''} /> Los falsos negativos restan</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" aria-label="Descuento por falso negativo" data-field="config.fnPenalty" data-number value="${examNumberValue(config.fnPenalty)}" ${config.fnPenaltyEnabled ? '' : 'disabled'} ${examInvalidAttrs('config.fnPenalty')} />
+            ${examFieldError('config.fnPenalty')}
+          </div>
+          <label class="exam-field">Aprobación
+            <select data-field="config.passMode">
+              <option value="percent" ${config.passMode === 'percent' ? 'selected' : ''}>Porcentaje</option>
+              <option value="points" ${config.passMode === 'points' ? 'selected' : ''}>Puntaje mínimo</option>
+            </select>
+          </label>
+          <label class="exam-field">${config.passMode === 'points' ? 'Puntaje mínimo para aprobar' : 'Porcentaje mínimo para aprobar'}
+            <input type="number" min="0" step="0.01" inputmode="decimal" data-field="config.passValue" data-number value="${examNumberValue(config.passValue)}" ${examInvalidAttrs('config.passValue')} />
+            ${examFieldError('config.passValue')}
+          </label>
+        </div>
+        <p class="form-hint">V/F: cada pregunta arranca con su puntaje y cada error lo descuenta. Una afirmación en blanco cuenta como error. Si un tipo de descuento está desactivado, un error de ese tipo deja la pregunta en 0. Opción múltiple: la correcta suma el puntaje y una incorrecta o en blanco vale 0 (los descuentos no se aplican). Para fórmulas escribí LaTeX entre $…$ (o $$…$$ para centrarlas); para un signo pesos común escribí \\$.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Preguntas (${draft.questions.length})</legend>
+        ${examFieldError('questions')}
+        <datalist id="examTopicList">${[...new Set(draft.questions.map(question => (question.topic || '').trim()).filter(Boolean))].map(topic => `<option value="${escapeHtml(topic).replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
+        <ol class="exam-q-list">${questions}</ol>
+        <button type="button" class="ghost-btn exam-add-btn" data-exam-add-question>+ Agregar pregunta</button>
+      </fieldset>
+
+      <div class="exam-editor-actions">
+        <button type="button" data-exam-save ${view.saving ? 'disabled' : ''}>${view.saving ? 'Guardando…' : 'Guardar evaluación'}</button>
+        <button type="button" class="ghost-btn" data-exam-cancel>Cancelar</button>
+      </div>
+    </form>
+  `;
+
+  const firstInvalid = target.querySelector('[aria-invalid="true"]');
+  if (firstInvalid && view.focusErrors) {
+    state.examView.focusErrors = false;
+    firstInvalid.focus();
+    firstInvalid.scrollIntoView({ block: 'center' });
+  }
+}
+
+function setDraftValue(path, value) {
+  const draft = state.examView.draft;
+  if (path.startsWith('config.')) draft.config[path.slice(7)] = value;
+  else draft[path] = value;
+  state.examView.dirty = true;
+}
+
+function handleExamEditorInput(event) {
+  const el = event.target;
+  const field = el.dataset.field;
+  if (!field) return;
+  const draft = state.examView.draft;
+
+  if (el.dataset.q !== undefined) {
+    const qIndex = Number(el.dataset.q);
+    const question = draft.questions[qIndex];
+    if (field === 'type') {
+      if ((question.type || 'true_false_statements') === el.value) return;
+      draft.questions[qIndex] = convertExamQuestion(question, el.value);
+      state.examView.dirty = true;
+      renderExamsSection(currentSubject());
+      const select = document.querySelector(`#subjectExams [data-q="${qIndex}"][data-field="type"]`);
+      if (select) select.focus();
+      return;
+    }
+    if (field === 'option') {
+      question.options[Number(el.dataset.o)].text = el.value;
+      const preview = el.closest('.exam-statement-edit').querySelector('.math-preview');
+      preview.hidden = !el.value.includes('$');
+      preview.innerHTML = renderMathText(el.value);
+      state.examView.dirty = true;
+      return;
+    }
+    if (field === 'topic') {
+      question.topic = el.value;
+    } else if (field === 'prompt') {
+      question.prompt = el.value;
+      const preview = el.closest('.exam-q-card').querySelector(`[data-preview="${el.dataset.q}"]`);
+      preview.hidden = !el.value;
+      preview.innerHTML = renderMathText(el.value);
+    } else {
+      question.statements[Number(el.dataset.s)].text = el.value;
+      const preview = el.closest('.exam-statement-edit').querySelector('.math-preview');
+      preview.hidden = !el.value.includes('$');
+      preview.innerHTML = renderMathText(el.value);
+    }
+    state.examView.dirty = true;
+    return;
+  }
+
+  if (el.type === 'checkbox') {
+    setDraftValue(field, el.checked);
+    const amount = el.closest('.exam-field').querySelector('input[type="number"]');
+    if (amount) amount.disabled = !el.checked;
+    return;
+  }
+  if (el.dataset.number !== undefined) {
+    const raw = el.value.trim().replace(',', '.');
+    if (field === 'durationMinutes') setDraftValue(field, raw === '' ? null : Number(raw));
+    else setDraftValue(field, raw === '' ? NaN : Number(raw));
+    return;
+  }
+  setDraftValue(field, el.value);
+  if (field === 'config.passMode') renderExamsSection(currentSubject());
+}
+
+async function handleExamEditorClick(event) {
+  const view = state.examView;
+  const draft = view.draft;
+  const subject = currentSubject();
+  const button = event.target.closest('button');
+  if (!button || !subject) return;
+
+  if (button.dataset.vf !== undefined) {
+    const value = button.dataset.vf === 'true';
+    draft.questions[Number(button.dataset.q)].statements[Number(button.dataset.s)].answer = value;
+    button.closest('.vf-group').querySelectorAll('.vf-btn').forEach(btn => btn.setAttribute('aria-pressed', String(btn === button)));
+    view.dirty = true;
+    return;
+  }
+
+  const rerenderAndFocus = selector => {
+    view.dirty = true;
+    renderExamsSection(subject);
+    const el = selector ? document.querySelector(`#subjectExams ${selector}`) : null;
+    if (el) el.focus();
+  };
+
+  if (button.dataset.correct !== undefined) {
+    const question = draft.questions[Number(button.dataset.q)];
+    question.correct = Number(button.dataset.correct);
+    button.closest('.exam-statements-edit').querySelectorAll('[data-correct]').forEach(btn => {
+      const isCorrect = Number(btn.dataset.correct) === question.correct;
+      btn.setAttribute('aria-pressed', String(isCorrect));
+      btn.textContent = isCorrect ? '✓ Correcta' : 'Correcta';
+    });
+    view.dirty = true;
+    return;
+  }
+
+  if (button.dataset.oRemove !== undefined) {
+    const question = draft.questions[Number(button.dataset.q)];
+    const removed = Number(button.dataset.oRemove);
+    if (question.options.length > 2) {
+      question.options.splice(removed, 1);
+      if (question.correct === removed) question.correct = 0;
+      else if (question.correct > removed) question.correct -= 1;
+    }
+    rerenderAndFocus(`[data-q-action="add-option"][data-q="${button.dataset.q}"]`);
+    return;
+  }
+
+  if (button.dataset.sRemove !== undefined) {
+    const question = draft.questions[Number(button.dataset.q)];
+    if (question.statements.length > 2) question.statements.splice(Number(button.dataset.sRemove), 1);
+    rerenderAndFocus(`[data-q-action="add-statement"][data-q="${button.dataset.q}"]`);
+    return;
+  }
+
+  if (button.dataset.qAction) {
+    const index = Number(button.dataset.q);
+    const list = draft.questions;
+    const action = button.dataset.qAction;
+    if (action === 'add-statement') {
+      list[index].statements.push({ text: '', answer: true });
+      rerenderAndFocus(`[data-q="${index}"][data-s="${list[index].statements.length - 1}"][data-field="text"]`);
+    } else if (action === 'add-option') {
+      list[index].options.push({ text: '' });
+      rerenderAndFocus(`[data-q="${index}"][data-o="${list[index].options.length - 1}"][data-field="option"]`);
+    } else if (action === 'delete') {
+      if (!confirm(`¿Eliminar la pregunta ${index + 1}?`)) return;
+      list.splice(index, 1);
+      rerenderAndFocus('[data-exam-add-question]');
+    } else {
+      const swap = action === 'up' ? index - 1 : index + 1;
+      if (swap < 0 || swap >= list.length) return;
+      [list[index], list[swap]] = [list[swap], list[index]];
+      rerenderAndFocus(`[data-q-action="${action}"][data-q="${swap}"]`);
+    }
+    return;
+  }
+
+  if (button.hasAttribute('data-exam-add-question')) {
+    const last = draft.questions[draft.questions.length - 1];
+    draft.questions.push(newExamQuestion(last ? last.type : undefined));
+    rerenderAndFocus(`[data-q="${draft.questions.length - 1}"][data-field="prompt"]`);
+    return;
+  }
+
+  if (button.hasAttribute('data-exam-cancel')) {
+    if (view.dirty && !confirm('¿Descartar los cambios de esta evaluación?')) return;
+    setExamView({ mode: 'list', examId: null, draft: null });
+    return;
+  }
+
+  if (button.hasAttribute('data-exam-save')) {
+    event.preventDefault();
+    const { ok, errors } = validateExamDraft(draft);
+    if (!ok) {
+      setExamView({ errors, saveError: 'Revisá los campos marcados.', focusErrors: true });
+      return;
+    }
+    setExamView({ errors: {}, saveError: '', saving: true });
+    const result = await saveExam(subject, draft);
+    if (!result.ok) {
+      setExamView({ saving: false, saveError: result.message });
+      return;
+    }
+    setExamView({ mode: 'list', examId: null, draft: null, saving: false });
+  }
+}
+
+// ---------- Rendir ----------
+
+function startExamAttempt(exam, practice = false) {
+  stopExamTimer();
+  const now = Date.now();
+  const attempt = {
+    examId: exam.id,
+    practice,
+    startedAt: now,
+    deadline: exam.durationMinutes && !practice ? now + exam.durationMinutes * 60000 : null,
+    answers: Object.fromEntries(exam.questions.map(question => [question.id, isMultipleChoice(question) ? null : question.statements.map(() => null)])),
+    timerId: null,
+    submitted: false,
+    warned: {}
+  };
+  setExamView({ mode: 'take', examId: exam.id, attempt, result: null });
+  if (attempt.deadline) {
+    attempt.timerId = setInterval(tickExamTimer, 1000);
+    tickExamTimer();
+  }
+  const section = document.getElementById('subjectExams');
+  if (section) section.scrollIntoView({ block: 'start' });
+}
+
+function stopExamTimer() {
+  const attempt = state.examView && state.examView.attempt;
+  if (attempt && attempt.timerId) {
+    clearInterval(attempt.timerId);
+    attempt.timerId = null;
+  }
+}
+
+function examAttemptInProgress() {
+  const view = state.examView;
+  return !!(view && view.mode === 'take' && view.attempt && !view.attempt.submitted);
+}
+
+// Recalcula con la hora real (no cuenta ticks), así que funciona igual si la
+// pestaña estuvo en segundo plano o hubo un confirm() abierto.
+function tickExamTimer() {
+  if (!examAttemptInProgress()) return;
+  const attempt = state.examView.attempt;
+  if (!attempt.deadline) return;
+  const remaining = attempt.deadline - Date.now();
+  if (remaining <= 0) {
+    submitExamAttempt('timeout');
+    return;
+  }
+  const clock = document.getElementById('examTimer');
+  if (clock) {
+    clock.textContent = formatClock(remaining);
+    clock.classList.toggle('low', remaining <= 60000);
+  }
+  const alert = document.getElementById('examTimerAlert');
+  [[300000, 'Quedan 5 minutos.'], [60000, 'Queda 1 minuto.']].forEach(([limit, message]) => {
+    if (remaining <= limit && !attempt.warned[limit]) {
+      attempt.warned[limit] = true;
+      if (alert) alert.textContent = message;
+    }
+  });
+}
+
+function examQuestionAnswered(question, answer) {
+  return isMultipleChoice(question) ? answer !== null : answer.every(mark => mark !== null);
+}
+
+function examProgressText(exam, attempt) {
+  const complete = exam.questions.filter(question => examQuestionAnswered(question, attempt.answers[question.id])).length;
+  return `${complete} de ${exam.questions.length} preguntas completas`;
+}
+
+// Respuestas sin marcar: afirmaciones V/F en blanco + preguntas de opción
+// múltiple sin elegir.
+function examBlankCount(exam, answers) {
+  return exam.questions.reduce((count, question) => {
+    const answer = answers[question.id];
+    if (isMultipleChoice(question)) return count + (answer === null ? 1 : 0);
+    return count + answer.filter(mark => mark === null).length;
+  }, 0);
+}
+
+function renderExamAttempt(exam, target) {
+  const attempt = state.examView.attempt;
+  const questions = exam.questions.map((question, qIndex) => {
+    if (isMultipleChoice(question)) {
+      const chosen = attempt.answers[question.id];
+      const options = question.options.map((option, oIndex) => `
+        <li>
+          <button type="button" class="mc-option" aria-pressed="${chosen === oIndex}" data-choice-q="${question.id}" data-o="${oIndex}">
+            <span class="exam-statement-letter">${examChoiceLetter(oIndex)})</span>
+            <span class="exam-statement-text">${renderMathText(option.text)}</span>
+          </button>
+        </li>
+      `).join('');
+      return `
+        <li class="exam-question">
+          <h4>Pregunta ${qIndex + 1}</h4>
+          <div class="exam-prompt">${renderMathText(question.prompt)}</div>
+          <ol class="mc-options" role="group" aria-label="Opciones de la pregunta ${qIndex + 1}">${options}</ol>
+        </li>
+      `;
+    }
+    const statements = question.statements.map((statement, sIndex) => `
+      <li class="exam-statement">
+        <span class="exam-statement-letter">${String.fromCharCode(97 + sIndex)})</span>
+        <div class="exam-statement-text">${renderMathText(statement.text)}</div>
+        ${vfGroupHtml(`Pregunta ${qIndex + 1}, afirmación ${String.fromCharCode(97 + sIndex)}`, attempt.answers[question.id][sIndex], `data-mark-q="${question.id}" data-s="${sIndex}"`)}
+      </li>
+    `).join('');
+    return `
+      <li class="exam-question">
+        <h4>Pregunta ${qIndex + 1}</h4>
+        <div class="exam-prompt">${renderMathText(question.prompt)}</div>
+        <ol class="exam-statements">${statements}</ol>
+      </li>
+    `;
+  }).join('');
+
+  target.innerHTML = `
+    <div class="exam-bar">
+      <div class="exam-bar-title"><strong>${escapeHtml(exam.title)}</strong><span id="examProgress">${examProgressText(exam, attempt)}</span>${attempt.practice ? '<span class="exam-mode">Modo práctica · sin límite de tiempo</span>' : ''}</div>
+      ${attempt.deadline ? `<span class="exam-timer" id="examTimer" role="timer" aria-label="Tiempo restante">${formatClock(attempt.deadline - Date.now())}</span>` : ''}
+      <button type="button" data-exam-submit>Entregar</button>
+    </div>
+    <p class="visually-hidden" id="examTimerAlert" aria-live="polite"></p>
+    <p class="form-hint">${examAttemptHint(exam)}</p>
+    <ol class="exam-questions">${questions}</ol>
+    <div class="exam-editor-actions"><button type="button" data-exam-submit>Entregar</button></div>
+  `;
+}
+
+function examAttemptHint(exam) {
+  const hasChoice = exam.questions.some(isMultipleChoice);
+  const hasTrueFalse = examHasTrueFalse(exam);
+  const tf = 'Marcá V o F en cada afirmación; tocá de nuevo para dejarla en blanco (en blanco cuenta como error).';
+  const choice = 'Elegí una opción por pregunta; tocala de nuevo para dejarla en blanco. Las incorrectas no restan.';
+  return [hasTrueFalse ? tf : '', hasChoice ? choice : ''].filter(Boolean).join(' ');
+}
+
+function handleExamAttemptClick(event) {
+  const button = event.target.closest('button');
+  if (!button) return;
+  const subject = currentSubject();
+  const view = state.examView;
+  const exam = subject && subject.exams.find(item => item.id === view.examId);
+  if (!exam) return;
+
+  if (button.dataset.choiceQ !== undefined) {
+    const questionId = button.dataset.choiceQ;
+    const index = Number(button.dataset.o);
+    view.attempt.answers[questionId] = view.attempt.answers[questionId] === index ? null : index;
+    const chosen = view.attempt.answers[questionId];
+    button.closest('.mc-options').querySelectorAll('.mc-option').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(Number(btn.dataset.o) === chosen));
+    });
+    const progress = document.getElementById('examProgress');
+    if (progress) progress.textContent = examProgressText(exam, view.attempt);
+    return;
+  }
+
+  if (button.dataset.markQ !== undefined) {
+    const marks = view.attempt.answers[button.dataset.markQ];
+    const index = Number(button.dataset.s);
+    const value = button.dataset.vf === 'true';
+    marks[index] = marks[index] === value ? null : value;
+    button.closest('.vf-group').querySelectorAll('.vf-btn').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(marks[index] !== null && (btn.dataset.vf === 'true') === marks[index]));
+    });
+    const progress = document.getElementById('examProgress');
+    if (progress) progress.textContent = examProgressText(exam, view.attempt);
+    return;
+  }
+
+  if (button.hasAttribute('data-exam-submit')) submitExamAttempt('manual');
+}
+
+function submitExamAttempt(reason) {
+  if (!examAttemptInProgress()) return;
+  const view = state.examView;
+  const attempt = view.attempt;
+  const subject = currentSubject();
+  const exam = subject && subject.exams.find(item => item.id === attempt.examId);
+  if (!exam) return;
+
+  if (reason === 'manual') {
+    const blanks = examBlankCount(exam, attempt.answers);
+    const unit = examHasTrueFalse(exam) ? ['respuesta', 'respuestas'] : ['pregunta', 'preguntas'];
+    if (blanks && !confirm(`Te ${blanks === 1 ? `queda 1 ${unit[0]}` : `quedan ${blanks} ${unit[1]}`} sin responder. En blanco no suma puntos. ¿Entregar igual?`)) return;
+    if (attempt.submitted) return;
+  }
+
+  const now = Date.now();
+  const timedOut = attempt.deadline !== null && now >= attempt.deadline;
+  attempt.submitted = true;
+  stopExamTimer();
+  const elapsedMs = timedOut ? attempt.deadline - attempt.startedAt : now - attempt.startedAt;
+  const result = { ...scoreExam(exam, attempt.answers), elapsedMs, reason: timedOut ? 'timeout' : 'manual', answers: attempt.answers, practice: !!attempt.practice };
+  setExamView({ mode: 'result', result });
+  const section = document.getElementById('subjectExams');
+  if (section) section.scrollIntoView({ block: 'start' });
+}
+
+// Pide confirmación antes de abandonar un intento en curso. Devuelve true si
+// se puede seguir navegando.
+function confirmLeaveExam() {
+  if (!examAttemptInProgress()) return true;
+  if (!confirm('Tenés una evaluación en curso. Si salís, se pierden tus respuestas. ¿Salir igual?')) return false;
+  stopExamTimer();
+  state.examView = { mode: 'list', examId: null };
+  return true;
+}
+
+// ---------- Resultado ----------
+
+const EXAM_PATTERN_ADVICE = {
+  fp: 'La mayoría de tus errores son falsos positivos: marcaste como verdaderas afirmaciones que eran falsas. Antes de marcar V, buscá un contraejemplo o revisá la condición que hace falta para que se cumpla. Recordá que un falso positivo descuenta más que un falso negativo.',
+  fn: 'La mayoría de tus errores son falsos negativos: descartaste afirmaciones que eran verdaderas. Revisá las definiciones y propiedades de cada tema para reconocerlas cuando aparecen escritas de otra forma.',
+  blanks: 'Muchos de tus errores vienen de respuestas en blanco: no suman puntos (y en V/F cuentan como error). Practicá con tiempo para llegar a responder todo.',
+  balanced: 'Tus errores se reparten entre falsos positivos y falsos negativos. Conviene repasar los temas marcados abajo antes que la forma de responder.',
+  mc: 'Elegiste opciones incorrectas en varias preguntas. Antes de responder, descartá las opciones que contradicen el material y releé el enunciado: muchas veces la diferencia está en una sola palabra ("siempre", "solo", "no"). Repasá los temas marcados abajo.',
+  none: 'No cometiste errores. ¡Excelente!'
+};
+
+function renderPerformanceSummary(exam, result) {
+  const summary = buildPerformanceSummary(exam, result);
+  const topicRow = topic => `
+    <li class="perf-topic ${topic.level}">
+      <span class="perf-topic-name">${escapeHtml(topic.topic)}</span>
+      <span class="perf-topic-score">${formatScore(topic.earned)} de ${formatScore(topic.max)} · ${formatScore(Math.round(topic.percent))} %</span>
+    </li>`;
+  const group = (title, level, extra) => {
+    const topics = summary.topics.filter(topic => topic.level === level);
+    if (!topics.length) return '';
+    return `
+      <section class="perf-group ${level}">
+        <h4>${title}</h4>
+        <ul class="perf-topics">${topics.map(topicRow).join('')}</ul>
+        ${extra || ''}
+      </section>`;
+  };
+  const { fp, fn, wrong, blanks } = summary.errors;
+  const errorParts = [
+    fp || fn ? `${fp} ${fp === 1 ? 'falso positivo' : 'falsos positivos'} y ${fn} ${fn === 1 ? 'falso negativo' : 'falsos negativos'}` : '',
+    wrong ? `${wrong} ${wrong === 1 ? 'pregunta de opción múltiple sin acertar' : 'preguntas de opción múltiple sin acertar'}` : ''
+  ].filter(Boolean);
+  const errorsLine = summary.errors.total
+    ? `Errores: ${errorParts.join('; ')}${blanks ? ` (${blanks} en blanco)` : ''}.`
+    : '';
+
+  return `
+    <section class="perf-summary" aria-labelledby="perfSummaryTitle">
+      <h3 id="perfSummaryTitle" class="exam-review-title">Resumen de tu desempeño</h3>
+      ${summary.topics.length ? `
+        <div class="perf-groups">
+          ${group('Qué tendrías que mejorar', 'weak', '<p class="form-hint">Repasá el material de estos temas en "Contenido del curso" y volvé a intentar.</p>')}
+          ${group('A reforzar', 'mid')}
+          ${group('Tus fortalezas', 'strong')}
+        </div>` : ''}
+      <div class="perf-pattern">
+        <p>${EXAM_PATTERN_ADVICE[summary.pattern]}</p>
+        ${errorsLine ? `<p class="form-hint">${errorsLine}</p>` : ''}
+      </div>
+    </section>
+  `;
+}
+
+function examQuestionCalc(scored, config) {
+  if (scored.choice) return formatScore(scored.score);
+  if (scored.voided) return '0 (un error de un tipo sin descuento anula la pregunta)';
+  const base = formatScore(config.pointsPerQuestion);
+  if (!scored.fp && !scored.fn) return base;
+  const term = (count, amount) => (count === 1 ? ` − ${formatScore(amount)}` : ` − ${count} × ${formatScore(amount)}`);
+  let calc = base;
+  if (scored.fp) calc += term(scored.fp, config.fpPenalty);
+  if (scored.fn) calc += term(scored.fn, config.fnPenalty);
+  return `${calc} = ${formatScore(scored.score)}`;
+}
+
+function renderExamResult(exam, target) {
+  const result = state.examView.result;
+  const config = exam.config;
+  const vf = value => (value === null ? 'En blanco' : value ? 'V' : 'F');
+  const outcomeLabel = statement => {
+    if (statement.outcome === 'ok') return '<span class="exam-outcome ok"><span class="icon icon-check-circle"></span> Acierto</span>';
+    const label = statement.outcome === 'fp' ? 'Falso positivo' : 'Falso negativo';
+    return `<span class="exam-outcome bad"><span class="icon icon-alert-triangle"></span> ${label}${statement.blank ? ' (en blanco)' : ''}</span>`;
+  };
+
+  const choiceOutcome = {
+    ok: '<span class="exam-outcome ok"><span class="icon icon-check-circle"></span> Correcta</span>',
+    wrong: '<span class="exam-outcome bad"><span class="icon icon-alert-triangle"></span> Incorrecta</span>',
+    blank: '<span class="exam-outcome bad"><span class="icon icon-alert-triangle"></span> En blanco</span>'
+  };
+
+  const questions = exam.questions.map((question, qIndex) => {
+    const scored = result.questions[qIndex];
+    if (scored.choice) {
+      const { marked, correct, outcome } = scored.choice;
+      const options = question.options.map((option, oIndex) => {
+        const tags = [
+          oIndex === marked ? '<span>Tu respuesta</span>' : '',
+          oIndex === correct ? '<strong>Correcta</strong>' : ''
+        ].filter(Boolean).join(' · ');
+        const mark = oIndex === correct ? 'ok' : oIndex === marked ? 'wrong' : '';
+        return `
+          <li class="exam-statement result mc-result ${mark}">
+            <span class="exam-statement-letter">${examChoiceLetter(oIndex)})</span>
+            <div class="exam-statement-text">${renderMathText(option.text)}</div>
+            ${tags ? `<div class="exam-statement-check">${tags}</div>` : ''}
+          </li>
+        `;
+      }).join('');
+      return `
+        <li class="exam-question">
+          <div class="exam-q-head"><h4>Pregunta ${qIndex + 1}</h4><span class="exam-q-score">${examQuestionCalc(scored, config)}</span>${choiceOutcome[outcome]}</div>
+          <div class="exam-prompt">${renderMathText(question.prompt)}</div>
+          <ol class="exam-statements">${options}</ol>
+        </li>
+      `;
+    }
+    const statements = question.statements.map((statement, sIndex) => {
+      const s = scored.statements[sIndex];
+      return `
+        <li class="exam-statement result ${s.outcome}">
+          <span class="exam-statement-letter">${String.fromCharCode(97 + sIndex)})</span>
+          <div class="exam-statement-text">${renderMathText(statement.text)}</div>
+          <div class="exam-statement-check">
+            <span>Marcaste: <strong>${vf(s.marked)}</strong></span>
+            <span>Correcta: <strong>${vf(s.answer)}</strong></span>
+            ${outcomeLabel(s)}
+          </div>
+        </li>
+      `;
+    }).join('');
+    return `
+      <li class="exam-question">
+        <div class="exam-q-head"><h4>Pregunta ${qIndex + 1}</h4><span class="exam-q-score ${scored.score < 0 ? 'negative' : ''}">${examQuestionCalc(scored, config)}</span></div>
+        <div class="exam-prompt">${renderMathText(question.prompt)}</div>
+        <ol class="exam-statements">${statements}</ol>
+      </li>
+    `;
+  }).join('');
+
+  target.innerHTML = `
+    <div class="exam-result-summary">
+      <span class="content-item-meta">${escapeHtml(exam.title)}</span>
+      <p class="exam-score"><strong>${formatScore(result.total)}</strong> de ${formatScore(result.max)}</p>
+      <div class="materia-chips">
+        <span class="subject-status-badge ${result.passed ? 'status-aprobada' : 'status-no-cursable'}">${result.passed ? 'Aprobado' : 'No aprobado'}</span>
+        <span class="materia-chip">${formatScore(result.percent)} %</span>
+        <span class="materia-chip">${examPassLabel(config)}</span>
+        <span class="materia-chip">Tiempo usado: ${formatClock(result.elapsedMs)}</span>
+        ${result.practice ? '<span class="materia-chip">Modo práctica</span>' : ''}
+      </div>
+      ${result.reason === 'timeout' ? '<p class="form-hint">Se entregó automáticamente al terminar el tiempo.</p>' : ''}
+      <div class="exam-editor-actions">
+        <button type="button" data-exam-retry>Volver a intentar</button>
+        ${currentSubject() && currentSubject().exams.filter(item => item.questions.length).length > 1 ? '<button type="button" class="ghost-btn" data-exam-another>Otra evaluación</button>' : ''}
+        <button type="button" class="ghost-btn" data-exam-back>Volver a evaluaciones</button>
+      </div>
+    </div>
+    ${renderPerformanceSummary(exam, result)}
+    <h3 class="exam-review-title">Corrección</h3>
+    <ol class="exam-questions">${questions}</ol>
+  `;
+}
+
+// ---------- Eventos (delegados, se registran una sola vez) ----------
+
+function setupExamEvents() {
+  const target = document.getElementById('subjectExams');
+  if (!target || target.dataset.bound) return;
+  target.dataset.bound = 'true';
+
+  target.addEventListener('input', event => {
+    if (state.examView.mode === 'edit') handleExamEditorInput(event);
+  });
+  target.addEventListener('change', event => {
+    if (state.examView.mode === 'edit' && (event.target.type === 'checkbox' || event.target.tagName === 'SELECT')) handleExamEditorInput(event);
+  });
+  target.addEventListener('submit', event => event.preventDefault());
+
+  target.addEventListener('click', async event => {
+    const subject = currentSubject();
+    if (!subject) return;
+    const mode = state.examView.mode;
+    if (mode === 'edit') {
+      handleExamEditorClick(event);
+      return;
+    }
+    if (mode === 'take') {
+      handleExamAttemptClick(event);
+      return;
+    }
+
+    const button = event.target.closest('button');
+    if (!button) return;
+    const findExam = id => subject.exams.find(item => item.id === id);
+
+    if (button.hasAttribute('data-exam-retry')) startExamAttempt(findExam(state.examView.examId), !!(state.examView.result && state.examView.result.practice));
+    else if (button.hasAttribute('data-exam-random')) startRandomExam(subject, false);
+    else if (button.hasAttribute('data-exam-random-practice')) startRandomExam(subject, true);
+    else if (button.hasAttribute('data-exam-another')) startRandomExam(subject, !!(state.examView.result && state.examView.result.practice));
+    else if (button.dataset.examPractice && isAdminView()) startExamAttempt(findExam(button.dataset.examPractice), true);
+    else if (button.hasAttribute('data-exam-back')) setExamView({ mode: 'list', examId: null, result: null });
+    else if (button.dataset.examStart && isAdminView()) startExamAttempt(findExam(button.dataset.examStart));
+    else if (button.hasAttribute('data-exam-new') && isAdminView()) openExamEditor(null);
+    else if (button.dataset.examEdit && isAdminView()) openExamEditor(findExam(button.dataset.examEdit));
+    else if (button.dataset.examDelete) {
+      state.confirmDeleteExamId = button.dataset.examDelete;
+      renderExamsSection(subject);
+    } else if (button.hasAttribute('data-exam-delete-cancel')) {
+      state.confirmDeleteExamId = null;
+      renderExamsSection(subject);
+    } else if (button.dataset.examDeleteConfirm) {
+      const examId = button.dataset.examDeleteConfirm;
+      button.disabled = true;
+      const result = await deleteExam(subject, examId);
+      state.confirmDeleteExamId = null;
+      if (state.examView.examId === examId) state.examView = { mode: 'list', examId: null };
+      renderExamsSection(subject);
+      if (!result.ok) {
+        const notice = document.getElementById('examListNotice');
+        if (notice) {
+          notice.textContent = result.message;
+          notice.classList.add('error', 'show');
+        }
+      }
+    }
+  });
+
+  // Salir del portal o recargar con un intento en curso.
+  window.addEventListener('beforeunload', event => {
+    if (!examAttemptInProgress()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  document.addEventListener('visibilitychange', tickExamTimer);
+
+  // Navegación del sidebar global con un intento en curso.
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.sidebar .nav-link, #sidebarLogoutBtn, #sidebarUserProfileBtn')) return;
+    if (!confirmLeaveExam()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
 }
 
 // Calendario, foro general y contenido de materias viven todos en Supabase.
@@ -1239,55 +2348,119 @@ function groupSubjects() {
   }, {});
 }
 
+// Botón "Materias" del sidebar: abre el último año visto (o el primero); el
+// año se cambia desde las pestañas de la vista.
 function renderYears() {
-  const container = document.getElementById('yearList');
-  if (!container) return;
-  const grouped = groupSubjects();
-  container.innerHTML = '';
-
-  Object.keys(grouped).sort((a, b) => Number(a) - Number(b)).forEach(year => {
-    const button = document.createElement('button');
-    button.className = 'nav-link year-btn';
-    button.dataset.year = year;
-    button.innerHTML = `<span class="nav-icon">${year}°</span><span class="nav-label sidebar-text">${year}° año</span>`;
-    button.addEventListener('click', () => openYear(year));
-    container.appendChild(button);
+  const button = document.getElementById('materiasNavBtn');
+  if (!button || button.dataset.bound) return;
+  button.dataset.bound = 'true';
+  button.addEventListener('click', () => {
+    const years = Object.keys(groupSubjects()).sort((a, b) => Number(a) - Number(b));
+    openYear(years.includes(state.currentYear) ? state.currentYear : (years[0] || '1'));
   });
 }
 
+// Indicador rápido de correlativas de una tarjeta: un punto por correlativa
+// (verde si ya está aprobada o a rendir final) + el conteo en texto. Al pasar
+// el mouse (o con foco de teclado en la tarjeta) muestra el detalle de cada una.
+function correlativeIndicator(subject) {
+  if (!subject.correlatives.length) {
+    return '<span class="correl-indicator none"><span class="icon icon-check-circle"></span> Sin correlativas</span>';
+  }
+  const email = state.currentUser ? state.currentUser.email : null;
+  const deps = subject.correlatives.map(id => {
+    const dependency = state.data.subjects.find(item => item.id === id);
+    const depStatus = email ? getSubjectProgress(email, id).status : '';
+    const met = depStatus === 'Aprobada' || depStatus === 'A rendir final';
+    return {
+      code: dependency ? dependency.code : id.replace(/^mat/, ''),
+      name: dependency ? dependency.name : 'Materia',
+      met,
+      label: depStatus === 'Aprobada' || depStatus === 'A rendir final' ? depStatus : 'No aprobada'
+    };
+  });
+  const metFlags = deps.map(dep => dep.met);
+  const metCount = metFlags.filter(Boolean).length;
+  const total = metFlags.length;
+  const dots = metFlags.map(met => `<span class="correl-dot ${met ? 'met' : ''}"></span>`).join('');
+  const label = total === 1
+    ? (metCount ? '1 correlativa cumplida' : '1 correlativa pendiente')
+    : `${metCount} de ${total} correlativas cumplidas`;
+  const rows = deps.map(dep => `
+    <span class="correl-row ${dep.met ? 'met' : ''}">
+      <span class="correl-dot ${dep.met ? 'met' : ''}" aria-hidden="true"></span>
+      <span class="correl-row-name">#${dep.code} ${dep.name}</span>
+      <span class="correl-row-status">${dep.label}</span>
+    </span>`).join('');
+  return `<span class="correl-indicator has-tip ${metCount === total ? 'all-met' : ''}"><span class="correl-dots" aria-hidden="true">${dots}</span> ${label}<span class="correl-tooltip" role="tooltip" id="correl-tip-${subject.id}"><span class="correl-tooltip-title">Correlativas</span>${rows}</span></span>`;
+}
+
+function subjectCardHtml(subject) {
+  const status = state.currentUser ? getSubjectProgress(state.currentUser.email, subject.id).status : 'No cursable';
+  const statusClass = STATUS_CLASSES[status] || '';
+  const modalityIcon = subject.modality === 'Presencial' ? '<span class="icon icon-pin"></span>' : '<span class="icon icon-monitor"></span>';
+  return `
+    <button type="button" class="subject-card" data-subject-id="${subject.id}" ${subject.correlatives.length ? `aria-describedby="correl-tip-${subject.id}"` : ''}>
+      <span class="subject-card-top">
+        <span class="subject-code">#${subject.code}</span>
+        <span class="subject-status-badge ${statusClass}">${status}</span>
+      </span>
+      <strong class="subject-card-name">${subject.name}</strong>
+      <span class="subject-card-meta">
+        <span><span class="icon icon-calendar"></span> ${subject.semester}° cuatrimestre</span>
+        <span><span class="icon icon-clock"></span> ${subject.hours}</span>
+        <span>${modalityIcon} ${subject.modality}</span>
+      </span>
+      ${correlativeIndicator(subject)}
+    </button>
+  `;
+}
+
+function renderYearTabs(grouped, activeYear) {
+  const tabs = document.getElementById('yearTabs');
+  if (!tabs) return;
+  tabs.innerHTML = Object.keys(grouped).sort((a, b) => Number(a) - Number(b)).map(year => {
+    const isActive = year === activeYear;
+    return `<button type="button" class="subject-tab ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive}" data-year-tab="${year}">${year}° año <span class="tab-count">${grouped[year].length}</span></button>`;
+  }).join('');
+  tabs.querySelectorAll('[data-year-tab]').forEach(button => {
+    button.addEventListener('click', () => openYear(button.dataset.yearTab));
+  });
+  const activeTab = tabs.querySelector('.subject-tab.active');
+  if (activeTab) tabs.scrollLeft = Math.max(0, activeTab.offsetLeft - 16);
+}
+
 function openYear(year) {
+  year = String(year);
+  state.currentYear = year;
   if (state.currentUser) enforceCorrelativityAndPersist(state.currentUser.email);
 
   const grouped = groupSubjects();
   const subjects = (grouped[year] || []).slice().sort((a, b) => Number(a.code) - Number(b.code));
 
-  const label = document.getElementById('materiasYearLabel');
-  if (label) label.textContent = `${year}° año`;
+  renderYearTabs(grouped, year);
 
-  renderList('subjectsGrid', subjects, subject => {
-    const status = state.currentUser ? getSubjectProgress(state.currentUser.email, subject.id).status : 'No cursable';
-    const statusClass = STATUS_CLASSES[status] || '';
-    const modalityIcon = subject.modality === 'Presencial' ? '<span class="icon icon-pin"></span>' : '<span class="icon icon-monitor"></span>';
-    return `
-      <button class="subject-card" data-subject-id="${subject.id}">
-        <div class="subject-card-top">
-          <span class="subject-code">#${subject.code}</span>
-          <span class="subject-status-badge ${statusClass}">${status}</span>
-        </div>
-        <strong class="subject-card-name">${subject.name}</strong>
-        <div class="subject-card-meta">
-          <span><span class="icon icon-clock"></span> ${subject.hours}</span>
-          <span>${modalityIcon} ${subject.modality}</span>
-        </div>
-      </button>
-    `;
-  });
+  const target = document.getElementById('subjectsGrid');
+  if (target) {
+    const terms = [...new Set(subjects.map(subject => subject.semester))].sort((a, b) => Number(a) - Number(b));
+    target.innerHTML = subjects.length
+      ? terms.map(term => {
+          const termSubjects = subjects.filter(subject => subject.semester === term);
+          return `
+            <details class="term-group" open>
+              <summary><span class="term-title">${term}° cuatrimestre</span><span class="tab-count">${termSubjects.length}</span><span class="term-arrow" aria-hidden="true">▾</span></summary>
+              <div class="subjects-grid">${termSubjects.map(subjectCardHtml).join('')}</div>
+            </details>
+          `;
+        }).join('')
+      : createItemCard('Sin materias', 'Todavía no hay materias cargadas para este año.', '');
 
-  document.querySelectorAll('#subjectsGrid .subject-card').forEach(card => {
-    card.addEventListener('click', () => openSubject(card.dataset.subjectId));
-  });
+    target.querySelectorAll('.subject-card').forEach(card => {
+      card.addEventListener('click', () => openSubject(card.dataset.subjectId));
+    });
+  }
 
-  document.querySelectorAll('.year-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.year === year));
+  document.querySelectorAll('.year-btn').forEach(btn => btn.classList.add('active'));
   document.querySelectorAll('.nav-link[data-view]').forEach(link => link.classList.remove('active'));
   setView('materias');
 }
@@ -2123,38 +3296,87 @@ function openPdfForItem(item) {
   }
 }
 
+function formatShortDate(value, withYear = true) {
+  if (!value) return '';
+  let iso = String(value);
+  if (iso.includes('T')) {
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return '';
+    iso = `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
+  }
+  const [year, month, day] = iso.slice(0, 10).split('-');
+  if (!year || !month || !day) return '';
+  return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
+}
+
+// Materiales de una unidad que se muestran en "Contenido del curso": todo
+// menos los videos, que van a "Clases grabadas".
+function unitDocuments(unit) {
+  return unit.items.filter(item => item.type !== 'video');
+}
+
+const RECORDED_TITLE_COLLATOR = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
+
+// Junta las clases grabadas de una materia: los videos cargados como material
+// de una unidad + las de RECORDED_CLASSES, ordenadas por nombre con orden
+// natural ("Clase 2" antes que "Clase 10"); a igual nombre, por fecha.
+function getRecordedClasses(subject) {
+  const fromUnits = subject.units.flatMap(unit => unit.items
+    .filter(item => item.type === 'video')
+    .map(item => ({ id: item.id, title: item.title, date: item.createdAt || '', duration: '', unit: unit.title, unitId: unit.id, embedUrl: item.body })));
+  const manual = (RECORDED_CLASSES[subject.code] || []).map((entry, index) => ({
+    id: `rec-${subject.code}-${index}`,
+    title: entry.title,
+    date: entry.date || '',
+    duration: entry.duration || '',
+    unit: entry.unit || '',
+    embedUrl: driveEmbedUrl(entry.url)
+  }));
+  return [...fromUnits, ...manual].sort((a, b) =>
+    RECORDED_TITLE_COLLATOR.compare(a.title || '', b.title || '')
+    || String(a.date).slice(0, 10).localeCompare(String(b.date).slice(0, 10)));
+}
+
+const CONTENT_TYPE_INFO = {
+  pdf: { icon: 'icon-file-text', label: 'PDF', action: 'Abrir' },
+  video: { icon: 'icon-video', label: 'Video', action: 'Ver video' },
+  clase: { icon: 'icon-graduation-cap', label: 'Clase', action: 'Ver clase' }
+};
+
 function renderContentItemBody(item) {
-  const meta = item.type === 'pdf'
-    ? `PDF · Subido por ${item.uploadedBy}`
-    : item.type === 'video'
-    ? `Video · Subido por ${item.uploadedBy}`
-    : `Clase · Publicada por ${item.uploadedBy}`;
+  const info = CONTENT_TYPE_INFO[item.type] || CONTENT_TYPE_INFO.clase;
+  const meta = [info.label, item.uploadedBy ? `Subido por ${item.uploadedBy}` : '', formatShortDate(item.createdAt)].filter(Boolean).join(' · ');
   const pdfSrc = item.url || item.dataUrl;
   const isMobile = window.innerWidth <= 900;
-  const body = item.type === 'pdf'
-    ? (isMobile
-        ? `<div class="pdf-mobile-open">
-             <p>En el celular, los PDFs se abren en una pestaña nueva.</p>
-             <div class="pdf-toolbar">
-               <button type="button" class="download-link" data-pdf-open="${item.id}"><span class="icon icon-external-link"></span> Abrir PDF</button>
-               <a class="download-link" href="${pdfSrc}" download="${item.fileName}"><span class="icon icon-download"></span> Descargar PDF</a>
-             </div>
-           </div>`
-        : `<iframe id="pdfPreviewFrame" class="pdf-preview" src="${pdfSrc}" title="${item.title}"></iframe>
-       <div class="pdf-toolbar">
-         <button type="button" class="download-link" data-pdf-fullscreen><span class="icon icon-maximize"></span> Pantalla completa</button>
-         <a class="download-link" href="${pdfSrc}" target="_blank" rel="noopener"><span class="icon icon-external-link"></span> Abrir en pestaña nueva</a>
-         <a class="download-link" href="${pdfSrc}" download="${item.fileName}"><span class="icon icon-download"></span> Descargar PDF</a>
-       </div>`)
-    : item.type === 'video'
-    ? `<iframe class="video-preview" src="${item.body}" title="${item.title}" allow="autoplay; fullscreen" allowfullscreen></iframe>`
-    : `<div class="clase-body">${/^\s*</.test(item.body || '') ? item.body : parseClaseBody(item.body)}</div>`;
+  const downloadLink = `<a class="download-link" href="${pdfSrc}" download="${item.fileName || ''}"><span class="icon icon-download"></span> Descargar</a>`;
+
+  let actions = '';
+  let body;
+  if (item.type === 'pdf' && isMobile) {
+    body = `<div class="pdf-mobile-open">
+      <p>En el celular, los PDFs se abren en una pestaña nueva.</p>
+      <div class="pdf-toolbar">
+        <button type="button" class="download-link primary" data-pdf-open="${item.id}"><span class="icon icon-external-link"></span> Abrir PDF</button>
+        ${downloadLink}
+      </div>
+    </div>`;
+  } else if (item.type === 'pdf') {
+    actions = `<button type="button" class="download-link primary" data-pdf-expand="${item.id}"><span class="icon icon-maximize"></span> Expandir</button>${downloadLink}`;
+    body = `<iframe class="pdf-preview" src="${pdfSrc}" title="${item.title}"></iframe>`;
+  } else if (item.type === 'video') {
+    body = `<iframe class="video-preview" src="${item.body}" title="${item.title}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  } else {
+    body = `<div class="clase-body">${/^\s*</.test(item.body || '') ? item.body : parseClaseBody(item.body)}</div>`;
+  }
 
   return `
-    <div class="content-item">
-      <div class="section-head"><h3>${item.title}</h3><span class="content-item-meta">${meta}</span></div>
+    <article class="content-item viewer">
+      <header class="viewer-head">
+        <div class="viewer-title"><h3>${item.title}</h3><span class="content-item-meta">${meta}</span></div>
+        ${actions ? `<div class="viewer-actions">${actions}</div>` : ''}
+      </header>
       ${body}
-    </div>
+    </article>
   `;
 }
 
@@ -2164,183 +3386,738 @@ function refreshContentUnitSelect(subject) {
   select.innerHTML = subject.units.map(unit => `<option value="${unit.id}">${unit.title}</option>`).join('');
 }
 
+// Barra interna de la materia: unidades, clases grabadas y secciones.
+function renderSubjectNav(subject) {
+  const navTarget = document.getElementById('unitNavList');
+  if (!navTarget) return;
+
+  const section = state.subjectSection;
+  const recorded = getRecordedClasses(subject);
+
+  // Recordamos qué botón tenía el foco para devolvérselo después de redibujar.
+  const focused = navTarget.contains(document.activeElement) ? document.activeElement : null;
+  const focusSelector = !focused ? null
+    : focused.dataset.navUnit ? `[data-nav-unit="${focused.dataset.navUnit}"]`
+    : focused.dataset.navRecorded ? `[data-nav-recorded="${focused.dataset.navRecorded}"]`
+    : focused.dataset.navSection ? `[data-nav-section="${focused.dataset.navSection}"]`
+    : focused.dataset.navGroup ? `[data-nav-group="${focused.dataset.navGroup}"]`
+    : null;
+
+  const current = isActive => (isActive ? 'aria-current="page"' : '');
+
+  const unitLinks = subject.units.length
+    ? subject.units.map(unit => {
+        const isActive = section === 'contenido' && unit.id === state.currentUnitId;
+        return `<li><button type="button" class="snav-sublink ${isActive ? 'active' : ''}" ${current(isActive)} data-nav-unit="${unit.id}"><span class="snav-label">${unit.title}</span><span class="snav-count">${unitDocuments(unit).length}</span></button></li>`;
+      }).join('')
+    : '<li class="snav-empty">Sin unidades cargadas</li>';
+
+  const recordedLinks = recorded.length
+    ? recorded.map(rec => {
+        const isActive = section === 'grabadas' && rec.id === state.currentRecordedId;
+        return `<li><button type="button" class="snav-sublink ${isActive ? 'active' : ''}" ${current(isActive)} data-nav-recorded="${rec.id}"><span class="snav-label">${rec.title}</span></button></li>`;
+      }).join('')
+    : '<li class="snav-empty">Sin clases grabadas</li>';
+
+  const group = (id, icon, label, links, isActive) => {
+    const isOpen = !!state.navGroupsOpen[id];
+    return `
+      <div class="snav-group">
+        <button type="button" class="snav-link ${isActive ? 'active' : ''} ${section === id ? 'in-section' : ''}" ${current(isActive)} aria-expanded="${isOpen}" data-nav-group="${id}">
+          <span class="icon ${icon}"></span><span class="snav-label">${label}</span><span class="snav-arrow" aria-hidden="true">▾</span>
+        </button>
+        <ul class="snav-sub ${isOpen ? 'open' : ''}">${links}</ul>
+      </div>
+    `;
+  };
+  const link = (id, icon, label) => `
+    <button type="button" class="snav-link ${section === id ? 'active' : ''}" ${current(section === id)} data-nav-section="${id}">
+      <span class="icon ${icon}"></span><span class="snav-label">${label}</span>
+    </button>
+  `;
+
+  navTarget.innerHTML = [
+    group('contenido', 'icon-book-open', 'Contenido del curso', unitLinks, false),
+    group('grabadas', 'icon-video', 'Clases grabadas', recordedLinks, section === 'grabadas' && !state.currentRecordedId),
+    link('evaluaciones', 'icon-check-circle', 'Evaluaciones'),
+    link('resumenes', 'icon-file-text', 'Resúmenes'),
+    link('foro', 'icon-chat', 'Foro de la materia'),
+    link('opiniones', 'icon-bar-chart', 'Opiniones y encuestas')
+  ].join('');
+
+  // Al elegir un destino en celular/tablet se cierra el drawer y se lleva la
+  // vista al contenido.
+  const goTo = (tab, changes) => {
+    if (tab !== 'evaluaciones' && !confirmLeaveExam()) return;
+    Object.assign(state, changes);
+    const wasDrawerOpen = closeSubjectNavDrawer();
+    setSubjectTab(tab);
+    if (wasDrawerOpen) {
+      const main = document.querySelector('.materia-main');
+      if (main) main.scrollIntoView({ block: 'start' });
+    }
+  };
+
+  navTarget.querySelectorAll('[data-nav-group]').forEach(button => {
+    button.addEventListener('click', () => {
+      const id = button.dataset.navGroup;
+      const atRecordedList = section === 'grabadas' && !state.currentRecordedId;
+      if (id === 'grabadas' && !atRecordedList) {
+        state.navGroupsOpen.grabadas = true;
+        goTo('grabadas', { currentRecordedId: null });
+        return;
+      }
+      state.navGroupsOpen[id] = !state.navGroupsOpen[id];
+      renderSubjectNav(subject);
+    });
+  });
+  navTarget.querySelectorAll('[data-nav-unit]').forEach(button => {
+    button.addEventListener('click', () => goTo('contenido', { currentUnitId: button.dataset.navUnit, currentItemId: null }));
+  });
+  navTarget.querySelectorAll('[data-nav-recorded]').forEach(button => {
+    button.addEventListener('click', () => goTo('grabadas', { currentRecordedId: button.dataset.navRecorded }));
+  });
+  navTarget.querySelectorAll('[data-nav-section]').forEach(button => {
+    button.addEventListener('click', () => goTo(button.dataset.navSection, {}));
+  });
+
+  if (focusSelector) {
+    const next = navTarget.querySelector(focusSelector);
+    if (next) next.focus();
+  }
+}
+
 function renderSubjectContent(subject) {
   const mainTarget = document.getElementById('subjectContent');
-  const navTarget = document.getElementById('unitNavList');
-  if (!mainTarget || !navTarget) return;
+  if (!mainTarget) return;
 
-  if (!subject.units.length) {
-    navTarget.innerHTML = createItemCard('Sin unidades', 'Todavía no se cargaron unidades.', '');
-    mainTarget.innerHTML = createItemCard('Sin contenido todavía', 'El equipo docente todavía no cargó unidades para esta materia.', '');
+  renderSubjectNav(subject);
+
+  const section = state.subjectSection;
+  if (section !== 'contenido' && section !== 'grabadas') return;
+
+  const rerender = () => renderSubjectContent(subject);
+
+  // Un visor ya abierto no se vuelve a dibujar, para no recargar el iframe
+  // del PDF o del video cada vez que se toca la barra lateral.
+  const showViewer = (key, html) => {
+    if (mainTarget.dataset.itemId === key) return false;
+    mainTarget.dataset.itemId = key;
+    mainTarget.innerHTML = html;
+    return true;
+  };
+  const showList = html => {
+    mainTarget.dataset.itemId = '';
+    mainTarget.innerHTML = html;
+  };
+
+  if (section === 'grabadas') {
+    const recorded = getRecordedClasses(subject);
+    const metaOf = rec => [formatShortDate(rec.date), rec.duration, rec.unit].filter(Boolean).join(' · ');
+    const selected = recorded.find(rec => rec.id === state.currentRecordedId);
+
+    if (selected) {
+      const drawn = showViewer(`recorded:${selected.id}`, `
+        <button type="button" class="ghost-btn small-btn back-to-unit" data-back-to-list>&larr; Clases grabadas</button>
+        <article class="content-item viewer">
+          <header class="viewer-head">
+            <div class="viewer-title"><h3>${selected.title}</h3><span class="content-item-meta">${metaOf(selected) || 'Clase grabada'}</span></div>
+          </header>
+          <iframe class="video-preview" src="${selected.embedUrl}" title="${selected.title}" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        </article>
+      `);
+      if (drawn) {
+        mainTarget.querySelector('[data-back-to-list]').addEventListener('click', () => {
+          state.currentRecordedId = null;
+          rerender();
+        });
+      }
+      return;
+    }
+
+    const cards = recorded.map(rec => contentCardHtml(rec.id, 'video', rec.title, metaOf(rec) || 'Clase grabada')).join('');
+    showList(`
+      <div class="section-head unit-list-head"><h3>Clases grabadas</h3><span class="content-item-meta">${recorded.length} ${recorded.length === 1 ? 'clase' : 'clases'}</span></div>
+      ${recorded.length
+        ? `${CONTENT_MENU_HINT}<ul class="material-list">${cards}</ul>`
+        : createItemCard('Sin clases grabadas', 'Todavía no se cargaron grabaciones para esta materia.', '')}
+    `);
     return;
   }
 
-  navTarget.innerHTML = subject.units.map(unit => {
-    const isOpen = unit.id === state.currentUnitId;
-    const icon = itemType => (itemType === 'pdf' ? '<span class="icon icon-file-text"></span>' : itemType === 'video' ? '<span class="icon icon-video"></span>' : '<span class="icon icon-graduation-cap"></span>');
-
-    const itemsHtml = unit.items.length
-      ? unit.items.map((item, itemIndex) => {
-          const itemDeleteControl = isAdminView()
-            ? (state.confirmDeleteItemId === item.id
-                ? `<span class="unit-nav-confirm">
-                     <button type="button" class="icon-btn tiny-btn danger-btn" data-confirm-delete-item="${item.id}" data-unit-id="${unit.id}" title="Confirmar eliminación">✓</button>
-                     <button type="button" class="icon-btn tiny-btn" data-cancel-delete-item="${item.id}" title="Cancelar">✕</button>
-                   </span>`
-                : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-item-trigger="${item.id}" title="Eliminar contenido"><span class="icon icon-trash"></span></button>`)
-            : '';
-          const itemMoveControl = isAdminView()
-            ? `<span class="unit-nav-move">
-                 <button type="button" class="icon-btn tiny-btn ghost-btn" data-move-item="-1" data-unit-id="${unit.id}" data-item-id="${item.id}" title="Subir" ${itemIndex === 0 ? 'disabled' : ''}>▲</button>
-                 <button type="button" class="icon-btn tiny-btn ghost-btn" data-move-item="1" data-unit-id="${unit.id}" data-item-id="${item.id}" title="Bajar" ${itemIndex === unit.items.length - 1 ? 'disabled' : ''}>▼</button>
-               </span>`
-            : '';
-          return `
-            <div class="unit-nav-item-row">
-              ${itemMoveControl}
-              <button type="button" class="unit-nav-item ${item.id === state.currentItemId ? 'active' : ''}" data-unit-id="${unit.id}" data-item-id="${item.id}">
-                ${icon(item.type)} ${item.title}
-              </button>
-              ${itemDeleteControl}
-            </div>
-          `;
-        }).join('')
-      : '<span class="unit-nav-empty">Sin contenido</span>';
-
-    const unitDeleteControl = isAdminView()
-      ? (state.confirmDeleteUnitId === unit.id
-          ? `<span class="unit-nav-confirm">
-               <button type="button" class="icon-btn tiny-btn danger-btn" data-confirm-delete-unit="${unit.id}" title="Confirmar eliminación de la unidad">✓</button>
-               <button type="button" class="icon-btn tiny-btn" data-cancel-delete-unit="${unit.id}" title="Cancelar">✕</button>
-             </span>`
-          : `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-unit-trigger="${unit.id}" title="Eliminar unidad"><span class="icon icon-trash"></span></button>`)
-      : '';
-
-    return `
-      <div class="unit-nav-block">
-        <div class="unit-nav-header">
-          <button type="button" class="unit-nav-btn ${isOpen ? 'open' : ''}" data-unit-id="${unit.id}">
-            <span>${unit.title}</span>
-            <span class="unit-nav-count">${unit.items.length}</span>
-            <span class="unit-nav-arrow">▾</span>
-          </button>
-          ${unitDeleteControl}
-        </div>
-        <div class="unit-nav-items ${isOpen ? 'open' : ''}">${itemsHtml}</div>
-      </div>
-    `;
-  }).join('');
-
-  navTarget.querySelectorAll('.unit-nav-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      state.currentUnitId = state.currentUnitId === button.dataset.unitId ? null : button.dataset.unitId;
-      renderSubjectContent(subject);
-    });
-  });
-
-  navTarget.querySelectorAll('.unit-nav-item').forEach(button => {
-    button.addEventListener('click', () => {
-      const unit = subject.units.find(item => item.id === button.dataset.unitId);
-      const item = unit ? unit.items.find(entry => entry.id === button.dataset.itemId) : null;
-
-      if (item && item.type === 'pdf' && window.innerWidth <= 900) {
-        openPdfForItem(item);
-        state.currentUnitId = button.dataset.unitId;
-        renderSubjectContent(subject);
-        return;
-      }
-
-      state.currentUnitId = button.dataset.unitId;
-      state.currentItemId = button.dataset.itemId;
-      renderSubjectContent(subject);
-    });
-  });
-
-  navTarget.querySelectorAll('[data-delete-unit-trigger]').forEach(button => {
-    button.addEventListener('click', () => {
-      state.confirmDeleteUnitId = button.dataset.deleteUnitTrigger;
-      renderSubjectContent(subject);
-    });
-  });
-  navTarget.querySelectorAll('[data-cancel-delete-unit]').forEach(button => {
-    button.addEventListener('click', () => {
-      state.confirmDeleteUnitId = null;
-      renderSubjectContent(subject);
-    });
-  });
-  navTarget.querySelectorAll('[data-confirm-delete-unit]').forEach(button => {
-    button.addEventListener('click', () => deleteUnit(subject, button.dataset.confirmDeleteUnit));
-  });
-
-  navTarget.querySelectorAll('[data-move-item]').forEach(button => {
-    button.addEventListener('click', () => {
-      moveContentItem(subject, button.dataset.unitId, button.dataset.itemId, Number(button.dataset.moveItem));
-    });
-  });
-
-  navTarget.querySelectorAll('[data-delete-item-trigger]').forEach(button => {
-    button.addEventListener('click', () => {
-      state.confirmDeleteItemId = button.dataset.deleteItemTrigger;
-      renderSubjectContent(subject);
-    });
-  });
-  navTarget.querySelectorAll('[data-cancel-delete-item]').forEach(button => {
-    button.addEventListener('click', () => {
-      state.confirmDeleteItemId = null;
-      renderSubjectContent(subject);
-    });
-  });
-  navTarget.querySelectorAll('[data-confirm-delete-item]').forEach(button => {
-    button.addEventListener('click', () => deleteContentItem(subject, button.dataset.unitId, button.dataset.confirmDeleteItem));
-  });
+  if (!subject.units.length) {
+    showList(createItemCard('Sin contenido todavía', 'El equipo docente todavía no cargó unidades para esta materia.', ''));
+    return;
+  }
 
   const selectedItem = state.currentItemId
     ? subject.units.flatMap(unit => unit.items).find(item => item.id === state.currentItemId)
     : null;
-  const targetItemId = selectedItem ? selectedItem.id : '';
 
-  // Solo re-renderizamos el contenido central si cambió el ítem seleccionado,
-  // para no recargar el iframe del PDF cada vez que se abre/cierra una unidad.
-  if (mainTarget.dataset.itemId !== targetItemId) {
-    mainTarget.innerHTML = selectedItem
-      ? renderContentItemBody(selectedItem)
-      : createItemCard('Seleccioná un contenido', 'Elegí una unidad y un PDF o clase desde el menú de la derecha para verlo acá.', '');
-    mainTarget.dataset.itemId = targetItemId;
-    const openBtn = mainTarget.querySelector('[data-pdf-open]');
-    if (openBtn && selectedItem) {
-      openBtn.addEventListener('click', () => openPdfForItem(selectedItem));
+  if (selectedItem) {
+    const parentUnit = subject.units.find(unit => unit.items.some(item => item.id === selectedItem.id));
+    const drawn = showViewer(`item:${selectedItem.id}`, `
+      <button type="button" class="ghost-btn small-btn back-to-unit" data-back-to-list>&larr; ${parentUnit ? parentUnit.title : 'Materiales'}</button>
+      ${renderContentItemBody(selectedItem)}
+    `);
+    if (drawn) {
+      mainTarget.querySelector('[data-back-to-list]').addEventListener('click', () => {
+        if (parentUnit) state.currentUnitId = parentUnit.id;
+        state.currentItemId = null;
+        rerender();
+      });
+      const openBtn = mainTarget.querySelector('[data-pdf-open]');
+      if (openBtn) openBtn.addEventListener('click', () => openPdfForItem(selectedItem));
+      const expandBtn = mainTarget.querySelector('[data-pdf-expand]');
+      if (expandBtn) expandBtn.addEventListener('click', () => openPdfModal(selectedItem, expandBtn));
     }
+    return;
+  }
+
+  const openUnit = subject.units.find(unit => unit.id === state.currentUnitId) || null;
+  if (!openUnit) {
+    showList(createItemCard('Elegí una unidad', 'Abrí una unidad en "Contenido del curso" para ver sus materiales acá.', ''));
+    return;
+  }
+
+  const admin = isAdminView();
+  const documents = unitDocuments(openUnit);
+  const cards = documents.map(item => {
+    const info = CONTENT_TYPE_INFO[item.type] || CONTENT_TYPE_INFO.clase;
+    const meta = [info.label, formatShortDate(item.createdAt), item.uploadedBy ? `Subido por ${item.uploadedBy}` : ''].filter(Boolean).join(' · ');
+    return contentCardHtml(item.id, item.type, item.title, meta);
+  }).join('');
+
+  const unitDeleteControl = !admin ? ''
+    : state.confirmDeleteUnitId === openUnit.id
+    ? `<button type="button" class="ghost-btn small-btn danger-btn" data-confirm-delete-unit>Confirmar eliminación</button>
+       <button type="button" class="ghost-btn small-btn" data-cancel-delete-unit>Cancelar</button>`
+    : `<button type="button" class="ghost-btn small-btn danger-btn" data-delete-unit-trigger><span class="icon icon-trash"></span> Eliminar unidad</button>`;
+
+  showList(`
+    <div class="section-head unit-list-head">
+      <h3>${openUnit.title}</h3>
+      <span class="content-item-meta">${documents.length} ${documents.length === 1 ? 'material' : 'materiales'}</span>
+      ${unitDeleteControl ? `<div class="unit-admin-actions">${unitDeleteControl}</div>` : ''}
+    </div>
+    ${documents.length
+      ? `${CONTENT_MENU_HINT}<ul class="material-list">${cards}</ul>`
+      : createItemCard('Unidad sin materiales', 'Todavía no se cargó contenido en esta unidad.', '')}
+  `);
+
+  const on = (selector, handler) => {
+    mainTarget.querySelectorAll(selector).forEach(button => button.addEventListener('click', () => handler(button)));
+  };
+  on('[data-delete-unit-trigger]', () => {
+    state.confirmDeleteUnitId = openUnit.id;
+    rerender();
+  });
+  on('[data-cancel-delete-unit]', () => {
+    state.confirmDeleteUnitId = null;
+    rerender();
+  });
+  on('[data-confirm-delete-unit]', () => deleteUnit(subject, openUnit.id));
+}
+
+// =========================================================
+// Tarjetas de material con menú contextual: clic derecho, mantener apretado
+// en el celular, o tecla de menú / Shift+F10 con la tarjeta enfocada. Un clic
+// o Enter abre el material.
+// =========================================================
+
+const CONTENT_MENU_HINT = '<p class="content-hint">Clic derecho (o mantené apretado) sobre un material para ver más opciones.</p>';
+
+function contentCardHtml(id, type, title, meta) {
+  const info = CONTENT_TYPE_INFO[type] || CONTENT_TYPE_INFO.clase;
+  return `
+    <li class="material-card content-card" tabindex="0" role="button" aria-keyshortcuts="Shift+F10" data-content-id="${id}" title="Clic derecho para más opciones">
+      <span class="material-icon type-${type}"><span class="icon ${info.icon}"></span></span>
+      <div class="material-info">
+        <strong>${title}</strong>
+        <span>${meta}</span>
+      </div>
+    </li>
+  `;
+}
+
+// Material de una unidad (editable) o clase de RECORDED_CLASSES (solo lectura).
+function findContentEntry(subject, id) {
+  for (const unit of subject.units) {
+    const item = unit.items.find(entry => entry.id === id);
+    if (item) return { item, unit, editable: true };
+  }
+  const rec = getRecordedClasses(subject).find(entry => entry.id === id);
+  return rec ? { item: { id: rec.id, type: 'video', title: rec.title, body: rec.embedUrl }, unit: null, editable: false } : null;
+}
+
+function driveFileId(url) {
+  const match = String(url || '').match(/drive\.google\.com\/.*?([-\w]{25,})/);
+  return match ? match[1] : null;
+}
+
+function contentDownload(item) {
+  if (item.type === 'pdf') {
+    const href = item.url || item.dataUrl;
+    return href ? { href, fileName: item.fileName || `${item.title}.pdf` } : null;
+  }
+  const id = item.type === 'video' ? driveFileId(item.body) : null;
+  return id ? { href: `https://drive.google.com/uc?export=download&id=${id}`, fileName: '' } : null;
+}
+
+function openContentEntry(subject, entry) {
+  if (entry.item.type === 'video') {
+    state.currentRecordedId = entry.item.id;
+    state.navGroupsOpen.grabadas = true;
+  } else {
+    state.currentItemId = entry.item.id;
+  }
+  renderSubjectContent(subject);
+}
+
+function openContentInNewWindow(item) {
+  if (item.type === 'pdf') {
+    openPdfForItem(item);
+    return;
+  }
+  if (item.type === 'video') {
+    const id = driveFileId(item.body);
+    window.open(id ? `https://drive.google.com/file/d/${id}/view` : item.body, '_blank', 'noopener');
+    return;
+  }
+  const body = /^\s*</.test(item.body || '') ? item.body : parseClaseBody(item.body);
+  const page = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(item.title)}</title>`
+    + '<style>body{font-family:system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 16px;line-height:1.6;color:#142033}img{max-width:100%;height:auto}</style>'
+    + `</head><body><h1>${escapeHtml(item.title)}</h1>${body}</body></html>`;
+  const blobUrl = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
+  window.open(blobUrl, '_blank');
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+
+function downloadContent(download) {
+  const link = document.createElement('a');
+  link.href = download.href;
+  if (download.fileName) link.download = download.fileName;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+// Ventana modal chica para cambiar nombre / organizar. onSubmit devuelve un
+// mensaje de error (se muestra y la ventana queda abierta) o null.
+function openContentDialog({ title, fieldsHtml, submitLabel, onReady, onSubmit }) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'content-dialog';
+  dialog.innerHTML = `
+    <form class="stack">
+      <h3>${title}</h3>
+      ${fieldsHtml}
+      <div class="notice" data-dialog-notice></div>
+      <div class="content-dialog-actions">
+        <button type="button" class="ghost-btn" data-dialog-cancel>Cancelar</button>
+        <button type="submit">${submitLabel}</button>
+      </div>
+    </form>
+  `;
+  document.body.appendChild(dialog);
+  const form = dialog.querySelector('form');
+  const notice = dialog.querySelector('[data-dialog-notice]');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-dialog-cancel]').addEventListener('click', () => dialog.close());
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    submitBtn.disabled = true;
+    const error = await onSubmit(form);
+    submitBtn.disabled = false;
+    if (error) {
+      notice.className = 'notice show error';
+      notice.textContent = error;
+      return;
+    }
+    dialog.close();
+  });
+  dialog.showModal();
+  if (onReady) onReady(form);
+}
+
+function promptRenameContent(subject, entry) {
+  openContentDialog({
+    title: 'Cambiar nombre',
+    fieldsHtml: `<div class="field"><input id="contentDialogTitle" name="title" type="text" placeholder=" " required value="${escapeHtml(entry.item.title)}" /><label for="contentDialogTitle">Nombre</label></div>`,
+    submitLabel: 'Guardar',
+    onReady: form => {
+      form.elements.title.focus();
+      form.elements.title.select();
+    },
+    onSubmit: form => {
+      const title = form.elements.title.value.trim();
+      if (!title) return 'El nombre no puede quedar vacío.';
+      return renameContentItem(subject, entry.item.id, title);
+    }
+  });
+}
+
+function promptOrganizeContent(subject, entry) {
+  const isVideo = entry.item.type === 'video';
+  const unitOptions = subject.units
+    .map(unit => `<option value="${unit.id}" ${unit.id === entry.unit.id ? 'selected' : ''}>${escapeHtml(unit.title)}</option>`)
+    .join('');
+  openContentDialog({
+    title: `Organizar "${escapeHtml(entry.item.title)}"`,
+    fieldsHtml: `
+      <label class="dialog-field">Unidad<select name="unit">${unitOptions}</select></label>
+      ${isVideo
+        ? '<p class="form-hint">Las clases grabadas se ordenan solas por nombre; acá solo cambia la unidad.</p>'
+        : '<label class="dialog-field">Lugar dentro de la unidad<select name="position"></select></label>'}
+    `,
+    submitLabel: 'Mover',
+    onReady: form => {
+      form.elements.unit.focus();
+      if (isVideo) return;
+      const fillPositions = () => {
+        const unit = subject.units.find(item => item.id === form.elements.unit.value);
+        const others = unitDocuments(unit).filter(doc => doc.id !== entry.item.id);
+        const currentIndex = unit.id === entry.unit.id
+          ? unitDocuments(unit).findIndex(doc => doc.id === entry.item.id)
+          : others.length;
+        form.elements.position.innerHTML = Array.from({ length: others.length + 1 }, (_, index) => {
+          const label = index === 0 ? 'Al principio' : `Después de "${others[index - 1].title}"`;
+          return `<option value="${index}" ${index === currentIndex ? 'selected' : ''}>${index + 1}. ${escapeHtml(label)}</option>`;
+        }).join('');
+      };
+      form.elements.unit.addEventListener('change', fillPositions);
+      fillPositions();
+    },
+    onSubmit: form => organizeContentItem(subject, entry.item.id, form.elements.unit.value, isVideo ? null : Number(form.elements.position.value))
+  });
+}
+
+let contentMenuState = null;
+
+function closeContentMenu(restoreFocus) {
+  if (!contentMenuState) return;
+  const { el, card } = contentMenuState;
+  contentMenuState = null;
+  el.remove();
+  if (restoreFocus && card.isConnected) card.focus();
+}
+
+function openContentMenu(subject, card, x, y) {
+  closeContentMenu(false);
+  const entry = findContentEntry(subject, card.dataset.contentId);
+  if (!entry) return;
+  const { item } = entry;
+  const download = contentDownload(item);
+  const actions = [
+    { label: 'Ver', run: () => openContentEntry(subject, entry) },
+    { label: 'Ver en otra ventana', run: () => openContentInNewWindow(item) },
+    download && { label: 'Descargar', run: () => downloadContent(download) }
+  ];
+  if (isAdminView() && entry.editable) {
+    actions.push(
+      { separator: true },
+      { label: 'Cambiar nombre', run: () => promptRenameContent(subject, entry) },
+      { label: 'Organizar', run: () => promptOrganizeContent(subject, entry) },
+      {
+        label: 'Eliminar',
+        danger: true,
+        run: () => {
+          if (window.confirm(`¿Eliminar "${item.title}"? Esta acción no se puede deshacer.`)) deleteContentItem(subject, entry.unit.id, item.id);
+        }
+      }
+    );
+  }
+  const visible = actions.filter(Boolean);
+
+  const el = document.createElement('div');
+  el.className = 'context-menu';
+  el.setAttribute('role', 'menu');
+  el.setAttribute('aria-label', `Opciones de ${item.title}`);
+  el.innerHTML = visible.map((action, index) => action.separator
+    ? '<div class="context-menu-sep" role="separator"></div>'
+    : `<button type="button" role="menuitem" tabindex="-1" class="context-menu-item ${action.danger ? 'danger' : ''}" data-menu-index="${index}">${action.label}</button>`
+  ).join('');
+  document.body.appendChild(el);
+
+  const rect = el.getBoundingClientRect();
+  el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+  el.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  contentMenuState = { el, card };
+
+  const items = [...el.querySelectorAll('[role="menuitem"]')];
+  items[0].focus();
+  el.addEventListener('click', event => {
+    const button = event.target.closest('[data-menu-index]');
+    if (!button) return;
+    closeContentMenu(true);
+    visible[Number(button.dataset.menuIndex)].run();
+  });
+  el.addEventListener('keydown', event => {
+    const index = items.indexOf(document.activeElement);
+    const focusAt = next => {
+      event.preventDefault();
+      items[(next + items.length) % items.length].focus();
+    };
+    if (event.key === 'ArrowDown') focusAt(index + 1);
+    else if (event.key === 'ArrowUp') focusAt(index - 1);
+    else if (event.key === 'Home') focusAt(0);
+    else if (event.key === 'End') focusAt(items.length - 1);
+    else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeContentMenu(true);
+    } else if (event.key === 'Tab') closeContentMenu(false);
+  });
+}
+
+function setupContentCards() {
+  const target = document.getElementById('subjectContent');
+  if (!target) return;
+  const currentSubjectNow = () => state.data.subjects.find(item => item.id === state.currentSubjectId);
+  const cardFrom = event => event.target.closest('.content-card');
+  let longPress = null;
+  let suppressClick = false;
+
+  target.addEventListener('click', event => {
+    const card = cardFrom(event);
+    if (!card) return;
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    const subject = currentSubjectNow();
+    const entry = subject && findContentEntry(subject, card.dataset.contentId);
+    if (entry) openContentEntry(subject, entry);
+  });
+
+  target.addEventListener('keydown', event => {
+    const card = cardFrom(event);
+    if (!card || event.target !== card) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      card.click();
+    }
+  });
+
+  target.addEventListener('contextmenu', event => {
+    const card = cardFrom(event);
+    if (!card) return;
+    event.preventDefault();
+    const subject = currentSubjectNow();
+    if (!subject) return;
+    // Abierto desde el teclado no hay puntero sobre la tarjeta: se ubica sobre ella.
+    const rect = card.getBoundingClientRect();
+    const onCard = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    openContentMenu(subject, card, onCard ? event.clientX : rect.left + 16, onCard ? event.clientY : rect.top + rect.height / 2);
+  });
+
+  // iOS no dispara "contextmenu" al mantener apretado; Android sí (ahí el
+  // timer encuentra el menú ya abierto y no hace nada).
+  target.addEventListener('touchstart', event => {
+    suppressClick = false;
+    const card = cardFrom(event);
+    if (!card || event.touches.length !== 1) return;
+    const start = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    if (longPress) clearTimeout(longPress.timer);
+    longPress = {
+      start,
+      timer: setTimeout(() => {
+        longPress = null;
+        suppressClick = true;
+        const subject = currentSubjectNow();
+        if (subject && !contentMenuState) openContentMenu(subject, card, start.x, start.y);
+      }, 550)
+    };
+  }, { passive: true });
+  target.addEventListener('touchmove', event => {
+    if (!longPress) return;
+    const touch = event.touches[0];
+    if (Math.hypot(touch.clientX - longPress.start.x, touch.clientY - longPress.start.y) > 10) {
+      clearTimeout(longPress.timer);
+      longPress = null;
+    }
+  }, { passive: true });
+  target.addEventListener('touchend', () => {
+    if (!longPress) return;
+    clearTimeout(longPress.timer);
+    longPress = null;
+  });
+
+  document.addEventListener('pointerdown', event => {
+    if (contentMenuState && !contentMenuState.el.contains(event.target)) closeContentMenu(false);
+  }, true);
+  document.addEventListener('scroll', () => closeContentMenu(false), true);
+  // Solo si cambia el ancho: en el celular la barra de direcciones cambia el
+  // alto al aparecer/ocultarse y cerraría el menú recién abierto.
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    closeContentMenu(false);
+  });
+}
+
+// Visor amplio de PDF (botón "Expandir").
+let pdfModalReturnFocus = null;
+
+function openPdfModal(item, trigger) {
+  const modal = document.getElementById('pdfModal');
+  const frame = document.getElementById('pdfModalFrame');
+  if (!modal || !frame) return;
+  const src = item.url || item.dataUrl;
+  const download = document.getElementById('pdfModalDownload');
+  document.getElementById('pdfModalTitle').textContent = item.title;
+  frame.title = item.title;
+  frame.src = src;
+  if (download) {
+    download.href = src;
+    download.setAttribute('download', item.fileName || '');
+  }
+  pdfModalReturnFocus = trigger || null;
+  modal.classList.remove('hidden');
+  const close = document.getElementById('pdfModalClose');
+  if (close) close.focus();
+}
+
+function closePdfModal() {
+  const modal = document.getElementById('pdfModal');
+  if (!modal || modal.classList.contains('hidden')) return false;
+  modal.classList.add('hidden');
+  document.getElementById('pdfModalFrame').src = 'about:blank';
+  if (pdfModalReturnFocus && document.contains(pdfModalReturnFocus)) pdfModalReturnFocus.focus();
+  pdfModalReturnFocus = null;
+  return true;
+}
+
+// Barra interna de la materia: hasta 1024px es un drawer con overlay; en
+// escritorio el mismo par de botones la pliega y la vuelve a mostrar.
+function isSubjectNavDrawer() {
+  return window.matchMedia('(max-width: 1024px)').matches;
+}
+
+// Cierra el drawer sin mover el foco. Devuelve true si estaba abierto.
+function closeSubjectNavDrawer() {
+  const view = document.getElementById('materiaView');
+  const toggle = document.getElementById('subjectNavToggle');
+  if (!view || !view.classList.contains('subject-nav-open')) return false;
+  view.classList.remove('subject-nav-open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  return true;
+}
+
+function setupSubjectNav() {
+  const view = document.getElementById('materiaView');
+  const nav = document.getElementById('subjectNav');
+  const toggle = document.getElementById('subjectNavToggle');
+  const close = document.getElementById('subjectNavClose');
+  const backdrop = document.getElementById('subjectNavBackdrop');
+  if (!view || !nav || !toggle) return;
+
+  const show = () => {
+    if (isSubjectNavDrawer()) {
+      view.classList.add('subject-nav-open');
+    } else {
+      view.classList.remove('subject-nav-collapsed');
+    }
+    toggle.setAttribute('aria-expanded', 'true');
+    if (close) close.focus();
+  };
+  const hide = () => {
+    if (isSubjectNavDrawer()) {
+      closeSubjectNavDrawer();
+    } else {
+      view.classList.add('subject-nav-collapsed');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+    toggle.focus();
+  };
+
+  toggle.addEventListener('click', show);
+  if (close) close.addEventListener('click', hide);
+  if (backdrop) backdrop.addEventListener('click', hide);
+
+  // Mientras el drawer está abierto, Tab no sale de él.
+  nav.addEventListener('keydown', event => {
+    if (event.key !== 'Tab' || !view.classList.contains('subject-nav-open')) return;
+    const focusable = [...nav.querySelectorAll('button:not([disabled])')].filter(el => el.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (closePdfModal()) return;
+    if (view.classList.contains('subject-nav-open')) hide();
+  });
+
+  const pdfModal = document.getElementById('pdfModal');
+  const pdfModalClose = document.getElementById('pdfModalClose');
+  if (pdfModalClose) pdfModalClose.addEventListener('click', closePdfModal);
+  if (pdfModal) {
+    pdfModal.addEventListener('click', event => {
+      if (event.target === pdfModal) closePdfModal();
+    });
   }
 }
 
-// Mueve un ítem de contenido un lugar hacia arriba/abajo dentro de su unidad,
-// intercambiando su "position" con la del vecino (solo admin).
-async function moveContentItem(subject, unitId, itemId, direction) {
-  if (!isAdminView()) return;
-  const unit = subject.units.find(item => item.id === unitId);
-  if (!unit) return;
-  const index = unit.items.findIndex(item => item.id === itemId);
-  const swapIndex = index + direction;
-  if (index === -1 || swapIndex < 0 || swapIndex >= unit.items.length) return;
+// Cambia el nombre de un material (solo admin). Devuelve un mensaje de error,
+// o null si se guardó.
+async function renameContentItem(subject, itemId, title) {
+  if (!isAdminView()) return 'Solo los admins pueden cambiar el nombre.';
+  const item = subject.units.flatMap(unit => unit.items).find(entry => entry.id === itemId);
+  if (!item) return 'No se encontró el material.';
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from('subject_content_items').update({ title }).eq('id', itemId);
+    if (error) return 'No se pudo cambiar el nombre: ' + error.message;
+  }
+  item.title = title;
+  renderSubjectLists(subject);
+  return null;
+}
 
-  const current = unit.items[index];
-  const neighbor = unit.items[swapIndex];
-  const currentPosition = current.position;
-  const neighborPosition = neighbor.position;
-  current.position = neighborPosition;
-  neighbor.position = currentPosition;
-  unit.items[index] = neighbor;
-  unit.items[swapIndex] = current;
+// Mueve un material a otra unidad y/o a otro lugar entre los documentos de la
+// unidad (solo admin). targetIndex es el lugar entre los documentos de la
+// unidad destino sin contar al que se mueve. Los videos van al final de la
+// unidad: "Clases grabadas" se ordena sola por nombre. Las unidades tocadas
+// quedan con posiciones 0..n-1.
+async function organizeContentItem(subject, itemId, targetUnitId, targetIndex) {
+  if (!isAdminView()) return 'Solo los admins pueden organizar el contenido.';
+  const sourceUnit = subject.units.find(unit => unit.items.some(entry => entry.id === itemId));
+  const targetUnit = subject.units.find(unit => unit.id === targetUnitId);
+  if (!sourceUnit || !targetUnit) return 'No se encontró la unidad.';
+  const item = sourceUnit.items.find(entry => entry.id === itemId);
 
+  sourceUnit.items.splice(sourceUnit.items.indexOf(item), 1);
+  const before = item.type === 'video' ? null : unitDocuments(targetUnit)[targetIndex];
+  targetUnit.items.splice(before ? targetUnit.items.indexOf(before) : targetUnit.items.length, 0, item);
+
+  const changed = [];
+  new Set([sourceUnit, targetUnit]).forEach(unit => unit.items.forEach((entry, index) => {
+    if (entry.position !== index || entry === item) {
+      entry.position = index;
+      changed.push(entry);
+    }
+  }));
+  if (item.type !== 'video') state.currentUnitId = targetUnit.id;
   renderSubjectLists(subject);
 
-  if (supabaseClient) {
-    const [{ error: err1 }, { error: err2 }] = await Promise.all([
-      supabaseClient.from('subject_content_items').update({ position: current.position }).eq('id', current.id),
-      supabaseClient.from('subject_content_items').update({ position: neighbor.position }).eq('id', neighbor.id)
-    ]);
-    if (err1 || err2) console.error('No se pudo guardar el nuevo orden:', err1 || err2);
-  }
+  if (!supabaseClient) return null;
+  const results = await Promise.all(changed.map(entry => supabaseClient
+    .from('subject_content_items')
+    .update(entry === item ? { position: entry.position, unit_id: targetUnit.id } : { position: entry.position })
+    .eq('id', entry.id)));
+  const failed = results.find(result => result.error);
+  if (!failed) return null;
+  console.error('No se pudo guardar el nuevo orden:', failed.error);
+  return 'No se pudo guardar el cambio: ' + failed.error.message;
 }
 
 async function deleteContentItem(subject, unitId, itemId) {
@@ -2355,7 +4132,7 @@ async function deleteContentItem(subject, unitId, itemId) {
     await supabaseClient.storage.from('subject-content').remove([removed.storagePath]);
   }
   if (state.currentItemId === itemId) state.currentItemId = null;
-  state.confirmDeleteItemId = null;
+  if (state.currentRecordedId === itemId) state.currentRecordedId = null;
   if (supabaseClient) {
     const { error } = await supabaseClient.from('subject_content_items').delete().eq('id', itemId);
     if (error) console.error('No se pudo borrar el contenido:', error);
@@ -2486,12 +4263,16 @@ function summaryCard(subject, summary) {
     ? `<button type="button" class="icon-btn tiny-btn ghost-btn" data-delete-summary="${summary.id}" title="Eliminar resumen"><span class="icon icon-trash"></span></button>`
     : '';
   return `
-    <article class="item-card summary-card">
-      <div class="summary-card-head">
-        <a href="${summary.url}" target="_blank" rel="noopener"><strong>${summary.title}</strong></a>
+    <article class="material-card">
+      <span class="material-icon type-pdf"><span class="icon icon-file-text"></span></span>
+      <div class="material-info">
+        <strong>${summary.title}</strong>
+        <span>${['Por ' + summary.author, formatShortDate(summary.createdAt), summary.fileName].filter(Boolean).join(' · ')}</span>
+      </div>
+      <div class="material-actions">
+        <a class="download-link primary" href="${summary.url}" target="_blank" rel="noopener"><span class="icon icon-external-link"></span> Abrir</a>
         ${deleteBtn}
       </div>
-      <span>Por ${summary.author}${summary.fileName ? ` · ${summary.fileName}` : ''}</span>
     </article>
   `;
 }
@@ -2534,7 +4315,8 @@ function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // Convierte texto plano en HTML seguro, soportando negrita/cursiva y links en
@@ -2654,76 +4436,76 @@ async function deleteFaqItem(faqId) {
   renderFaqAdminList();
 }
 
-function buildSubjectExamCard(item) {
-  const timeLabel = item.startTime ? ` · ${item.startTime}` : '';
-  const adminControls = isAdminView()
-    ? `<button type="button" class="ghost-btn small-btn danger-btn" data-subject-exam-delete="${item.id}">Eliminar</button>`
-    : '';
-  return `<article class="item-card"><strong>${item.title}</strong><span>${item.date}${timeLabel}</span>${adminControls}</article>`;
-}
-
-function renderSubjectDates(subject) {
-  const target = document.getElementById('subjectDates');
-  if (!target) return;
-  const exams = state.data.calendar
-    .filter(event => event.type === 'Examen' && event.subjectId === subject.id)
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  target.innerHTML = exams.length
-    ? exams.map(buildSubjectExamCard).join('')
-    : createItemCard('Sin fechas de examen cargadas', 'Todavía no hay fechas de examen para esta materia.', '');
-}
-
 function renderSubjectLists(subject) {
   renderSubjectContent(subject);
-  renderSubjectDates(subject);
   renderList('subjectForum', subject.forum, item => createItemCard(item.author, 'Comentario en el foro', item.content));
   renderOpinions(subject);
   renderPolls(subject);
   renderSummaries(subject);
 }
 
+// Muestra una sección de la materia. "Contenido" y "Clases grabadas" comparten
+// el mismo panel (el área de materiales).
 function setSubjectTab(tab) {
-  document.querySelectorAll('.subject-tab').forEach(button => {
-    button.classList.toggle('active', button.dataset.subjectTab === tab);
+  state.subjectSection = tab;
+  const panelId = tab === 'grabadas' ? 'contenido' : tab;
+  document.querySelectorAll('[data-subject-panel]').forEach(panel => {
+    panel.classList.toggle('hidden', panel.dataset.subjectPanel !== panelId);
   });
-  document.querySelectorAll('.subject-panel').forEach(panel => {
-    panel.classList.toggle('hidden', panel.dataset.subjectPanel !== tab);
-  });
+  const contentAddCard = document.getElementById('subjectContentAdmin');
+  if (contentAddCard) contentAddCard.classList.toggle('hidden', !isAdminView() || panelId !== 'contenido');
+  const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
+  if (subject) renderSubjectContent(subject);
+  if (subject && tab === 'evaluaciones') renderExamsSection(subject);
 }
 
 function openSubject(subjectId) {
   const subject = state.data.subjects.find(item => item.id === subjectId);
   if (!subject) return;
+  if (!confirmLeaveExam()) return;
+  stopExamTimer();
+  state.examView = { mode: 'list', examId: null };
+  state.confirmDeleteExamId = null;
 
   state.currentSubjectId = subject.id;
-  state.currentUnitId = null;
+  state.currentUnitId = subject.units.length ? subject.units[0].id : null;
   state.currentItemId = null;
+  state.currentRecordedId = null;
+  state.subjectSection = 'contenido';
+  state.navGroupsOpen = { contenido: true, grabadas: false };
   state.opinionProfessorFilter = 'all';
   state.opinionStarFilter = 'all';
 
-  const year = document.getElementById('subjectYear');
   const title = document.getElementById('subjectTitle');
   const summary = document.getElementById('subjectSummary');
-  const contentAddCard = document.getElementById('subjectContentAdmin');
-  const examAddCard = document.getElementById('subjectExamAdmin');
+  const navTitle = document.getElementById('subjectNavTitle');
+  const mainTarget = document.getElementById('subjectContent');
 
-  if (year) year.textContent = `${subject.year}° año · ${subject.semester}° cuatrimestre`;
   if (title) title.textContent = subject.name;
-  if (summary && state.currentUser) {
-    const progress = getSubjectProgress(state.currentUser.email, subject.id);
-    summary.textContent = `Estado: ${progress.status} · Nota final: ${progress.grades.notaFinal || '-'} · Correlativas: ${correlativeCodes(subject)}`;
+  if (navTitle) navTitle.textContent = subject.name;
+  if (mainTarget) mainTarget.dataset.itemId = '';
+  closeSubjectNavDrawer();
+  if (summary) {
+    const chips = [
+      `<span class="materia-chip">#${subject.code}</span>`,
+      `<span class="materia-chip">${subject.year}° año</span>`,
+      `<span class="materia-chip">${subject.semester}° cuatrimestre</span>`
+    ];
+    if (state.currentUser) {
+      const progress = getSubjectProgress(state.currentUser.email, subject.id);
+      chips.push(`<span class="subject-status-badge ${STATUS_CLASSES[progress.status] || ''}">${progress.status}</span>`);
+      if (progress.grades.notaFinal) chips.push(`<span class="materia-chip">Nota final: ${progress.grades.notaFinal}</span>`);
+    }
+    chips.push(`<span class="materia-chip">${subject.correlatives.length ? `Correlativas: ${correlativeCodes(subject)}` : 'Sin correlativas'}</span>`);
+    summary.innerHTML = chips.join('');
   }
-  if (contentAddCard) contentAddCard.classList.toggle('hidden', !isAdminView());
-  if (examAddCard) examAddCard.classList.toggle('hidden', !isAdminView());
 
   renderSubjectLists(subject);
   refreshContentUnitSelect(subject);
   setSubjectTab('contenido');
 
   const backBtn = document.getElementById('backToMaterias');
-  if (backBtn) backBtn.onclick = () => openYear(subject.year);
+  if (backBtn) backBtn.onclick = () => { if (confirmLeaveExam()) openYear(subject.year); };
 
   setView('materia');
 }
@@ -2760,6 +4542,16 @@ function setView(view) {
 
   if (view === 'alumnos') loadStudentDirectory();
   if (view === 'faq') renderFaqList();
+}
+
+// "jUAN  pablo" → "Juan Pablo". También después de guion y apóstrofo
+// (Pérez-García, O'Connor). La base aplica la misma regla con initcap().
+function formatPersonName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('es')
+    .replace(/(^|[\s'’-])(\p{L})/gu, (match, sep, letter) => sep + letter.toLocaleUpperCase('es'));
 }
 
 function getFullName(user) {
@@ -2926,17 +4718,6 @@ function setupDrawerToggle({ layoutId, toggleId, closeId, backdropId, openClass,
       if (event.target.closest(autoCloseItemSelector)) setOpen(false);
     });
   }
-}
-
-function setupUnitsNavToggle() {
-  setupDrawerToggle({
-    layoutId: 'contentLayout',
-    toggleId: 'unitsNavToggle',
-    closeId: 'unitsNavClose',
-    backdropId: 'unitsNavBackdrop',
-    openClass: 'units-nav-open',
-    autoCloseItemSelector: '.unit-nav-item'
-  });
 }
 
 function setupCalendarNavToggle() {
@@ -3117,8 +4898,10 @@ function closeStudentProfile() {
 
 function attachPortalEvents() {
   setupSidebarToggle('portalScreen');
-  setupUnitsNavToggle();
   setupCalendarNavToggle();
+  setupSubjectNav();
+  setupContentCards();
+  setupExamEvents();
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
   const logoutBtn = document.getElementById('logoutBtn');
@@ -3217,7 +5000,8 @@ function attachPortalEvents() {
     registerForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!supabaseClient) return;
-      const name = document.getElementById('registerName').value.trim();
+      const name = formatPersonName(document.getElementById('registerName').value);
+      const lastName = formatPersonName(document.getElementById('registerLastName').value);
       const email = document.getElementById('registerEmail').value.trim();
       const password = document.getElementById('registerPassword').value.trim();
       const passwordConfirm = document.getElementById('registerPasswordConfirm').value.trim();
@@ -3236,7 +5020,7 @@ function attachPortalEvents() {
       const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
-        options: { data: { name } }
+        options: { data: { name, last_name: lastName } }
       });
 
       if (submitBtn) submitBtn.textContent = 'Crear cuenta';
@@ -3902,10 +5686,6 @@ function attachPortalEvents() {
   const pollForm = document.getElementById('pollForm');
   const MAX_FILE_SIZE = 15 * 1024 * 1024;
 
-  document.querySelectorAll('.subject-tab').forEach(button => {
-    button.addEventListener('click', () => setSubjectTab(button.dataset.subjectTab));
-  });
-
   if (contentTypeSelect) {
     contentTypeSelect.addEventListener('change', () => {
       const type = contentTypeSelect.value;
@@ -4106,8 +5886,10 @@ function attachPortalEvents() {
 
         const newItem = mapContentItemRow(data);
         unit.items.push(newItem);
-        state.currentItemId = newItem.id;
+        state.currentRecordedId = newItem.id;
+        state.navGroupsOpen.grabadas = true;
         renderSubjectLists(subject);
+        setSubjectTab('grabadas');
         contentItemForm.reset();
         document.getElementById('contentFileInput').classList.remove('hidden');
         document.getElementById('contentVideoWrapper').classList.add('hidden');
@@ -4211,35 +5993,6 @@ function attachPortalEvents() {
       subject.forum.unshift({ id: data.id, author: data.author_name, authorId: data.author_id, content: data.content });
       renderSubjectLists(subject);
       subjectForumForm.reset();
-    });
-  }
-
-  const subjectExamForm = document.getElementById('subjectExamForm');
-  if (subjectExamForm) {
-    subjectExamForm.addEventListener('submit', async event => {
-      event.preventDefault();
-      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
-      if (!subject || !isAdminView()) return;
-
-      const title = document.getElementById('subjectExamTitle').value.trim() || `Examen · ${subject.name}`;
-      const date = document.getElementById('subjectExamDate').value;
-      const startTime = document.getElementById('subjectExamTime').value;
-      if (!date) return;
-
-      await createCalendarEvent({ title, date, type: 'Examen', endDate: '', startTime, endTime: '', subjectId: subject.id });
-      subjectExamForm.reset();
-      renderSubjectDates(subject);
-    });
-  }
-
-  const subjectDatesEl = document.getElementById('subjectDates');
-  if (subjectDatesEl) {
-    subjectDatesEl.addEventListener('click', event => {
-      const deleteBtn = event.target.closest('[data-subject-exam-delete]');
-      if (!deleteBtn || !isAdminView()) return;
-      const subject = state.data.subjects.find(item => item.id === state.currentSubjectId);
-      if (!subject) return;
-      deleteCalendarEvent(deleteBtn.dataset.subjectExamDelete).then(() => renderSubjectDates(subject));
     });
   }
 
@@ -4438,6 +6191,7 @@ async function loadAndRenderAdminUsers() {
   const { data, error } = await supabaseClient
     .from('profiles')
     .select('*')
+    .order('last_name', { nullsFirst: true })
     .order('name');
 
   if (error) {
@@ -4487,25 +6241,27 @@ function renderAdminUsersTable(users) {
     const selfAttrs = isSelf ? 'disabled title="No podés aplicarte esta acción a vos mismo"' : '';
     return `
       <tr data-user-id="${profile.id}">
-        <td>${profile.name}</td>
+        <td data-cell="name">${escapeHtml(profile.name || '')}</td>
+        <td data-cell="last-name">${escapeHtml(profile.last_name || '')}</td>
         <td>${profile.email}</td>
         <td><span class="subject-status-badge ${isAdmin ? 'status-aprobada' : 'status-cursable'}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
         <td>${profile.email_verified ? 'Verificado' : 'Pendiente'}${isBanned ? ' · <span class="subject-status-badge status-no-cursable">Suspendido</span>' : ''}</td>
         <td class="stack-row">
+          <button type="button" class="ghost-btn small-btn" data-edit-name="${profile.id}">Editar nombre</button>
           <button type="button" class="ghost-btn small-btn" data-toggle-role="${profile.id}" data-current-role="${profile.role}" ${selfAttrs}>${toggleLabel}</button>
           <button type="button" class="ghost-btn small-btn" data-toggle-ban="${profile.id}" data-current-banned="${isBanned}" ${selfAttrs}>${isBanned ? 'Desbanear' : 'Banear'}</button>
-          <button type="button" class="ghost-btn small-btn" data-reset-password="${profile.id}" data-email="${profile.email}" data-name="${profile.name}">Cambiar contraseña</button>
-          <button type="button" class="ghost-btn small-btn danger-btn" data-delete-user="${profile.id}" data-name="${profile.name}" ${selfAttrs}>Eliminar</button>
+          <button type="button" class="ghost-btn small-btn" data-reset-password="${profile.id}" data-email="${profile.email}" data-name="${escapeHtml(profile.name || '')}">Cambiar contraseña</button>
+          <button type="button" class="ghost-btn small-btn danger-btn" data-delete-user="${profile.id}" data-name="${escapeHtml([profile.name, profile.last_name].filter(Boolean).join(' '))}" ${selfAttrs}>Eliminar</button>
         </td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="5" class="table-empty">Todavía no hay usuarios registrados.</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="table-empty">Todavía no hay usuarios registrados.</td></tr>';
 
   target.innerHTML = `
     <div class="table-scroll">
       <table class="admin-table">
         <thead>
-          <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Correo verificado</th><th>Acciones</th></tr>
+          <tr><th>Nombre/s</th><th>Apellido/s</th><th>Correo</th><th>Rol</th><th>Correo verificado</th><th>Acciones</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -4532,6 +6288,58 @@ function renderAdminUsersTable(users) {
       }
       setNotice('Rol actualizado.', false);
       loadAndRenderAdminUsers();
+    });
+  });
+
+  target.querySelectorAll('[data-edit-name]').forEach(button => {
+    button.addEventListener('click', () => {
+      const userId = button.dataset.editName;
+      const profile = users.find(item => item.id === userId);
+      const row = button.closest('tr');
+      if (!profile || !row || row.querySelector('[data-name-input]')) return;
+      const nameCell = row.querySelector('[data-cell="name"]');
+      const lastNameCell = row.querySelector('[data-cell="last-name"]');
+      nameCell.innerHTML = `<input type="text" class="admin-name-input" data-name-input aria-label="Nombre/s" value="${escapeHtml(profile.name || '')}" />`;
+      lastNameCell.innerHTML = `
+        <input type="text" class="admin-name-input" aria-label="Apellido/s" value="${escapeHtml(profile.last_name || '')}" />
+        <div class="stack-row admin-name-actions">
+          <button type="button" class="small-btn" data-save-name>Guardar</button>
+          <button type="button" class="ghost-btn small-btn" data-cancel-name>Cancelar</button>
+        </div>
+      `;
+      const nameInput = nameCell.querySelector('input');
+      const lastNameInput = lastNameCell.querySelector('input');
+      const saveBtn = lastNameCell.querySelector('[data-save-name]');
+      const cancel = () => renderAdminUsersTable(users);
+      nameInput.focus();
+
+      const save = async () => {
+        const name = formatPersonName(nameInput.value);
+        const lastName = formatPersonName(lastNameInput.value);
+        if (!name || !lastName) {
+          setNotice('Completá nombre y apellido.', true);
+          return;
+        }
+        saveBtn.disabled = true;
+        const { error } = await supabaseClient
+          .from('profiles')
+          .update({ name, last_name: lastName, avatar: name.charAt(0).toUpperCase() })
+          .eq('id', userId);
+        if (error) {
+          setNotice('No se pudo actualizar el nombre: ' + error.message, true);
+          saveBtn.disabled = false;
+          return;
+        }
+        setNotice('Nombre actualizado.', false);
+        loadAndRenderAdminUsers();
+      };
+
+      saveBtn.addEventListener('click', save);
+      lastNameCell.querySelector('[data-cancel-name]').addEventListener('click', cancel);
+      [nameInput, lastNameInput].forEach(input => input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') save();
+        if (event.key === 'Escape') cancel();
+      }));
     });
   });
 
@@ -5466,7 +7274,7 @@ function attachAdminEvents() {
           id, code, year, semester, name, hours, modality, libre, examFinal,
           correlatives: correlativeIds,
           anySemester,
-          units: [], dates: [], forum: [], opinions: [], polls: []
+          units: [], dates: [], forum: [], opinions: [], polls: [], exams: []
         });
       }
 
@@ -5590,19 +7398,6 @@ function initAdminPage() {
 document.addEventListener('click', event => {
   if (event.target.closest('#profilePillBtn')) {
     window.location.href = 'user.html';
-  }
-});
-
-document.addEventListener('click', event => {
-  const btn = event.target.closest('[data-pdf-fullscreen]');
-  if (!btn) return;
-  const frame = document.getElementById('pdfPreviewFrame');
-  if (!frame) return;
-  const isVisible = frame.offsetParent !== null;
-  if (isVisible && frame.requestFullscreen) {
-    frame.requestFullscreen().catch(() => window.open(frame.src, '_blank'));
-  } else {
-    window.open(frame.src, '_blank');
   }
 });
 
@@ -5747,8 +7542,8 @@ function attachUserPageEvents() {
     accountForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!supabaseClient || !state.currentUser) return;
-      const name = document.getElementById('accountName').value.trim();
-      const lastName = document.getElementById('accountLastName').value.trim();
+      const name = formatPersonName(document.getElementById('accountName').value);
+      const lastName = formatPersonName(document.getElementById('accountLastName').value);
       const birthDate = document.getElementById('accountBirthDate').value;
       const submitBtn = accountForm.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
@@ -5774,6 +7569,8 @@ function attachUserPageEvents() {
         accountNotice.className = 'notice show';
         accountNotice.textContent = 'Datos actualizados.';
       }
+      document.getElementById('accountName').value = name;
+      document.getElementById('accountLastName').value = lastName;
       state.currentUser.name = name;
       state.currentUser.lastName = lastName;
       state.currentUser.birthDate = birthDate;
